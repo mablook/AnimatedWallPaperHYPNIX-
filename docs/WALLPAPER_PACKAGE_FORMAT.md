@@ -129,7 +129,6 @@ The first enabled downloaded type is `native-preset`. It selects an internal ren
 `rendererId` and may contain JSON plus PNG/JPEG/WebP assets only. Current renderer IDs:
 
 - `hypnix.visualizer.classic.v1`: available.
-- `hypnix.visualizer.flame.v1`: available.
 - `hypnix.flame-fluid.v1`: recognized and reserved, but unavailable until the Direct3D renderer ships.
 
 ```json

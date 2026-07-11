@@ -350,6 +350,19 @@ LivePaper currently supports only one display and uses the classic WorkerW path,
     Never stretch one image across the combined virtual desktop when monitor aspect ratios differ.
 33. Renderer variants may share one WASAPI/FFT pipeline while remaining separate wallpaper choices. The classic
     bars and reactive flames have independent render modes, backgrounds, previews, and package manifests.
+34. Premium audio states must be derived from semantic frequency ranges rather than total volume: silence drives
+    ember breathing, low bands drive radial impact, high bands drive cyan jets/sparks, and simultaneous spectral
+    spread drives the harmonic vortex. Blend weights continuously; never switch scenes abruptly.
+35. A technically valid procedural shader is not automatically premium. The rejected Aethelis prototype proved
+    that bright rings, square hash particles, and analytic glow can compile and run at 60 FPS while still missing
+    the approved glass/liquid/plasma art direction. Never ship or add a premium renderer to the gallery before
+    side-by-side frame review against its storyboard.
+36. Premium visual work must use an isolated prototype and explicit visual gates: silhouette, material response,
+    particle shape, exposure, palette, motion, silence state, bass state, high-frequency state, and climax state.
+    Only after still frames and motion are manually approved may the renderer be connected to the desktop host.
+37. Do not describe mathematical hash particles as fluid simulation or billions of particles. Product language
+    must match the actual renderer. A future Aethelis attempt needs a genuine multipass fluid/particle pipeline,
+    temporal buffers, bloom, and depth layers, or a deliberately pre-rendered high-quality alternative.
 
 ## Recommended next steps
 

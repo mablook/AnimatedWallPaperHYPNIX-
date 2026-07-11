@@ -4,6 +4,5 @@ internal enum WallpaperKind
 {
     BuiltIn,
     VisualizerDemo,
-    FlameVisualizer,
     ExampleVideo
 }

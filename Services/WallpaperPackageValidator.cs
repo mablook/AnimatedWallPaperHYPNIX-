@@ -11,8 +11,7 @@ internal static partial class WallpaperPackageValidator
     private const long MaximumManifestBytes = 64L * 1024;
     private static readonly HashSet<string> SupportedRenderers = new(StringComparer.OrdinalIgnoreCase)
     {
-        "hypnix.visualizer.classic.v1",
-        "hypnix.visualizer.flame.v1"
+        "hypnix.visualizer.classic.v1"
     };
     private static readonly HashSet<string> KnownFutureRenderers = new(StringComparer.OrdinalIgnoreCase)
     {

@@ -18,7 +18,6 @@ internal sealed class WallpaperController : IDisposable
         _session = kind switch
         {
             WallpaperKind.VisualizerDemo => new WallpaperSession(framesPerSecond, NativeRenderMode.VisualizerDemo),
-            WallpaperKind.FlameVisualizer => new WallpaperSession(framesPerSecond, NativeRenderMode.FlameVisualizer),
             WallpaperKind.ExampleVideo when !string.IsNullOrWhiteSpace(videoPath) => new VideoWallpaperSession(videoPath),
             WallpaperKind.ExampleVideo => throw new InvalidOperationException("The example video path is missing."),
             _ => new WallpaperSession(framesPerSecond, NativeRenderMode.Ambient)

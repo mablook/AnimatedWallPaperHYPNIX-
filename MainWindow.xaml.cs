@@ -254,8 +254,7 @@ public partial class MainWindow : Window
     private WallpaperKind GetSelectedWallpaperKind() => WallpaperComboBox.SelectedIndex switch
     {
         1 => WallpaperKind.VisualizerDemo,
-        2 => WallpaperKind.FlameVisualizer,
-        3 => WallpaperKind.ExampleVideo,
+        2 => WallpaperKind.ExampleVideo,
         _ => WallpaperKind.BuiltIn
     };
 
@@ -276,7 +275,7 @@ public partial class MainWindow : Window
 
     private void UpdateVisualizerSettingsVisibility()
     {
-        var isVisualizer = GetSelectedWallpaperKind() is WallpaperKind.VisualizerDemo or WallpaperKind.FlameVisualizer;
+        var isVisualizer = GetSelectedWallpaperKind() == WallpaperKind.VisualizerDemo;
         VisualizerSettingsButton.Visibility = isVisualizer ? Visibility.Visible : Visibility.Collapsed;
         if (!isVisualizer) VisualizerSettingsPopup.IsOpen = false;
         UpdateWallpaperSelectionVisuals();
@@ -286,33 +285,27 @@ public partial class MainWindow : Window
 
     private void VisualizerCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 1;
 
-    private void FlameVisualizerCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 2;
-
-    private void VideoCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 3;
+    private void VideoCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 2;
 
     private void UpdateWallpaperSelectionVisuals()
     {
-        if (AmbientCardBorder is null || VisualizerCardBorder is null ||
-            FlameVisualizerCardBorder is null || VideoCardBorder is null) return;
+        if (AmbientCardBorder is null || VisualizerCardBorder is null || VideoCardBorder is null) return;
         var accent = (System.Windows.Media.Brush)FindResource("AccentBrush");
         var transparent = System.Windows.Media.Brushes.Transparent;
         AmbientCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 0 ? accent : transparent;
         VisualizerCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 1 ? accent : transparent;
-        FlameVisualizerCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 2 ? accent : transparent;
-        VideoCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 3 ? accent : transparent;
+        VideoCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 2 ? accent : transparent;
 
         (ActivePreviewTitle.Text, ActivePreviewSubtitle.Text) = WallpaperComboBox.SelectedIndex switch
         {
             1 => ("Audio visualizer", "WASAPI loopback · 64 FFT bands · two displays"),
-            2 => ("Flame visualizer", "Audio-reactive flames · independent per display"),
-            3 => ("Example MP4", "Local video · per-display aspect correction"),
+            2 => ("Example MP4", "Local video · per-display aspect correction"),
             _ => ("Built-in ambient", "Native procedural wallpaper")
         };
         var previewPath = WallpaperComboBox.SelectedIndex switch
         {
             1 => "Assets/Wallpapers/audio-visualizer-classic/preview.png",
-            2 => "Assets/Wallpapers/flame-visualizer/preview.png",
-            3 => "Assets/Wallpapers/example-video/preview.jpg",
+            2 => "Assets/Wallpapers/example-video/preview.jpg",
             _ => "Assets/Wallpapers/built-in-ambient/preview.jpg"
         };
         SelectedPreviewImage.Source = new BitmapImage(new Uri($"pack://application:,,,/{previewPath}"));
@@ -323,7 +316,7 @@ public partial class MainWindow : Window
 
     private void ApplyVisualizerSettings()
     {
-        if (GetSelectedWallpaperKind() is not (WallpaperKind.VisualizerDemo or WallpaperKind.FlameVisualizer)) return;
+        if (GetSelectedWallpaperKind() != WallpaperKind.VisualizerDemo) return;
         var (startColor, endColor) = VisualizerColorComboBox.SelectedIndex switch
         {
             1 => (System.Drawing.Color.FromArgb(255, 82, 120), System.Drawing.Color.FromArgb(255, 185, 70)),

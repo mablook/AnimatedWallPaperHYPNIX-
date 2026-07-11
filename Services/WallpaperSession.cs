@@ -11,7 +11,7 @@ internal sealed class WallpaperSession : IWallpaperSession
         try
         {
             _host = new NativeWallpaperHost(renderMode, DesktopWorker.GetMonitorTargets());
-            if (renderMode is NativeRenderMode.VisualizerDemo or NativeRenderMode.FlameVisualizer)
+            if (renderMode == NativeRenderMode.VisualizerDemo)
             {
                 _audioSpectrum = new AudioSpectrumService();
                 _audioSpectrum.BandsAvailable += _host.SubmitAudioBands;

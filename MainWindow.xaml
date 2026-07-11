@@ -130,18 +130,6 @@
                                     </Grid>
                                 </Border>
                             </Button>
-                            <Button Style="{StaticResource WallpaperCardStyle}" Click="FlameVisualizerCard_Click">
-                                <Border x:Name="FlameVisualizerCardBorder" CornerRadius="8" BorderThickness="2"
-                                        BorderBrush="Transparent" Background="#24100A">
-                                    <Grid>
-                                        <Image Source="Assets/Wallpapers/flame-visualizer/preview.png"
-                                               Stretch="UniformToFill"/>
-                                        <Rectangle Fill="#38000000"/>
-                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
-                                                   Text="Flame visualizer"/>
-                                    </Grid>
-                                </Border>
-                            </Button>
                             <Button Style="{StaticResource WallpaperCardStyle}" Click="VideoCard_Click">
                                 <Border x:Name="VideoCardBorder" CornerRadius="8" BorderThickness="2"
                                         BorderBrush="Transparent" Background="#201416">
@@ -220,7 +208,6 @@
                   SelectionChanged="WallpaperComboBox_SelectionChanged">
             <ComboBoxItem Content="Built-in ambient" IsSelected="True"/>
             <ComboBoxItem Content="Visualizer demo"/>
-            <ComboBoxItem Content="Flame visualizer"/>
             <ComboBoxItem Content="Example MP4"/>
         </ComboBox>
 

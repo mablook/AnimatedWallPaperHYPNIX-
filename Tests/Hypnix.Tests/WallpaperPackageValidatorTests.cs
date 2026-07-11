@@ -7,7 +7,7 @@ public sealed class WallpaperPackageValidatorTests
     [Fact]
     public void ValidKnownNativePresetIsReady()
     {
-        using var package = TestPackage.Create("safe-preset", "hypnix.visualizer.flame.v1");
+        using var package = TestPackage.Create("safe-preset", "hypnix.visualizer.classic.v1");
 
         var result = WallpaperPackageValidator.Validate(package.DirectoryPath);
 

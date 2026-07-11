@@ -9,7 +9,6 @@ public sealed class AssetContractTests
 
     [Theory]
     [InlineData("audio-visualizer-classic")]
-    [InlineData("flame-visualizer")]
     public void VisualizerPackageDeclaresExistingBackgroundAndPreview(string packageName)
     {
         var folder = Path.Combine(RepositoryRoot, "Assets", "Wallpapers", packageName);
@@ -53,12 +52,14 @@ public sealed class AssetContractTests
     }
 
     [Fact]
-    public void UiKeepsBothVisualizerOptionsAndExpectedIntensityCeiling()
+    public void UiKeepsOnlyApprovedVisualizerAndExpectedIntensityCeiling()
     {
         var xaml = File.ReadAllText(Path.Combine(RepositoryRoot, "MainWindow.xaml"));
 
-        Assert.Contains("Flame visualizer", xaml);
         Assert.Contains("Visualizer demo", xaml);
+        Assert.DoesNotContain("Flame visualizer", xaml);
+        Assert.DoesNotContain("Premium living flame", xaml);
+        Assert.DoesNotContain("Aethelis GPU visualizer", xaml);
         Assert.Contains("Maximum=\"2.7\"", xaml);
         Assert.Contains("Content=\"60 FPS\"", xaml);
     }
