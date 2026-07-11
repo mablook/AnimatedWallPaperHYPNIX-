@@ -1,0 +1,8 @@
+{
+  "id": "audio-visualizer",
+  "title": "Audio visualizer",
+  "type": "native-audio-reactive",
+  "preview": "preview.jpg",
+  "previewKind": "example",
+  "audioReactive": true
+}

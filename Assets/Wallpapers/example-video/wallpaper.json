@@ -1,0 +1,8 @@
+{
+  "id": "example-video",
+  "title": "Example MP4",
+  "type": "video",
+  "preview": "preview.jpg",
+  "previewKind": "extracted-frame",
+  "audioReactive": false
+}

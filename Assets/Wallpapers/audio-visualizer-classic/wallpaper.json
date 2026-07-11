@@ -1,0 +1,11 @@
+{
+  "id": "audio-visualizer-classic",
+  "title": "Audio Visualizer",
+  "type": "native-audio-visualizer",
+  "renderer": "classic-bars",
+  "background": "background.png",
+  "preview": "preview.png",
+  "previewKind": "generated-example",
+  "audio": "wasapi-loopback",
+  "multiMonitor": "independent-cover"
+}

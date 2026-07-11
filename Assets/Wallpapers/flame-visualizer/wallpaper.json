@@ -1,0 +1,11 @@
+{
+  "id": "flame-visualizer",
+  "title": "Flame Visualizer",
+  "type": "native-audio-visualizer",
+  "renderer": "reactive-flames",
+  "background": "background.png",
+  "preview": "preview.png",
+  "previewKind": "generated-example",
+  "audio": "wasapi-loopback",
+  "multiMonitor": "independent-cover"
+}

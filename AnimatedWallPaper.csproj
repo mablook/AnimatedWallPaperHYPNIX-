@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>HYPNIX</AssemblyName>
+    <RootNamespace>AnimatedWallPaper</RootNamespace>
+    <ApplicationIcon>Assets\Brand\hypnix-v2.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
+    <PackageReference Include="NAudio" Version="2.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Brand\hypnix-icon.png" />
+    <Resource Include="Assets\Brand\hypnix-icon-v2.png" />
+    <Resource Include="Assets\Brand\hypnix-tray-white.png" />
+    <Resource Include="Assets\Wallpapers\**\preview.jpg" />
+    <Resource Include="Assets\Wallpapers\**\preview.png" />
+    <Content Include="Assets\Brand\hypnix.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Brand\hypnix-v2.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Brand\hypnix-tray-white.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Wallpapers\**\wallpaper.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Wallpapers\**\background.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
