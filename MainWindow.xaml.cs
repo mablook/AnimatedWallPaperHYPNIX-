@@ -254,7 +254,11 @@ public partial class MainWindow : Window
     private WallpaperKind GetSelectedWallpaperKind() => WallpaperComboBox.SelectedIndex switch
     {
         1 => WallpaperKind.VisualizerDemo,
-        2 => WallpaperKind.ExampleVideo,
+        2 => WallpaperKind.AethelisVisualizer,
+        3 => WallpaperKind.AethelisFlameBurst,
+        4 => WallpaperKind.FlamethrowerRingV2,
+        5 => WallpaperKind.VolumetricFire,
+        6 => WallpaperKind.ExampleVideo,
         _ => WallpaperKind.BuiltIn
     };
 
@@ -275,7 +279,8 @@ public partial class MainWindow : Window
 
     private void UpdateVisualizerSettingsVisibility()
     {
-        var isVisualizer = GetSelectedWallpaperKind() == WallpaperKind.VisualizerDemo;
+        var isVisualizer = GetSelectedWallpaperKind() is WallpaperKind.VisualizerDemo or
+            WallpaperKind.AethelisVisualizer or WallpaperKind.AethelisFlameBurst or WallpaperKind.FlamethrowerRingV2 or WallpaperKind.VolumetricFire;
         VisualizerSettingsButton.Visibility = isVisualizer ? Visibility.Visible : Visibility.Collapsed;
         if (!isVisualizer) VisualizerSettingsPopup.IsOpen = false;
         UpdateWallpaperSelectionVisuals();
@@ -285,27 +290,64 @@ public partial class MainWindow : Window
 
     private void VisualizerCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 1;
 
-    private void VideoCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 2;
+    private void AethelisCard_Click(object sender, RoutedEventArgs e)
+    {
+        FpsComboBox.SelectedIndex = 2;
+        WallpaperComboBox.SelectedIndex = 2;
+    }
+
+    private void FlameBurstCard_Click(object sender, RoutedEventArgs e)
+    {
+        FpsComboBox.SelectedIndex = 2;
+        WallpaperComboBox.SelectedIndex = 3;
+    }
+
+    private void FlamethrowerCard_Click(object sender, RoutedEventArgs e)
+    {
+        FpsComboBox.SelectedIndex = 2;
+        WallpaperComboBox.SelectedIndex = 4;
+    }
+
+    private void VolumetricFireCard_Click(object sender, RoutedEventArgs e)
+    {
+        FpsComboBox.SelectedIndex = 2;
+        WallpaperComboBox.SelectedIndex = 5;
+    }
+
+    private void VideoCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 6;
 
     private void UpdateWallpaperSelectionVisuals()
     {
-        if (AmbientCardBorder is null || VisualizerCardBorder is null || VideoCardBorder is null) return;
+        if (AmbientCardBorder is null || VisualizerCardBorder is null || AethelisCardBorder is null ||
+            FlameBurstCardBorder is null || FlamethrowerCardBorder is null || VolumetricFireCardBorder is null || VideoCardBorder is null) return;
         var accent = (System.Windows.Media.Brush)FindResource("AccentBrush");
         var transparent = System.Windows.Media.Brushes.Transparent;
         AmbientCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 0 ? accent : transparent;
         VisualizerCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 1 ? accent : transparent;
-        VideoCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 2 ? accent : transparent;
+        AethelisCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 2 ? accent : transparent;
+        FlameBurstCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 3 ? accent : transparent;
+        FlamethrowerCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 4 ? accent : transparent;
+        VolumetricFireCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 5 ? accent : transparent;
+        VideoCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 6 ? accent : transparent;
 
         (ActivePreviewTitle.Text, ActivePreviewSubtitle.Text) = WallpaperComboBox.SelectedIndex switch
         {
             1 => ("Audio visualizer", "WASAPI loopback · 64 FFT bands · two displays"),
-            2 => ("Example MP4", "Local video · per-display aspect correction"),
+            2 => ("Aethelis Audio Reactive", "Bass impact · mid turbulence · high-frequency particles"),
+            3 => ("Fire Burst Experimental", "Approved fire ring · detached bass-driven flames"),
+            4 => ("Flamethrower Ring V2", "EmberGen volumetric jet · 64-frame reactive flipbook"),
+            5 => ("Volumetric Fire 3D Prototype", "Persistent voxel volume · 64-slice ray marching · no flipbooks"),
+            6 => ("Example MP4", "Local video · per-display aspect correction"),
             _ => ("Built-in ambient", "Native procedural wallpaper")
         };
         var previewPath = WallpaperComboBox.SelectedIndex switch
         {
             1 => "Assets/Wallpapers/audio-visualizer-classic/preview.png",
-            2 => "Assets/Wallpapers/example-video/preview.jpg",
+            2 => "Assets/Wallpapers/aethelis-audio-visualizer/preview.png",
+            3 => "Assets/Wallpapers/aethelis-audio-visualizer/preview.png",
+            4 => "Assets/Wallpapers/aethelis-audio-visualizer/preview.png",
+            5 => "Assets/Wallpapers/aethelis-audio-visualizer/preview.png",
+            6 => "Assets/Wallpapers/example-video/preview.jpg",
             _ => "Assets/Wallpapers/built-in-ambient/preview.jpg"
         };
         SelectedPreviewImage.Source = new BitmapImage(new Uri($"pack://application:,,,/{previewPath}"));
@@ -316,7 +358,8 @@ public partial class MainWindow : Window
 
     private void ApplyVisualizerSettings()
     {
-        if (GetSelectedWallpaperKind() != WallpaperKind.VisualizerDemo) return;
+        if (GetSelectedWallpaperKind() is not (WallpaperKind.VisualizerDemo or WallpaperKind.AethelisVisualizer or
+            WallpaperKind.AethelisFlameBurst or WallpaperKind.FlamethrowerRingV2 or WallpaperKind.VolumetricFire)) return;
         var (startColor, endColor) = VisualizerColorComboBox.SelectedIndex switch
         {
             1 => (System.Drawing.Color.FromArgb(255, 82, 120), System.Drawing.Color.FromArgb(255, 185, 70)),

@@ -1,0 +1,11 @@
+{
+  "id": "aethelis-audio-visualizer",
+  "title": "Aethelis Audio Reactive",
+  "type": "native-audio-visualizer",
+  "renderer": "aethelis-state-mixer-v1",
+  "background": "background.png",
+  "preview": "preview.png",
+  "previewKind": "generated-example",
+  "audio": "wasapi-loopback",
+  "multiMonitor": "independent-cover"
+}

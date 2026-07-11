@@ -130,6 +130,54 @@
                                     </Grid>
                                 </Border>
                             </Button>
+                            <Button Style="{StaticResource WallpaperCardStyle}" Click="AethelisCard_Click">
+                                <Border x:Name="AethelisCardBorder" CornerRadius="8" BorderThickness="2"
+                                        BorderBrush="Transparent" Background="#120B16">
+                                    <Grid>
+                                        <Image Source="Assets/Wallpapers/aethelis-audio-visualizer/preview.png"
+                                               Stretch="UniformToFill"/>
+                                        <Rectangle Fill="#33000000"/>
+                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
+                                                   Text="Aethelis reactive"/>
+                                    </Grid>
+                                </Border>
+                            </Button>
+                            <Button Style="{StaticResource WallpaperCardStyle}" Click="FlameBurstCard_Click">
+                                <Border x:Name="FlameBurstCardBorder" CornerRadius="8" BorderThickness="2"
+                                        BorderBrush="Transparent" Background="#1A0905">
+                                    <Grid>
+                                        <Image Source="Assets/Wallpapers/aethelis-audio-visualizer/preview.png"
+                                               Stretch="UniformToFill"/>
+                                        <Rectangle Fill="#33000000"/>
+                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
+                                                   Text="Fire Burst experimental"/>
+                                    </Grid>
+                                </Border>
+                            </Button>
+                            <Button Style="{StaticResource WallpaperCardStyle}" Click="FlamethrowerCard_Click">
+                                <Border x:Name="FlamethrowerCardBorder" CornerRadius="8" BorderThickness="2"
+                                        BorderBrush="Transparent" Background="#1D0B04">
+                                    <Grid>
+                                        <Image Source="Assets/Wallpapers/aethelis-audio-visualizer/preview.png"
+                                               Stretch="UniformToFill"/>
+                                        <Rectangle Fill="#33000000"/>
+                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
+                                                   Text="Flamethrower Ring V2"/>
+                                    </Grid>
+                                </Border>
+                            </Button>
+                            <Button Visibility="Collapsed" Style="{StaticResource WallpaperCardStyle}" Click="VolumetricFireCard_Click">
+                                <Border x:Name="VolumetricFireCardBorder" CornerRadius="8" BorderThickness="2"
+                                        BorderBrush="Transparent" Background="#160603">
+                                    <Grid>
+                                        <Image Source="Assets/Wallpapers/aethelis-audio-visualizer/preview.png"
+                                               Stretch="UniformToFill"/>
+                                        <Rectangle Fill="#52000000"/>
+                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
+                                                   Text="Volumetric Fire 3D Prototype"/>
+                                    </Grid>
+                                </Border>
+                            </Button>
                             <Button Style="{StaticResource WallpaperCardStyle}" Click="VideoCard_Click">
                                 <Border x:Name="VideoCardBorder" CornerRadius="8" BorderThickness="2"
                                         BorderBrush="Transparent" Background="#201416">
@@ -208,6 +256,10 @@
                   SelectionChanged="WallpaperComboBox_SelectionChanged">
             <ComboBoxItem Content="Built-in ambient" IsSelected="True"/>
             <ComboBoxItem Content="Visualizer demo"/>
+            <ComboBoxItem Content="Aethelis Audio Reactive"/>
+            <ComboBoxItem Content="Fire Burst Experimental"/>
+            <ComboBoxItem Content="Flamethrower Ring V2"/>
+            <ComboBoxItem Content="Volumetric Fire 3D Prototype"/>
             <ComboBoxItem Content="Example MP4"/>
         </ComboBox>
 

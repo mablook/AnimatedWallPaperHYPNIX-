@@ -123,3 +123,11 @@ Run before releases and Store submissions:
 - Test multiple monitor shapes, not only current physical resolutions.
 - Extend asset-contract coverage whenever a wallpaper type gains required files.
 - Assert the state or geometry that prevents the visible defect, not merely that a method returned successfully.
+# Volumetric fire research gate
+
+The rejected volumetric prototypes are documented in
+[`VOLUMETRIC_FIRE_RESEARCH.md`](VOLUMETRIC_FIRE_RESEARCH.md). The experimental
+card must remain collapsed in production-facing UI until a new implementation
+passes visual review against `docs/assets/volumetric-fire-approved-target.png`.
+Compilation, nonzero GPU buffers and smooth animation are necessary but are not
+visual acceptance criteria.

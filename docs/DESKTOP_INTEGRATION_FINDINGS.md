@@ -359,6 +359,35 @@ LivePaper currently supports only one display and uses the classic WorkerW path,
     side-by-side frame review against its storyboard.
 36. Premium visual work must use an isolated prototype and explicit visual gates: silhouette, material response,
     particle shape, exposure, palette, motion, silence state, bass state, high-frequency state, and climax state.
+
+## Effekseer and GPU visualizer findings
+
+The first Direct3D 11 Aethelis experiments established several additional rules:
+
+1. A powerful GPU does not improve an under-designed effect. The initial full-screen pixel shader was fast, but
+   visually sparse because it approximated particles and fluid with analytic loops rather than an authored VFX
+   system.
+2. Effekseer 1.80 can share the existing Direct3D 11 device and immediate context through a small native C ABI
+   bridge. The runtime initialized on the NVIDIA adapter, loaded an HDR effect, and rendered inside the existing
+   desktop swap chain at 60 FPS.
+3. The runtime is kept optional. Failure to load the native DLL or effect must leave the procedural renderer usable;
+   it must never prevent Stop, tray exit, or the approved classic visualizer from working.
+4. Combining an authored Effekseer aura, the earlier procedural vortex, two glowing rings, smoke and independent
+   spark layers produced visual noise. Technical capability is not a reason to show every effect simultaneously.
+5. Each premium wallpaper starts with one dominant visual idea. Additional emitters are introduced only when they
+   support that idea and pass a side-by-side visual review.
+6. The next Aethelis gate is intentionally minimal: one organic fire circle on a dark field. Bass controls impact and
+   thickness, mids control turbulence speed, and highs may affect heat/color only. No logo, secondary ring, tornado,
+   smoke cloud, orbiting particles, or unrelated sample effect is allowed in this gate.
+7. Official sample effects are integration fixtures, not product artwork. They prove loaders, textures, materials,
+   trails, device sharing, and packaging; they must be disabled before product visual review.
+8. The single fire-circle shader reached its first approved visual milestone after bass compression, asymmetric
+   turbulence, a white-hot core, extended red tails, and a 60 FPS default were tuned together. Preserve this exact
+   renderer as `Aethelis reactive`; future flame experiments are separate wallpaper choices and shader files.
+9. Detached flame fragments are a second visual gate, not a modification of the approved ring. They require their
+   own direction, lifetime, velocity, fade, and bass threshold so they read as small explosions rather than a ring
+   whose radius merely scales.
+
     Only after still frames and motion are manually approved may the renderer be connected to the desktop host.
 37. Do not describe mathematical hash particles as fluid simulation or billions of particles. Product language
     must match the actual renderer. A future Aethelis attempt needs a genuine multipass fluid/particle pipeline,

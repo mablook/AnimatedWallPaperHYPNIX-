@@ -56,7 +56,8 @@ internal static partial class DesktopWorker
         return targets;
     }
 
-    public static void AttachWallpaperWindow(IntPtr wallpaperHandle, WallpaperTarget? requestedTarget = null)
+    public static void AttachWallpaperWindow(IntPtr wallpaperHandle, WallpaperTarget? requestedTarget = null,
+        bool useLayeredWindow = true)
     {
         AppLog.Write($"AttachWallpaperWindow begin. Wallpaper=0x{wallpaperHandle.ToInt64():X}");
         var desktopHandle = GetDesktopHostHandle();
@@ -73,10 +74,11 @@ internal static partial class DesktopWorker
             SetWindowLong(
                 wallpaperHandle,
                 GwlExStyle,
-                exStyle | WsExNoActivate | WsExToolWindow | WsExTransparent | (_isRaisedDesktop ? WsExLayered : 0));
+                exStyle | WsExNoActivate | WsExToolWindow | WsExTransparent |
+                (_isRaisedDesktop && useLayeredWindow ? WsExLayered : 0));
             AppLog.Write($"Extended style requested. Before=0x{exStyle:X8}; after=0x{GetWindowLong(wallpaperHandle, GwlExStyle):X8}");
 
-            if (_isRaisedDesktop)
+            if (_isRaisedDesktop && useLayeredWindow)
             {
                 Marshal.SetLastPInvokeError(0);
                 var alphaResult = SetLayeredWindowAttributes(wallpaperHandle, 0, 255, LwaAlpha);

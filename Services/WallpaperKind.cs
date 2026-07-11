@@ -4,5 +4,9 @@ internal enum WallpaperKind
 {
     BuiltIn,
     VisualizerDemo,
+    AethelisVisualizer,
+    AethelisFlameBurst,
+    FlamethrowerRingV2,
+    VolumetricFire,
     ExampleVideo
 }

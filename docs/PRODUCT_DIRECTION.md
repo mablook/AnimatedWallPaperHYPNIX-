@@ -167,6 +167,16 @@ Current analysis contract:
 - Produce 64 logarithmic bands from approximately 35 Hz to the endpoint Nyquist limit, capped at 18 kHz.
 - Apply faster attack and slower release smoothing before publishing normalized values to the renderer.
 - Mirror the bands around the circular visualizer while keeping one capture stream for every display.
+
+### Premium VFX renderer gate
+
+Premium audio-reactive wallpapers use the validated WASAPI/FFT source but own an independent Direct3D 11 renderer.
+The Effekseer runtime is available for authored 3D effects through the HYPNIX native bridge; official Effekseer
+samples are never presented as finished HYPNIX wallpapers.
+
+Visual development proceeds from one readable effect to controlled complexity. The first accepted gate is a single
+fire circle: quiet ember motion at silence, bass-driven thickness and impact, mid-driven turbulence, and restrained
+heat response to highs. A feature is not added merely because the renderer supports it.
 - Capture starts only for an audio-reactive wallpaper and stops when that wallpaper is replaced or stopped.
 - Endpoint failure/disconnection schedules a reopen of the current default render endpoint.
 
@@ -338,3 +348,25 @@ Static findings at commit `475ae69d8ba277ac709d68a4d12b4daaa724302c`:
 - Claims such as multi-monitor, playlists, interactivity, and audio visualization cannot be verified from the repository.
 
 The external download was not opened. Nothing from this repository may be executed, installed, copied, or used as a technical dependency. The feature names are treated only as general product ideas implemented independently.
+# Approved effect milestone: Fire Ring V1
+
+`Assets/Effects/Milestones/FireRingV1` is the immutable snapshot of the first approved Effekseer-powered audio-reactive fire ring. It is a fallback and comparison baseline for future fire work. New variants must receive distinct package IDs/assets and must never replace this snapshot.
+
+The next target is a realistic campfire ring: a continuous annular fuel bed using a purpose-built fluid/fire flipbook, with independent flame, smoke, ember and crackle/spike emitters. Bass affects flame height and pressure, mids affect turbulence, highs trigger short-lived sparks. The effect must remain quiet at silence and retain per-monitor pause behavior.
+# Volumetric Fire GPU direction
+
+`Hypnix Volumetric Fire` is a separate renderer and must not replace the approved
+classic visualizer or the FireRingV1 milestone. The approved visual target is
+[`docs/assets/volumetric-fire-approved-target.png`](assets/volumetric-fire-approved-target.png).
+The rejected experimental card is hidden from the product gallery. The current
+foundation maintains two persistent 3D voxel volumes per monitor and advances
+velocity and combustion density with a Direct3D compute shader using advection,
+buoyancy, curl and dissipation. A 64-slice ray marcher composites the result.
+It deliberately has no flipbook, PNG atlas, EmberGen runtime dependency, or
+Effekseer emitter. Audio changes live fuel injection and forces instead of
+selecting or scaling prerecorded frames.
+
+The discarded 2D version proved that higher resolution and bilinear filtering
+cannot replace pressure, combustion and volumetric depth. Do not restore it as a
+product wallpaper. The next quality gates are pressure projection, separate fuel
+and temperature fields, blackbody emission, smoke conversion and temporal jitter.

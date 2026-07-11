@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Hypnix.Tests;
@@ -9,6 +10,7 @@ public sealed class AssetContractTests
 
     [Theory]
     [InlineData("audio-visualizer-classic")]
+    [InlineData("aethelis-audio-visualizer")]
     public void VisualizerPackageDeclaresExistingBackgroundAndPreview(string packageName)
     {
         var folder = Path.Combine(RepositoryRoot, "Assets", "Wallpapers", packageName);
@@ -57,6 +59,8 @@ public sealed class AssetContractTests
         var xaml = File.ReadAllText(Path.Combine(RepositoryRoot, "MainWindow.xaml"));
 
         Assert.Contains("Visualizer demo", xaml);
+        Assert.Contains("Aethelis Audio Reactive", xaml);
+        Assert.Contains("Fire Burst Experimental", xaml);
         Assert.DoesNotContain("Flame visualizer", xaml);
         Assert.DoesNotContain("Premium living flame", xaml);
         Assert.DoesNotContain("Aethelis GPU visualizer", xaml);
@@ -71,6 +75,98 @@ public sealed class AssetContractTests
 
         Assert.Contains("hypnix-tray-white.ico", code);
         Assert.DoesNotContain("Path.Combine(AppContext.BaseDirectory, \"hypnix-v2.ico\")", code);
+    }
+
+    [Fact]
+    public void ApprovedAethelisRemainsOneProceduralFireCircleWithoutParticles()
+    {
+        var shader = File.ReadAllText(Path.Combine(RepositoryRoot, "Shaders", "Aethelis.hlsl"));
+        var renderer = File.ReadAllText(Path.Combine(RepositoryRoot, "Services", "AethelisGpuRenderer.cs"));
+
+        Assert.Contains("float flameHeight", shader);
+        Assert.Contains("float3 fireColor", shader);
+        Assert.DoesNotContain("for (int particle", shader);
+        Assert.DoesNotContain("H-shaped", shader);
+        Assert.Contains("string.Equals(shaderFileName, \"AethelisFlameBurst.hlsl\"", renderer);
+        Assert.Contains("string.Equals(shaderFileName, \"FlamethrowerRingV2.hlsl\"", renderer);
+        Assert.Contains("_usesFluidSimulation", renderer);
+        Assert.Contains("CSSetUnorderedAccessView", renderer);
+        Assert.Contains("_usesFireRingEffect", renderer);
+    }
+
+    [Fact]
+    public void FlameBurstIsSeparateFromApprovedFireRingMilestone()
+    {
+        var approved = File.ReadAllText(Path.Combine(RepositoryRoot, "Shaders", "Aethelis.hlsl"));
+        var experimental = File.ReadAllText(Path.Combine(RepositoryRoot, "Shaders", "AethelisFlameBurst.hlsl"));
+
+        Assert.DoesNotContain("for (int fragment", approved);
+        Assert.DoesNotContain("for (int flame", experimental);
+        Assert.Contains("actual flames are rendered by Effekseer", experimental);
+        Assert.DoesNotContain("for (int fragment", experimental);
+    }
+
+    [Fact]
+    public void EffekseerBridgeAndIntegrationFixtureRemainPackagedForFutureEffects()
+    {
+        Assert.True(File.Exists(Path.Combine(RepositoryRoot, "NativeBin", "Hypnix.EffekseerBridge.dll")));
+        Assert.True(File.Exists(Path.Combine(RepositoryRoot, "Assets", "Effects", "Aethelis", "Aura01_HDR.efkefc")));
+        Assert.True(File.Exists(Path.Combine(RepositoryRoot, "Assets", "Effects", "HypnixFireRing", "HypnixFireRing.efkefc")));
+        Assert.True(File.Exists(Path.Combine(RepositoryRoot, "Assets", "Effects", "HypnixFireRing", "HypnixFireRingSmoke.efkefc")));
+
+        var bridge = File.ReadAllText(Path.Combine(RepositoryRoot, "Native", "EffekseerBridge", "HypnixEffekseerBridge.cpp"));
+        Assert.Contains("FlameCount = 48", bridge);
+        Assert.Contains("SmokeCount = 12", bridge);
+        Assert.Contains("SetDynamicInput", bridge);
+        Assert.Contains("SetRotation", bridge);
+
+        var renderer = File.ReadAllText(Path.Combine(RepositoryRoot, "Services", "AethelisGpuRenderer.cs"));
+        Assert.Contains("_effekseerByViewport", renderer);
+        Assert.Contains("viewportKey", renderer);
+
+        var flamethrower = Path.Combine(RepositoryRoot, "Assets", "Effects", "FlamethrowerRingV2", "Runtime");
+        Assert.True(File.Exists(Path.Combine(flamethrower, "HypnixFlamethrower.efkefc")));
+        Assert.True(File.Exists(Path.Combine(flamethrower, "Texture", "hypnix_jet_pulse.png")));
+    }
+
+    [Fact]
+    public void ApprovedFireRingV1MilestoneCannotBeSilentlyOverwritten()
+    {
+        var folder = Path.Combine(RepositoryRoot, "Assets", "Effects", "Milestones", "FireRingV1");
+        Assert.True(File.Exists(Path.Combine(folder, "README.md")));
+        Assert.Equal("5FCA0CA663074DE7F2DFFA364A68A734B36CA6205CBDE60B0D949C9656BFB437",
+            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(folder, "HypnixFireRing.efkefc")))));
+        Assert.Equal("685082792181F4149E86BCBA7F9A1E5714679FD32FF9709A415C6BC6B30E057E",
+            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(folder, "HypnixFireRingSmoke.efkefc")))));
+    }
+
+    [Fact]
+    public void VolumetricFireUsesPersistentGpuStateWithoutFlipbookDependencies()
+    {
+        var shader = File.ReadAllText(Path.Combine(RepositoryRoot, "Shaders", "HypnixVolumetricFire.hlsl"));
+        Assert.Contains("RWTexture3D<float4> NextVolume", shader);
+        Assert.Contains("CSMain", shader);
+        Assert.Contains("backtrace", shader);
+        Assert.Contains("velocity.y -= density", shader);
+        Assert.Contains("VolumeState.Load", shader);
+        Assert.Contains("for(uint z=0;z<depth;z++)", shader);
+        Assert.DoesNotContain("hypnix_jet_pulse", shader);
+    }
+
+    [Fact]
+    public void RejectedVolumetricPrototypeStaysDocumentedAndHidden()
+    {
+        var xaml = File.ReadAllText(Path.Combine(RepositoryRoot, "MainWindow.xaml"));
+        var research = Path.Combine(RepositoryRoot, "docs", "VOLUMETRIC_FIRE_RESEARCH.md");
+        var target = Path.Combine(RepositoryRoot, "docs", "assets", "volumetric-fire-approved-target.png");
+
+        Assert.Contains("<Button Visibility=\"Collapsed\" Style=\"{StaticResource WallpaperCardStyle}\" Click=\"VolumetricFireCard_Click\">", xaml);
+        Assert.True(File.Exists(research));
+        Assert.True(File.Exists(target));
+        var findings = File.ReadAllText(research);
+        Assert.Contains("Repeated failure patterns", findings);
+        Assert.Contains("Required architecture for the next credible prototype", findings);
+        Assert.Contains("Hide `Volumetric Fire 3D Prototype`", findings);
     }
 
     private static string FindRepositoryRoot()

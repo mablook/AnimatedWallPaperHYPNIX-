@@ -12,6 +12,10 @@ internal enum NativeRenderMode
 {
     Ambient,
     VisualizerDemo,
+    AethelisVisualizer,
+    AethelisFlameBurst,
+    FlamethrowerRingV2,
+    VolumetricFire,
     FlameVisualizer,
     Video
 }
@@ -45,6 +49,9 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private readonly PerMonitorVisualizerFreezeState _visualizerFreezeState = new();
     private VisualizerSettings _visualizerSettings = VisualizerSettings.Default;
     private readonly Bitmap? _visualizerBackground;
+    private readonly Bitmap? _aethelisBassState;
+    private readonly Bitmap? _aethelisDecayState;
+    private AethelisGpuRenderer? _aethelisGpuRenderer;
     private bool _isShown;
     private static readonly object WindowClassLock = new();
     private static readonly WindowProcedure WindowProcedureDelegate = HostWindowProcedure;
@@ -70,8 +77,10 @@ internal sealed partial class NativeWallpaperHost : IDisposable
                          $"Size={_visualizerBackground.Width}x{_visualizerBackground.Height}");
         }
         EnsureWindowClassRegistered();
+        var extendedStyle = WsExNoActivate | WsExToolWindow | WsExTransparent;
+        if (renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)) extendedStyle |= WsExLayered;
         Handle = CreateWindowEx(
-            WsExLayered | WsExNoActivate | WsExToolWindow | WsExTransparent,
+            extendedStyle,
             WindowClassName,
             "Animated Wallpaper Native Host",
             WsPopup,
@@ -90,7 +99,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         Marshal.SetLastPInvokeError(0);
-        var alphaResult = SetLayeredWindowAttributes(Handle, 0, 255, LwaAlpha);
+        var alphaResult = renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire ||
+                          SetLayeredWindowAttributes(Handle, 0, 255, LwaAlpha);
         AppLog.Write($"Native host created. Handle=0x{Handle.ToInt64():X}; alphaResult={alphaResult}; " +
                      $"error={Marshal.GetLastPInvokeError()}");
 
@@ -102,6 +112,20 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     public void Start(int framesPerSecond)
     {
         SetFrameCap(framesPerSecond);
+        if (_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)
+        {
+            if (!GetClientRect(Handle, out var client))
+                throw new InvalidOperationException("Could not read the Direct3D wallpaper client size.");
+            var shader = _renderMode switch
+            {
+                NativeRenderMode.AethelisFlameBurst => "AethelisFlameBurst.hlsl",
+                NativeRenderMode.FlamethrowerRingV2 => "FlamethrowerRingV2.hlsl",
+                NativeRenderMode.VolumetricFire => "HypnixVolumetricFire.hlsl",
+                _ => "Aethelis.hlsl"
+            };
+            _aethelisGpuRenderer = new AethelisGpuRenderer(
+                Handle, client.Right - client.Left, client.Bottom - client.Top, shader);
+        }
         // Prepare a complete frame while the desktop host is still hidden.
         RenderFrame();
 
@@ -188,6 +212,16 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             return;
         }
 
+        // Direct3D owns the complete frame for both Aethelis modes. Rendering it
+        // here avoids the old nested monitor loop (GDI monitor -> all GPU monitors),
+        // which updated active effects on displays that were meant to stay frozen.
+        if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire) &&
+            _aethelisGpuRenderer is not null)
+        {
+            RenderAethelisGpuFrame(width, height);
+            return;
+        }
+
         using var target = Graphics.FromHwnd(Handle);
         using var frame = BufferedGraphicsManager.Current.Allocate(target, new Rectangle(0, 0, width, height));
         var graphics = frame.Graphics;
@@ -200,7 +234,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             return;
         }
 
-        if (_renderMode is NativeRenderMode.VisualizerDemo or NativeRenderMode.FlameVisualizer)
+        if (_renderMode is NativeRenderMode.VisualizerDemo or NativeRenderMode.AethelisVisualizer or
+            NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.FlameVisualizer)
         {
             if (_renderTargets is { Length: > 0 })
             {
@@ -246,7 +281,9 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             ? Color.FromArgb(8, 3, 2)
             : Color.FromArgb(3, 4, 10));
 
-        if (_renderMode == NativeRenderMode.FlameVisualizer)
+        if (_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)
+            RenderAethelisVisualizer(graphics, width, height, time, bands, _visualizerSettings);
+        else if (_renderMode == NativeRenderMode.FlameVisualizer)
             RenderFlameVisualizer(graphics, width, height, time, bands, _visualizerSettings);
         else
             RenderVisualizerDemo(graphics, width, height, time, bands, _visualizerSettings, clearBackground: false);
@@ -257,6 +294,114 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         var source = ImageCoverCalculator.CalculateSourceRectangle(
             image.Width, image.Height, width, height);
         graphics.DrawImage(image, new Rectangle(0, 0, width, height), source, GraphicsUnit.Pixel);
+    }
+
+    private void RenderAethelisGpuFrame(int width, int height)
+    {
+        if (_aethelisGpuRenderer is null) return;
+
+        _aethelisGpuRenderer.BeginFrame();
+        if (_renderTargets is { Length: > 0 })
+        {
+            for (var index = 0; index < _renderTargets.Length; index++)
+            {
+                var target = _renderTargets[index];
+                var sample = _visualizerFreezeState.Resolve(index, _clock.Elapsed.TotalSeconds, GetAudioBands());
+                var profile = AethelisAudioProfile.Analyze(sample.Bands, _visualizerSettings.Sensitivity);
+                _aethelisGpuRenderer.RenderViewport(target.X, target.Y, target.Width, target.Height,
+                    sample.TimeSeconds, profile, _visualizerSettings, sample.IsFrozen);
+            }
+        }
+        else
+        {
+            var profile = AethelisAudioProfile.Analyze(GetAudioBands(), _visualizerSettings.Sensitivity);
+            _aethelisGpuRenderer.RenderViewport(0, 0, width, height, _clock.Elapsed.TotalSeconds,
+                profile, _visualizerSettings);
+        }
+
+        _aethelisGpuRenderer.EndFrame();
+    }
+
+    private Bitmap? LoadOptionalBitmap(string fileName)
+    {
+        var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "Wallpapers",
+            "aethelis-audio-visualizer", fileName);
+        if (!System.IO.File.Exists(path)) return null;
+        var bitmap = new Bitmap(path);
+        AppLog.Write($"Aethelis state loaded. Path={path}; Size={bitmap.Width}x{bitmap.Height}");
+        return bitmap;
+    }
+
+    private void RenderAethelisVisualizer(
+        Graphics graphics, int width, int height, double time, float[] bands, VisualizerSettings settings)
+    {
+        var profile = AethelisAudioProfile.Analyze(bands, settings.Sensitivity);
+        var idleBreath = 1f + 0.008f * (float)Math.Sin(time * Math.PI * 2 / 3);
+        var coreScale = idleBreath + profile.Mids * 0.012f * settings.Intensity;
+
+        if (_visualizerBackground is not null)
+            DrawImageCoverTransformed(graphics, _visualizerBackground, width, height, 1f, coreScale,
+                (float)Math.Sin(time * 0.22) * 0.12f);
+
+        if (_aethelisDecayState is not null)
+        {
+            var veilAlpha = Math.Clamp(0.05f + profile.Mids * 0.42f + profile.Complexity * 0.28f, 0, 0.72f);
+            DrawImageCoverTransformed(graphics, _aethelisDecayState, width, height, veilAlpha,
+                1.01f + profile.Mids * 0.035f, (float)(time * (0.35 + profile.Mids * 0.8)) % 360);
+        }
+
+        if (_aethelisBassState is not null)
+        {
+            var impact = MathF.Pow(profile.Bass, 1.15f) * settings.Intensity;
+            var impactAlpha = Math.Clamp((impact - 0.06f) * 1.25f, 0, 1);
+            var impactScale = 0.78f + Math.Clamp(impact, 0, 1.35f) * 0.30f;
+            DrawImageCoverTransformed(graphics, _aethelisBassState, width, height, impactAlpha,
+                impactScale, (float)Math.Sin(time * 1.7) * profile.Mids * 1.8f);
+        }
+
+        RenderAethelisParticles(graphics, width, height, time, profile.Highs, settings.Glow);
+    }
+
+    private static void DrawImageCoverTransformed(
+        Graphics graphics, Image image, int width, int height, float alpha, float scale, float rotation)
+    {
+        if (alpha <= 0.001f) return;
+        var source = ImageCoverCalculator.CalculateSourceRectangle(image.Width, image.Height, width, height);
+        var state = graphics.Save();
+        graphics.TranslateTransform(width / 2f, height / 2f);
+        graphics.RotateTransform(rotation);
+        graphics.ScaleTransform(scale, scale);
+        using var attributes = new ImageAttributes();
+        var matrix = new ColorMatrix { Matrix33 = Math.Clamp(alpha, 0, 1) };
+        attributes.SetColorMatrix(matrix, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+        graphics.DrawImage(image,
+            new Rectangle(-width / 2, -height / 2, width, height),
+            source.X, source.Y, source.Width, source.Height,
+            GraphicsUnit.Pixel, attributes);
+        graphics.Restore(state);
+    }
+
+    private static void RenderAethelisParticles(
+        Graphics graphics, int width, int height, double time, float highs, float glow)
+    {
+        if (highs < 0.025f) return;
+        var centerX = width / 2f;
+        var centerY = height / 2f;
+        var radius = Math.Min(width, height) * (0.20f + highs * 0.34f);
+        var count = 18 + (int)(highs * 54);
+        for (var index = 0; index < count; index++)
+        {
+            var seed = Fraction(index * 0.61803398875);
+            var angle = seed * Math.PI * 2 + time * (0.18 + highs * 0.85);
+            var orbit = radius * (0.32f + 0.68f * (float)Fraction(index * 0.381966 + time * (0.08 + highs * 0.22)));
+            var x = centerX + orbit * (float)Math.Cos(angle);
+            var y = centerY + orbit * 0.58f * (float)Math.Sin(angle) - highs * height * 0.035f;
+            var size = Math.Max(1.5f, Math.Min(width, height) * (0.0012f + highs * 0.0032f) * (0.55f + (float)seed));
+            var alpha = (int)Math.Clamp(45 + highs * 175 + glow * 25, 0, 240);
+            var color = index % 3 == 0 ? Color.FromArgb(alpha, 90, 225, 255) : Color.FromArgb(alpha, 255, 221, 155);
+            using var brush = new SolidBrush(color);
+            graphics.FillEllipse(brush, x - size / 2, y - size / 2, size, size);
+        }
     }
 
     private static void RenderAmbient(Graphics graphics, int width, int height, double time)
@@ -596,6 +741,9 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         Handle = IntPtr.Zero;
         _renderTimer.Stop();
         _visualizerBackground?.Dispose();
+        _aethelisBassState?.Dispose();
+        _aethelisDecayState?.Dispose();
+        _aethelisGpuRenderer?.Dispose();
         var result = DestroyWindow(handle);
         AppLog.Write($"Native host destroyed. Handle=0x{handle.ToInt64():X}; result={result}; error={Marshal.GetLastPInvokeError()}");
     }

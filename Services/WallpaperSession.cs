@@ -11,13 +11,15 @@ internal sealed class WallpaperSession : IWallpaperSession
         try
         {
             _host = new NativeWallpaperHost(renderMode, DesktopWorker.GetMonitorTargets());
-            if (renderMode == NativeRenderMode.VisualizerDemo)
+            if (renderMode is NativeRenderMode.VisualizerDemo or NativeRenderMode.AethelisVisualizer or
+                NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)
             {
                 _audioSpectrum = new AudioSpectrumService();
                 _audioSpectrum.BandsAvailable += _host.SubmitAudioBands;
                 _audioSpectrum.Start();
             }
-            DesktopWorker.AttachWallpaperWindow(_host.Handle, target);
+            DesktopWorker.AttachWallpaperWindow(_host.Handle, target,
+                useLayeredWindow: renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire));
             _host.Start(framesPerSecond);
             AppLog.Write($"WallpaperSession started with native renderer. Host=0x{_host.Handle.ToInt64():X}");
         }

@@ -17,6 +17,8 @@
   <ItemGroup>
     <Compile Remove="Tests\**\*.cs" />
     <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +32,11 @@
     <Content Include="Assets\Brand\hypnix-tray-white.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Wallpapers\**\wallpaper.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Wallpapers\**\background.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Wallpapers\**\*-state.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Shaders\**\*.hlsl" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Effects\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="NativeBin\Hypnix.EffekseerBridge.dll"
+             Link="Hypnix.EffekseerBridge.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

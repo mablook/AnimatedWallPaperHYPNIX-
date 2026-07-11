@@ -11,3 +11,8 @@ TestResults/
 logs/
 *.log
 *.trx
+.tools/
+tmp/
+Native/EffekseerBridge/build/
+Prototypes/
+Assets/Effects/FlamethrowerRingV2/Exports/
