@@ -23,6 +23,7 @@ internal sealed class AudioSpectrumService : IDisposable
     private volatile bool _disposed;
     private volatile bool _captureStopped;
     private volatile bool _captureFaultLogged;
+    private volatile bool _startFaultLogged;
 
     public event Action<float[]>? BandsAvailable;
 
@@ -37,7 +38,10 @@ internal sealed class AudioSpectrumService : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
-                await RetryWorker.RunAsync(StartCapture, TimeSpan.FromMilliseconds(1500), token);
+                // Retry forever so playback recovers if a device returns, but back off from
+                // 1.5s toward 30s so a permanently absent endpoint is not polled/logged in a storm.
+                await RetryWorker.RunAsync(StartCapture, TimeSpan.FromMilliseconds(1500), token,
+                    maxInterval: TimeSpan.FromSeconds(30), backoffFactor: 2.0);
                 while (!token.IsCancellationRequested && !_captureStopped)
                 {
                     await Task.Delay(1500, token);
@@ -80,11 +84,18 @@ internal sealed class AudioSpectrumService : IDisposable
             AppLog.Write($"Audio loopback started. Device={device.FriendlyName}; Format={capture.WaveFormat}; " +
                          $"SampleRate={capture.WaveFormat.SampleRate}; Channels={capture.WaveFormat.Channels}; " +
                          $"Bits={capture.WaveFormat.BitsPerSample}");
+            _startFaultLogged = false;
             return true;
         }
         catch (Exception exception)
         {
-            AppLog.WriteException("Audio loopback start failed", exception);
+            // Log only the first failure of a streak; a permanently missing device must not
+            // fill the log. The flag is cleared above once a start succeeds.
+            if (!_startFaultLogged)
+            {
+                _startFaultLogged = true;
+                AppLog.WriteException("Audio loopback start failed", exception);
+            }
             ReleaseCapture();
             return false;
         }

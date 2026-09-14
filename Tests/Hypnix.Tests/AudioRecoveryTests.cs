@@ -24,6 +24,23 @@ public sealed class AudioRecoveryTests
         Assert.Equal(1, attempts);
     }
 
+    [Fact]
+    public void BackoffEscalatesGeometricallyThenHoldsAtCeiling()
+    {
+        var max = TimeSpan.FromSeconds(30);
+        Assert.Equal(TimeSpan.FromSeconds(3), RetryWorker.NextDelay(TimeSpan.FromSeconds(1.5), max, 2.0));
+        Assert.Equal(TimeSpan.FromSeconds(24), RetryWorker.NextDelay(TimeSpan.FromSeconds(12), max, 2.0));
+        Assert.Equal(max, RetryWorker.NextDelay(TimeSpan.FromSeconds(24), max, 2.0)); // scaled past ceiling is clamped
+        Assert.Equal(max, RetryWorker.NextDelay(max, max, 2.0));                      // holds at ceiling
+    }
+
+    [Fact]
+    public void FixedIntervalRetryIsUnchangedWhenBackoffFactorIsOne()
+    {
+        var interval = TimeSpan.FromMilliseconds(1500);
+        Assert.Equal(interval, RetryWorker.NextDelay(interval, TimeSpan.FromSeconds(30), 1.0));
+    }
+
     [Theory]
     [InlineData(float.NaN)]
     [InlineData(float.PositiveInfinity)]

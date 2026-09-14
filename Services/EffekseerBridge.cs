@@ -52,9 +52,23 @@ internal sealed class EffekseerBridge : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         if (_state == IntPtr.Zero) return;
         Native.HypnixEfkDestroy(_state);
         _state = IntPtr.Zero;
+    }
+
+    // Safety net: runs only if Dispose was skipped. The native state holds Direct3D references
+    // that are unsafe to release on the finalizer thread, so we record the missed disposal for
+    // diagnosis; the OS reclaims the memory at process exit. A finalizer must never throw.
+    ~EffekseerBridge()
+    {
+        try
+        {
+            if (_state != IntPtr.Zero)
+                AppLog.Write("EffekseerBridge finalized without Dispose(); native state left to OS reclamation.");
+        }
+        catch { }
     }
 
     private static class Native

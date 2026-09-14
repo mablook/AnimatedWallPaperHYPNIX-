@@ -681,6 +681,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         if (Handle == IntPtr.Zero)
         {
             return;
@@ -695,6 +696,19 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         _aethelisGpuRenderer?.Dispose();
         var result = DestroyWindow(handle);
         AppLog.Write($"Native host destroyed. Handle=0x{handle.ToInt64():X}; result={result}; error={Marshal.GetLastPInvokeError()}");
+    }
+
+    // Safety net: runs only if Dispose was skipped. A window handle is thread-affine and cannot
+    // be destroyed on the finalizer thread; the OS reclaims the window and its GDI/GPU resources
+    // at process exit, so we record the missed disposal for diagnosis. A finalizer must never throw.
+    ~NativeWallpaperHost()
+    {
+        try
+        {
+            if (Handle != IntPtr.Zero)
+                AppLog.Write($"NativeWallpaperHost finalized without Dispose(); handle=0x{Handle.ToInt64():X} left to OS reclamation.");
+        }
+        catch { }
     }
 
     [LibraryImport("user32.dll", EntryPoint = "CreateWindowExW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]

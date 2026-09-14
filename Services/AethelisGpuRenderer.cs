@@ -209,6 +209,7 @@ internal sealed class AethelisGpuRenderer : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        GC.SuppressFinalize(this);
         _context.ClearState();
         _context.Flush();
         foreach (var effekseer in _effekseerByViewport.Values) effekseer.Dispose();
@@ -216,6 +217,19 @@ internal sealed class AethelisGpuRenderer : IDisposable
         foreach (var fluid in _fluidByViewport.Values) fluid.Dispose();
         _fluidByViewport.Clear();
         ReleaseDeviceResources();
+    }
+
+    // Safety net: runs only if Dispose was skipped. The Direct3D COM objects release through
+    // their own finalizers, so here we just record the missed disposal for diagnosis. A
+    // finalizer must never throw.
+    ~AethelisGpuRenderer()
+    {
+        try
+        {
+            if (!_disposed)
+                AppLog.Write("AethelisGpuRenderer finalized without Dispose(); GPU resources left to COM finalizers.");
+        }
+        catch { }
     }
 
     [StructLayout(LayoutKind.Sequential)]
