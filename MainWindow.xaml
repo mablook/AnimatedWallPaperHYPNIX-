@@ -58,7 +58,7 @@
                 </StackPanel>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Button x:Name="StartButton" Content="Start" Click="StartButton_Click"/>
+                <Button x:Name="StartButton" Content="Start" Click="StartButton_Click" Style="{StaticResource PrimaryButtonStyle}"/>
                 <Button x:Name="StopButton" Content="Stop" Click="StopButton_Click" Margin="0"/>
             </StackPanel>
         </Grid>
@@ -66,7 +66,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="18"/>
-                <ColumnDefinition Width="260"/>
+                <ColumnDefinition Width="286"/>
             </Grid.ColumnDefinitions>
             <Grid>
                 <Grid.RowDefinitions>
@@ -117,20 +117,31 @@
                                     ToolTip="Audio visualizer settings" AutomationProperties.Name="Audio visualizer settings"
                                     Click="VisualizerSettingsButton_Click"/>
                         </Grid>
-                        <TextBlock Text="Pause animation for apps" Margin="0,0,0,6"/>
-                        <ComboBox x:Name="AppPauseModeComboBox" Margin="0,0,0,14" SelectionChanged="PolicyModeChanged"
-                                  AutomationProperties.Name="Pause animation for apps">
-                            <ComboBoxItem Content="Never"/>
-                            <ComboBoxItem Content="Fullscreen apps only"/>
-                            <ComboBoxItem Content="Maximized or fullscreen apps"/>
-                        </ComboBox>
-                        <TextBlock Text="Pause scope" Margin="0,0,0,6"/>
-                        <ComboBox x:Name="PauseScopeComboBox" Margin="0,0,0,14" SelectionChanged="PolicyModeChanged"
-                                  AutomationProperties.Name="Pause scope">
-                            <ComboBoxItem Content="All displays"/>
-                            <ComboBoxItem Content="Active display only"/>
-                        </ComboBox>
-                        <CheckBox x:Name="PauseBatteryCheckBox" Content="Pause on battery" Checked="PolicyChanged" Unchecked="PolicyChanged"/>
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="14" Margin="0,0,0,16"
+                                BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="APP PAUSE" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,10"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBlock Text="Pause animation for apps" Margin="0,0,0,6"/>
+                                <ComboBox x:Name="AppPauseModeComboBox" Margin="0,0,0,6" SelectionChanged="PolicyModeChanged"
+                                          AutomationProperties.Name="Pause animation for apps">
+                                    <ComboBoxItem Content="Never"/>
+                                    <ComboBoxItem Content="Fullscreen apps only"/>
+                                    <ComboBoxItem Content="Maximized or fullscreen apps"/>
+                                </ComboBox>
+                                <TextBlock Text="Choose “Never” to keep the wallpaper animating at all times."
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,0,0,14"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <CheckBox x:Name="PausePerMonitorToggle" Style="{StaticResource ToggleSwitchStyle}"
+                                          Content="Pause only the display in use" Checked="PolicyChanged" Unchecked="PolicyChanged"
+                                          AutomationProperties.Name="Pause only the display in use"/>
+                                <TextBlock Text="On: freeze only monitors an app covers, clean monitors keep animating. Off: any covering app pauses every display."
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,4,0,14"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <CheckBox x:Name="PauseBatteryCheckBox" Content="Pause on battery" Margin="0"
+                                          Checked="PolicyChanged" Unchecked="PolicyChanged"/>
+                            </StackPanel>
+                        </Border>
                         <TextBlock Text="Frame cap" Margin="0,0,0,6"/>
                         <ComboBox x:Name="FpsComboBox" SelectionChanged="FpsComboBox_SelectionChanged" AutomationProperties.Name="Frame cap">
                             <ComboBoxItem Content="15 FPS" Tag="15"/>

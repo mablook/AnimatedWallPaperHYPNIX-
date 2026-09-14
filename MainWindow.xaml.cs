@@ -42,9 +42,10 @@ public partial class MainWindow : Window
         InitializeComponent();
         InitializeTrayIcon();
         AppPauseModeComboBox.SelectedIndex = _settings.AppPauseMode;
-        PauseScopeComboBox.SelectedIndex = _settings.PausePerMonitor ? 1 : 0;
+        PausePerMonitorToggle.IsChecked = _settings.PausePerMonitor;
         PauseBatteryCheckBox.IsChecked = _settings.PauseOnBattery;
         FpsComboBox.SelectedIndex = _settings.FramesPerSecond == 15 ? 0 : _settings.FramesPerSecond == 60 ? 2 : 1;
+        UpdatePauseControlsEnabled();
         RefreshGallery();
         _isUiInitialized = true;
         UpdateSelection();
@@ -218,7 +219,8 @@ public partial class MainWindow : Window
     }
 
     private void PolicyChanged(object sender, RoutedEventArgs e) { if (_isUiInitialized) { QueueSave(); ApplyPlaybackPolicy(); } }
-    private void PolicyModeChanged(object sender, SelectionChangedEventArgs e) { if (_isUiInitialized) { QueueSave(); ApplyPlaybackPolicy(); } }
+    private void PolicyModeChanged(object sender, SelectionChangedEventArgs e) { if (_isUiInitialized) { UpdatePauseControlsEnabled(); QueueSave(); ApplyPlaybackPolicy(); } }
+    private void UpdatePauseControlsEnabled() => PausePerMonitorToggle.IsEnabled = AppPauseModeComboBox.SelectedIndex != 0;
     private void FpsComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isUiInitialized) return;
@@ -232,7 +234,7 @@ public partial class MainWindow : Window
     private PlaybackDecision Decision => PlaybackPolicy.Evaluate(AppPauseModeComboBox.SelectedIndex,
         _foregroundMonitor.FullscreenMonitors, _foregroundMonitor.CoveredMonitors,
         PauseBatteryCheckBox.IsChecked == true, _foregroundMonitor.IsOnBattery,
-        PauseScopeComboBox.SelectedIndex == 1, _environment.SessionLocked);
+        PausePerMonitorToggle.IsChecked == true, _environment.SessionLocked);
 
     private void ApplyPlaybackPolicy()
     {
@@ -330,7 +332,7 @@ public partial class MainWindow : Window
     {
         if (!_isUiInitialized) return;
         _settings.AppPauseMode = AppPauseModeComboBox.SelectedIndex;
-        _settings.PausePerMonitor = PauseScopeComboBox.SelectedIndex == 1;
+        _settings.PausePerMonitor = PausePerMonitorToggle.IsChecked == true;
         _settings.PauseOnBattery = PauseBatteryCheckBox.IsChecked == true;
         _settings.FramesPerSecond = GetSelectedFps();
         _saveTimer.Stop();
