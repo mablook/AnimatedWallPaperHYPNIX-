@@ -7,44 +7,86 @@ namespace AnimatedWallPaper.Services;
 internal sealed class AudioSpectrumService : IDisposable
 {
     private const int FftSize = 2048;
+    // FFT length must be a power of two; the exponent is derived so FftSize can be retuned safely.
+    private static readonly int FftExponent = System.Numerics.BitOperations.Log2(FftSize);
     private const int BandCount = 64;
     private readonly object _sync = new();
     private readonly float[] _sampleWindow = new float[FftSize];
     private readonly float[] _bands = new float[BandCount];
+    private readonly Complex[] _fft = new Complex[FftSize];
+    private readonly float[] _nextBands = new float[BandCount];
+    private readonly CancellationTokenSource _shutdown = new();
+    private Task? _worker;
+    private MMDevice? _device;
     private WasapiLoopbackCapture? _capture;
     private int _sampleCount;
-    private bool _disposed;
-    private int _restartScheduled;
+    private volatile bool _disposed;
+    private volatile bool _captureStopped;
+    private volatile bool _captureFaultLogged;
 
     public event Action<float[]>? BandsAvailable;
 
-    public void Start() => StartCapture();
-
-    private void StartCapture()
+    public void Start()
     {
-        if (_disposed) return;
+        if (!_disposed) _worker ??= Task.Run(() => RunAsync(_shutdown.Token));
+    }
+
+    private async Task RunAsync(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await RetryWorker.RunAsync(StartCapture, TimeSpan.FromMilliseconds(1500), token);
+                while (!token.IsCancellationRequested && !_captureStopped)
+                {
+                    await Task.Delay(1500, token);
+                    try
+                    {
+                        using var enumerator = new MMDeviceEnumerator();
+                        using var current = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                        if (current.ID != _device?.ID) break;
+                    }
+                    catch (Exception exception)
+                    {
+                        AppLog.WriteException("Audio endpoint unavailable", exception);
+                        break;
+                    }
+                }
+                await Task.Delay(1500, token);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        finally { ReleaseCapture(); }
+    }
+
+    private bool StartCapture()
+    {
+        if (_disposed) return true;
+        ReleaseCapture();
         try
         {
             using var enumerator = new MMDeviceEnumerator();
-            var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            var device = _device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
             var capture = new WasapiLoopbackCapture(device);
+            _capture = capture;
+            _sampleCount = 0;
+            Array.Clear(_bands);
+            _captureStopped = false;
+            _captureFaultLogged = false;
             capture.DataAvailable += CaptureOnDataAvailable;
             capture.RecordingStopped += CaptureOnRecordingStopped;
-            lock (_sync)
-            {
-                _capture?.Dispose();
-                _capture = capture;
-            }
             capture.StartRecording();
-            Interlocked.Exchange(ref _restartScheduled, 0);
             AppLog.Write($"Audio loopback started. Device={device.FriendlyName}; Format={capture.WaveFormat}; " +
                          $"SampleRate={capture.WaveFormat.SampleRate}; Channels={capture.WaveFormat.Channels}; " +
                          $"Bits={capture.WaveFormat.BitsPerSample}");
+            return true;
         }
         catch (Exception exception)
         {
             AppLog.WriteException("Audio loopback start failed", exception);
-            ScheduleRestart();
+            ReleaseCapture();
+            return false;
         }
     }
 
@@ -52,51 +94,78 @@ internal sealed class AudioSpectrumService : IDisposable
     {
         if (args.Exception is not null) AppLog.WriteException("Audio loopback stopped", args.Exception);
         else AppLog.Write("Audio loopback stopped; endpoint may have changed");
-        ScheduleRestart();
+        _captureStopped = true;
     }
 
-    private void ScheduleRestart()
+    private void ReleaseCapture()
     {
-        if (_disposed || Interlocked.Exchange(ref _restartScheduled, 1) != 0) return;
-        _ = Task.Run(async () =>
+        var capture = _capture;
+        _capture = null;
+        if (capture is not null)
         {
-            await Task.Delay(1500);
-            if (!_disposed) StartCapture();
-        });
+            capture.DataAvailable -= CaptureOnDataAvailable;
+            capture.RecordingStopped -= CaptureOnRecordingStopped;
+            try { capture.StopRecording(); }
+            catch (Exception exception) { AppLog.WriteException("Audio stop failed", exception); }
+            try { capture.Dispose(); }
+            catch (Exception exception) { AppLog.WriteException("Audio release failed", exception); }
+        }
+        _device?.Dispose();
+        _device = null;
     }
 
     private void CaptureOnDataAvailable(object? sender, WaveInEventArgs args)
     {
         var capture = sender as WasapiLoopbackCapture;
-        if (capture is null) return;
+        if (_disposed || capture is null || capture != _capture) return;
         var format = capture.WaveFormat;
         var bytesPerSample = format.BitsPerSample / 8;
         var frameSize = bytesPerSample * format.Channels;
         if (frameSize <= 0) return;
 
-        for (var offset = 0; offset + frameSize <= args.BytesRecorded; offset += frameSize)
+        // NAudio raises this on a background capture thread; an escaping exception would
+        // tear down the capture (RecordingStopped) and trigger a restart storm. Contain it.
+        try
         {
-            float mono = 0;
-            for (var channel = 0; channel < format.Channels; channel++)
+            for (var offset = 0; offset + frameSize <= args.BytesRecorded; offset += frameSize)
             {
-                var sampleOffset = offset + channel * bytesPerSample;
-                mono += ReadSample(args.Buffer, sampleOffset, format);
+                float mono = 0;
+                for (var channel = 0; channel < format.Channels; channel++)
+                {
+                    var sampleOffset = offset + channel * bytesPerSample;
+                    mono += ReadSample(args.Buffer, sampleOffset, format);
+                }
+                mono /= Math.Max(1, format.Channels);
+                _sampleWindow[_sampleCount++] = mono;
+                if (_sampleCount == FftSize)
+                {
+                    Analyze(format.SampleRate);
+                    Array.Copy(_sampleWindow, FftSize / 2, _sampleWindow, 0, FftSize / 2);
+                    _sampleCount = FftSize / 2;
+                }
             }
-            mono /= Math.Max(1, format.Channels);
-            _sampleWindow[_sampleCount++] = mono;
-            if (_sampleCount == FftSize)
+        }
+        catch (Exception exception)
+        {
+            _sampleCount = 0;
+            if (!_captureFaultLogged)
             {
-                Analyze(format.SampleRate);
-                Array.Copy(_sampleWindow, FftSize / 2, _sampleWindow, 0, FftSize / 2);
-                _sampleCount = FftSize / 2;
+                _captureFaultLogged = true;
+                AppLog.WriteException("Audio frame processing failed; dropping buffer", exception);
             }
         }
     }
 
-    private static float ReadSample(byte[] buffer, int offset, WaveFormat format)
+    internal static float ReadSample(byte[] buffer, int offset, WaveFormat format)
     {
-        if (format.BitsPerSample == 32 && format.Encoding is WaveFormatEncoding.IeeeFloat or WaveFormatEncoding.Extensible)
-            return BitConverter.ToSingle(buffer, offset);
+        var isFloat = format.Encoding == WaveFormatEncoding.IeeeFloat ||
+            format is WaveFormatExtensible extensible &&
+            extensible.SubFormat == new Guid("00000003-0000-0010-8000-00aa00389b71");
+        if (format.BitsPerSample == 32 && isFloat)
+        {
+            var sample = BitConverter.ToSingle(buffer, offset);
+            return float.IsFinite(sample) ? Math.Clamp(sample, -1, 1) : 0;
+        }
         if (format.BitsPerSample == 16)
             return BitConverter.ToInt16(buffer, offset) / 32768f;
         if (format.BitsPerSample == 24)
@@ -112,14 +181,15 @@ internal sealed class AudioSpectrumService : IDisposable
 
     private void Analyze(int sampleRate)
     {
-        var fft = new Complex[FftSize];
+        var fft = _fft;
         for (var i = 0; i < FftSize; i++)
         {
             fft[i].X = _sampleWindow[i] * (float)FastFourierTransform.HammingWindow(i, FftSize);
+            fft[i].Y = 0;
         }
-        FastFourierTransform.FFT(true, 11, fft);
+        FastFourierTransform.FFT(true, FftExponent, fft);
 
-        var next = new float[BandCount];
+        var next = _nextBands;
         const double minFrequency = 35;
         var maxFrequency = Math.Min(18000, sampleRate / 2d);
         for (var band = 0; band < BandCount; band++)
@@ -150,18 +220,12 @@ internal sealed class AudioSpectrumService : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
         _disposed = true;
-        lock (_sync)
-        {
-            if (_capture is not null)
-            {
-                _capture.DataAvailable -= CaptureOnDataAvailable;
-                _capture.RecordingStopped -= CaptureOnRecordingStopped;
-                try { _capture.StopRecording(); } catch { }
-                _capture.Dispose();
-                _capture = null;
-            }
-        }
+        _shutdown.Cancel();
+        // The worker owns WASAPI teardown; never wait for it while holding an FFT lock.
+        if (_worker is null) _shutdown.Dispose();
+        else _ = _worker.ContinueWith(_ => _shutdown.Dispose(), TaskScheduler.Default);
         AppLog.Write("Audio loopback disposed");
     }
 }

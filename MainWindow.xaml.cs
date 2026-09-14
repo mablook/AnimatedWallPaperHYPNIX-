@@ -1,433 +1,429 @@
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
-using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using AnimatedWallPaper.Services;
 
 namespace AnimatedWallPaper;
 
 public partial class MainWindow : Window
 {
-    private const string ExampleVideoPath = @"D:\LiveWallpaper\68ae669b92d000f8170811b1\68ae669b92d000f8170811b1.mp4";
     private readonly WallpaperController _wallpaperController = new();
     private readonly ForegroundAppMonitor _foregroundMonitor = new();
-    private readonly WallpaperLibraryService _wallpaperLibrary = new();
+    private readonly WallpaperLibraryService _wallpaperLibrary;
+    private readonly DesktopEnvironmentMonitor _environment = new();
+    private readonly AppSettingsStore _settingsStore;
+    private readonly AppSettings _settings;
+    private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
+    private readonly DispatcherTimer _recoveryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private System.Drawing.Icon? _trayDrawingIcon;
     private bool _isUiInitialized;
     private bool _isQuitting;
     private bool _trayHintShown;
+    private bool _changingWallpaper;
+    private bool _recovering;
+    private bool _playRequested;
+    private int _selectionRevision;
+    private int _recoveryAttempts;
+    private WallpaperEntry? Selected => WallpaperGallery.SelectedItem as WallpaperEntry;
 
-    public MainWindow()
+    public MainWindow() : this(new AppSettingsStore(), null) { }
+
+    internal MainWindow(AppSettingsStore settingsStore, string? libraryRoot)
     {
+        _settingsStore = settingsStore;
+        _wallpaperLibrary = new WallpaperLibraryService(libraryRoot);
+        _settings = _settingsStore.Load();
         InitializeComponent();
         InitializeTrayIcon();
+        AppPauseModeComboBox.SelectedIndex = _settings.AppPauseMode;
+        PauseScopeComboBox.SelectedIndex = _settings.PausePerMonitor ? 1 : 0;
+        PauseBatteryCheckBox.IsChecked = _settings.PauseOnBattery;
+        FpsComboBox.SelectedIndex = _settings.FramesPerSecond == 15 ? 0 : _settings.FramesPerSecond == 60 ? 2 : 1;
+        RefreshGallery();
         _isUiInitialized = true;
-        UpdateVisualizerSettingsVisibility();
-        PreviewBackdrop.Start();
+        UpdateSelection();
+        _saveTimer.Tick += (_, _) => SavePreferences();
+        _recoveryTimer.Tick += async (_, _) => { _recoveryTimer.Stop(); await RecoverAsync(); };
+        _wallpaperLibrary.PackagesChanged += OnPackagesChanged;
         _foregroundMonitor.StateChanged += (_, _) => ApplyPlaybackPolicy();
+        _wallpaperController.StateChanged += () => ApplyPlaybackPolicy();
+        _environment.PolicyChanged += ApplyPlaybackPolicy;
+        _environment.LayoutChanged += () => { RememberDisplays(); _recoveryAttempts = 0; ScheduleRecovery(); };
+        _environment.HealthCheck += () =>
+        {
+            if (_wallpaperController.IsRunning && !_wallpaperController.IsHealthy) ScheduleRecovery();
+        };
+        LivePreview.StatusChanged += status => PreviewStatusText.Text = status;
+        IsVisibleChanged += (_, _) => UpdatePreviewSuspension();
+        StateChanged += (_, _) => UpdatePreviewSuspension();
         _foregroundMonitor.Start();
+        RememberDisplays();
         UpdateStatus();
     }
 
-    protected override void OnClosed(EventArgs e)
+    private void OnPackagesChanged(IReadOnlyList<WallpaperPackageRegistration> packages)
+        => Dispatcher.BeginInvoke(new Action(() => { if (!_isQuitting) RefreshGallery(); }));
+
+    private void RefreshGallery()
     {
-        if (_trayIcon is not null)
+        var selectedId = Selected?.Id ?? _settings.SelectedWallpaperId;
+        var initialized = _isUiInitialized;
+        _isUiInitialized = false;
+        var entries = WallpaperCatalog.LoadBuiltIns().ToList();
+        var invalid = 0;
+        foreach (var package in _wallpaperLibrary.Packages)
         {
-            _trayIcon.Visible = false;
-            _trayIcon.Dispose();
+            try
+            {
+                if (package.Status == WallpaperPackageStatus.Ready) entries.Add(WallpaperCatalog.FromPackage(package));
+                else invalid++;
+            }
+            catch (Exception exception)
+            {
+                invalid++;
+                AppLog.WriteException("Library preset could not be loaded", exception);
+            }
         }
-        _trayDrawingIcon?.Dispose();
-        PreviewBackdrop.Dispose();
-        _foregroundMonitor.Dispose();
-        _wallpaperLibrary.Dispose();
-        _wallpaperController.Dispose();
-        base.OnClosed(e);
+        entries.AddRange(_settings.Videos.Select(video => new WallpaperEntry(video.Id, video.Title,
+            WallpaperKind.ExampleVideo, null, VideoPath: video.Path)));
+        WallpaperGallery.ItemsSource = entries;
+        WallpaperGallery.SelectedItem = entries.FirstOrDefault(entry => entry.Id == selectedId) ?? entries.FirstOrDefault();
+        LibraryStatusText.Text = $"{entries.Count} wallpapers · {invalid} unavailable packages";
+        _isUiInitialized = initialized;
+        if (initialized) UpdateSelection();
     }
 
-    protected override void OnClosing(CancelEventArgs e)
+    private async void WallpaperGallery_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_isQuitting)
+        if (!_isUiInitialized) return;
+        UpdateSelection();
+        QueueSave();
+        if (_playRequested) await StartSelectedAsync();
+    }
+
+    private void UpdateSelection()
+    {
+        if (Selected is not { } entry) { LivePreview.Select(null); return; }
+        _settings.SelectedWallpaperId = entry.Id;
+        ActivePreviewTitle.Text = entry.Title;
+        ActivePreviewSubtitle.Text = entry.Description;
+        VisualizerSettingsButton.Visibility = entry.IsVisualizer ? Visibility.Visible : Visibility.Collapsed;
+        VisualizerSettingsPopup.IsOpen = false;
+        var initialized = _isUiInitialized;
+        _isUiInitialized = false;
+        var value = _settings.Visualizers.GetValueOrDefault(entry.Id) ?? entry.Defaults ?? new();
+        VisualizerIntensitySlider.Value = value.Intensity;
+        VisualizerSensitivitySlider.Value = value.Sensitivity;
+        VisualizerGlowSlider.Value = value.Glow;
+        VisualizerColorComboBox.SelectedIndex = value.ColorTheme;
+        _isUiInitialized = initialized;
+        try { LivePreview.Select(WallpaperCatalog.Request(entry, _settings)); }
+        catch (Exception exception) { LivePreview.Select(null); ReportError("Preview", exception); }
+        UpdatePreviewSuspension();
+    }
+
+    private async void StartButton_Click(object sender, RoutedEventArgs e)
+    {
+        _playRequested = true;
+        await StartSelectedAsync();
+    }
+
+    private async Task StartSelectedAsync()
+    {
+        if (Selected is not { } entry) return;
+        var revision = ++_selectionRevision;
+        _changingWallpaper = true;
+        _recoveryAttempts = 0;
+        _recoveryTimer.Stop();
+        StartButton.IsEnabled = false;
+        ErrorText.Text = "";
+        StatusText.Text = "Preparing wallpaper…";
+        try
         {
-            e.Cancel = true;
-            Hide();
-            AppLog.Write("Main window hidden to notification area; wallpaper remains active");
-
-            if (!_trayHintShown && _trayIcon is not null)
-            {
-                _trayHintShown = true;
-                _trayIcon.ShowBalloonTip(
-                    2500,
-                    "HYPNIX is still running",
-                    "Double-click the tray icon to reopen it, or use Quit HYPNIX to exit.",
-                    System.Windows.Forms.ToolTipIcon.Info);
-            }
-
-            return;
+            await _wallpaperController.StartAsync(WallpaperCatalog.Request(entry, _settings));
+            _wallpaperController.SetFrameCap(GetSelectedFps());
+            ApplyVisualizerSettings();
+            _foregroundMonitor.ExcludedProcessId = _wallpaperController.ActiveProcessId;
+            _foregroundMonitor.RefreshNow();
+            ApplyPlaybackPolicy();
         }
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
+        {
+            if (revision == _selectionRevision)
+            {
+                _playRequested = _wallpaperController.IsRunning;
+                ReportError("Wallpaper could not be started", exception);
+            }
+        }
+        finally
+        {
+            if (revision == _selectionRevision)
+            {
+                _changingWallpaper = false;
+                StartButton.IsEnabled = true;
+                UpdateStatus();
+            }
+        }
+    }
 
-        base.OnClosing(e);
+    private void StopButton_Click(object sender, RoutedEventArgs e) => StopWallpaper();
+    private void StopWallpaper()
+    {
+        _playRequested = false;
+        _selectionRevision++;
+        _changingWallpaper = false;
+        _recoveryTimer.Stop();
+        _wallpaperController.Stop();
+        _foregroundMonitor.ExcludedProcessId = null;
+        StartButton.IsEnabled = true;
+        UpdateStatus();
+    }
+
+    private void ScheduleRecovery()
+    {
+        if (_isQuitting || !_playRequested || _changingWallpaper || _recovering || _recoveryTimer.IsEnabled) return;
+        _recoveryTimer.Start();
+    }
+
+    private async Task RecoverAsync()
+    {
+        if (_isQuitting || !_playRequested || _changingWallpaper || _recovering || _wallpaperController.ActiveRequest is not { } request) return;
+        _recovering = true;
+        try
+        {
+            AppLog.Write("Rebuilding wallpaper after desktop/display/decoder change");
+            await _wallpaperController.StartAsync(request);
+            _recoveryAttempts = 0;
+            _foregroundMonitor.RefreshNow();
+            ApplyPlaybackPolicy();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
+        {
+            ReportError("Desktop recovery", exception);
+            if (++_recoveryAttempts >= 3)
+            {
+                StopWallpaper();
+                ErrorText.Text += " Playback stopped after three failed attempts. Use Start to retry.";
+            }
+        }
+        finally { _recovering = false; }
+    }
+
+    private void PolicyChanged(object sender, RoutedEventArgs e) { if (_isUiInitialized) { QueueSave(); ApplyPlaybackPolicy(); } }
+    private void PolicyModeChanged(object sender, SelectionChangedEventArgs e) { if (_isUiInitialized) { QueueSave(); ApplyPlaybackPolicy(); } }
+    private void FpsComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isUiInitialized) return;
+        _settings.FramesPerSecond = GetSelectedFps();
+        _wallpaperController.SetFrameCap(_settings.FramesPerSecond);
+        LivePreview.SetFrameCap(_settings.FramesPerSecond);
+        QueueSave();
+    }
+    private int GetSelectedFps() => FpsComboBox.SelectedItem is ComboBoxItem item &&
+        int.TryParse(item.Tag?.ToString(), out var fps) ? FrameRatePolicy.Normalize(fps) : 30;
+    private PlaybackDecision Decision => PlaybackPolicy.Evaluate(AppPauseModeComboBox.SelectedIndex,
+        _foregroundMonitor.IsFullscreenActive, _foregroundMonitor.IsOtherAppActive,
+        PauseBatteryCheckBox.IsChecked == true, _foregroundMonitor.IsOnBattery,
+        PauseScopeComboBox.SelectedIndex == 1, _foregroundMonitor.ForegroundMonitorIndex, _environment.SessionLocked);
+
+    private void ApplyPlaybackPolicy()
+    {
+        if (!_isUiInitialized || _isQuitting) return;
+        var decision = Decision;
+        try
+        {
+            if (decision.PauseAll)
+            {
+                _wallpaperController.Pause();
+                _wallpaperController.SetPausedMonitor(null);
+            }
+            else
+            {
+                _wallpaperController.SetPausedMonitor(decision.PausedMonitor);
+                _wallpaperController.Resume();
+            }
+        }
+        catch (Exception exception) { ReportError("Playback policy", exception); ScheduleRecovery(); }
+        UpdatePreviewSuspension();
+        UpdateStatus();
+    }
+    private void UpdatePreviewSuspension() => LivePreview.SetSuspended(!IsVisible ||
+        WindowState == WindowState.Minimized || _environment.SessionLocked ||
+        PauseBatteryCheckBox.IsChecked == true && _foregroundMonitor.IsOnBattery);
+    private void UpdateStatus()
+    {
+        var state = _wallpaperController.IsRunning ? _wallpaperController.IsPaused ? "Paused" : "Running" : "Stopped";
+        StatusText.Text = _wallpaperController.IsRunning ? $"{state} · {Decision.Reason}" : state;
+        StatusText.ToolTip = _wallpaperController.ActiveRequest?.Id;
+    }
+
+    private void VisualizerSettingsButton_Click(object sender, RoutedEventArgs e) => VisualizerSettingsPopup.IsOpen = !VisualizerSettingsPopup.IsOpen;
+    private void VisualizerSettingChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => ApplyVisualizerSettings();
+    private void VisualizerColorChanged(object sender, SelectionChangedEventArgs e) => ApplyVisualizerSettings();
+    private void ApplyVisualizerSettings()
+    {
+        if (!_isUiInitialized || Selected is not { IsVisualizer: true } entry) return;
+        var preferences = new VisualizerPreferences((float)VisualizerIntensitySlider.Value,
+            (float)VisualizerSensitivitySlider.Value, (float)VisualizerGlowSlider.Value, VisualizerColorComboBox.SelectedIndex).Normalize();
+        _settings.Visualizers[entry.Id] = preferences;
+        var settings = preferences.ToSettings();
+        if (_wallpaperController.ActiveRequest?.Id == entry.Id) _wallpaperController.UpdateVisualizerSettings(settings);
+        LivePreview.UpdateSettings(settings);
+        QueueSave();
+    }
+
+    private async void AddVideo_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose a local video", CheckFileExists = true,
+            Filter = "Video files|*.mp4;*.mkv;*.webm;*.mov;*.avi;*.gif|All files|*.*"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            await MediaTools.ProbeAsync(dialog.FileName, _settings.MediaToolsDirectory, CancellationToken.None);
+            MediaTools.Resolve("ffmpeg", _settings.MediaToolsDirectory);
+            if (_isQuitting) return;
+            var existing = _settings.Videos.FirstOrDefault(video => string.Equals(video.Path, dialog.FileName, StringComparison.OrdinalIgnoreCase));
+            var video = existing ?? new LocalVideo("video:" + Guid.NewGuid().ToString("N"), dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName));
+            if (existing is null) _settings.Videos.Add(video);
+            RefreshGallery();
+            WallpaperGallery.SelectedItem = WallpaperGallery.Items.Cast<WallpaperEntry>().First(entry => entry.Id == video.Id);
+            QueueSave();
+            ErrorText.Text = "";
+        }
+        catch (Exception exception) { ReportError("Video could not be added", exception); }
+    }
+    private void MediaTools_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Choose ffmpeg.exe (ffprobe.exe must be in the same folder)", Filter = "FFmpeg|ffmpeg.exe", CheckFileExists = true };
+        if (dialog.ShowDialog(this) != true) return;
+        var folder = Path.GetDirectoryName(dialog.FileName)!;
+        if (!File.Exists(Path.Combine(folder, "ffprobe.exe"))) { ErrorText.Text = "This folder also needs ffprobe.exe."; return; }
+        _settings.MediaToolsDirectory = folder;
+        QueueSave();
+        UpdateSelection();
+        ErrorText.Text = "";
+    }
+    private void OpenLibrary_Click(object sender, RoutedEventArgs e) => OpenFolder(_wallpaperLibrary.PackagesDirectory);
+    private void OpenDiagnostics_Click(object sender, RoutedEventArgs e) => OpenFolder(AppLog.LogDirectory);
+    private void OpenFolder(string path)
+    {
+        try { Directory.CreateDirectory(path); Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch (Exception exception) { ReportError("Folder could not be opened", exception); }
+    }
+    private void ReportError(string context, Exception exception)
+    {
+        AppLog.WriteException(context, exception);
+        ErrorText.Text = $"{context}: {exception.Message}";
+    }
+    private void QueueSave()
+    {
+        if (!_isUiInitialized) return;
+        _settings.AppPauseMode = AppPauseModeComboBox.SelectedIndex;
+        _settings.PausePerMonitor = PauseScopeComboBox.SelectedIndex == 1;
+        _settings.PauseOnBattery = PauseBatteryCheckBox.IsChecked == true;
+        _settings.FramesPerSecond = GetSelectedFps();
+        _saveTimer.Stop();
+        _saveTimer.Start();
+    }
+
+    private void RememberDisplays()
+    {
+        var snapshots = DesktopWorker.GetMonitorTargets().Select(display => new SavedDisplay(
+            display.DeviceId, display.DeviceName, display.X, display.Y, display.Width, display.Height,
+            display.DpiX, display.DpiY));
+        // Disconnected displays retain their snapshot; indices are never persisted as identity.
+        _settings.Displays = (_settings.Displays ?? []).Concat(snapshots)
+            .GroupBy(display => display.DeviceId).Select(group => group.Last()).ToList();
+        QueueSave();
+    }
+    private void SavePreferences()
+    {
+        _saveTimer.Stop();
+        if (!_settingsStore.Save(_settings)) ErrorText.Text = "Preferences could not be saved. Open diagnostics for details.";
     }
 
     private void InitializeTrayIcon()
     {
-        var iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "hypnix-tray-white.ico");
-        _trayDrawingIcon = System.IO.File.Exists(iconPath)
-            ? new System.Drawing.Icon(iconPath)
-            : System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!);
-
-        var menu = new System.Windows.Forms.ContextMenuStrip();
-        var openItem = menu.Items.Add("Open HYPNIX");
-        openItem.Font = new System.Drawing.Font(openItem.Font, System.Drawing.FontStyle.Bold);
-        openItem.Click += (_, _) => Dispatcher.Invoke(ShowMainWindow);
-        menu.Items.Add("Stop wallpaper", null, (_, _) => Dispatcher.Invoke(StopWallpaperFromTray));
-        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-        menu.Items.Add("Quit HYPNIX", null, (_, _) => Dispatcher.Invoke(QuitApplication));
-
-        _trayIcon = new System.Windows.Forms.NotifyIcon
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Brand", "hypnix-tray-white.ico");
+        try
         {
-            Icon = _trayDrawingIcon,
-            Text = "HYPNIX - Animated wallpapers",
-            ContextMenuStrip = menu,
-            Visible = true
-        };
+            _trayDrawingIcon = File.Exists(iconPath)
+                ? new System.Drawing.Icon(iconPath)
+                : Environment.ProcessPath is { } processPath
+                    ? System.Drawing.Icon.ExtractAssociatedIcon(processPath)
+                    : null;
+        }
+        catch (Exception exception) { AppLog.WriteException("Tray icon load failed; using default", exception); }
+        // Guarantee a disposable, owned icon so the tray is always visible and cleanup is safe.
+        _trayDrawingIcon ??= (System.Drawing.Icon)System.Drawing.SystemIcons.Application.Clone();
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add("Open HYPNIX", null, (_, _) => Dispatcher.Invoke(ShowMainWindow));
+        menu.Items.Add("Stop wallpaper", null, (_, _) => Dispatcher.Invoke(StopWallpaper));
+        menu.Items.Add("Quit HYPNIX", null, (_, _) => Dispatcher.Invoke(() => { _isQuitting = true; Close(); }));
+        _trayIcon = new System.Windows.Forms.NotifyIcon { Icon = _trayDrawingIcon, Text = "HYPNIX", ContextMenuStrip = menu, Visible = true };
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowMainWindow);
-        AppLog.Write($"Notification-area icon initialized. Icon={iconPath}");
     }
-
     private void ShowMainWindow()
     {
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
-        Topmost = true;
-        Topmost = false;
-        Focus();
-        AppLog.Write("Main window restored from notification area");
     }
-
-    private void StopWallpaperFromTray()
+    protected override void OnClosing(CancelEventArgs e)
     {
-        AppLog.Write("Stop wallpaper selected from notification area");
-        _wallpaperController.Stop();
-        _foregroundMonitor.ExcludedProcessId = null;
-        _foregroundMonitor.RefreshNow();
-        UpdateStatus();
+        if (!_isQuitting)
+        {
+            e.Cancel = true;
+            SavePreferences();
+            Hide();
+            if (!_trayHintShown)
+            {
+                _trayHintShown = true;
+                _trayIcon?.ShowBalloonTip(2500, "HYPNIX is still running", "Double-click the tray icon to reopen, or choose Quit HYPNIX to exit.", System.Windows.Forms.ToolTipIcon.Info);
+            }
+            return;
+        }
+        base.OnClosing(e);
     }
-
-    private void QuitApplication()
+    protected override void OnClosed(EventArgs e)
     {
-        AppLog.Write("Quit HYPNIX selected from notification area");
         _isQuitting = true;
-        Close();
+        SavePreferences();
+        _recoveryTimer.Stop();
+        _wallpaperLibrary.PackagesChanged -= OnPackagesChanged;
+        _environment.Dispose();
+        LivePreview.Dispose();
+        _foregroundMonitor.Dispose();
+        _wallpaperLibrary.Dispose();
+        _wallpaperController.Dispose();
+        if (_trayIcon is not null) { _trayIcon.Visible = false; _trayIcon.ContextMenuStrip?.Dispose(); _trayIcon.Dispose(); }
+        _trayDrawingIcon?.Dispose();
+        base.OnClosed(e);
     }
-
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        ApplyDarkTitleBar();
-        // SystemParameters.WorkArea is the primary monitor's usable area in WPF
-        // device-independent pixels, so it already accounts for DPI and taskbar.
-        var workArea = SystemParameters.WorkArea;
-        const double safeMargin = 32;
-        Width = Math.Min(1180, Math.Max(MinWidth, workArea.Width - safeMargin * 2));
-        Height = Math.Min(760, Math.Max(MinHeight, workArea.Height - safeMargin * 2));
-        Left = workArea.Left + Math.Max(safeMargin, (workArea.Width - Width) / 2);
-        Top = workArea.Top + Math.Max(safeMargin, (workArea.Height - Height) / 2);
-        AppLog.Write($"Main window placed on primary work area. WorkArea={workArea.Left},{workArea.Top}," +
-                     $"{workArea.Width},{workArea.Height}; Window={Left},{Top},{Width},{Height}");
-    }
-
-    private void ApplyDarkTitleBar()
-    {
-        var handle = new WindowInteropHelper(this).Handle;
         var enabled = 1;
-        var result = DwmSetWindowAttribute(handle, 20, ref enabled, sizeof(int));
-        if (result != 0) DwmSetWindowAttribute(handle, 19, ref enabled, sizeof(int));
-        AppLog.Write($"Dark title bar requested. Handle=0x{handle.ToInt64():X}; result={result}");
+        DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, ref enabled, sizeof(int));
+        var work = SystemParameters.WorkArea;
+        MinWidth = Math.Min(MinWidth, Math.Max(320, work.Width - 32));
+        MinHeight = Math.Min(MinHeight, Math.Max(320, work.Height - 32));
+        Width = Math.Min(1180, work.Width - 32);
+        Height = Math.Min(760, work.Height - 32);
+        Left = work.Left + (work.Width - Width) / 2;
+        Top = work.Top + (work.Height - Height) / 2;
+        UpdateSelection();
     }
-
-    private async void StartButton_Click(object sender, RoutedEventArgs e)
-    {
-        AppLog.Write($"Start clicked. FPS={GetSelectedFps()}");
-        StatusText.Text = "Preparing wallpaper...";
-        StartButton.IsEnabled = false;
-        await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-
-        try
-        {
-            _wallpaperController.Start(GetSelectedFps(), GetSelectedWallpaperKind(), ExampleVideoPath);
-            ApplyVisualizerSettings();
-            _foregroundMonitor.ExcludedProcessId = _wallpaperController.ActiveProcessId;
-            _foregroundMonitor.RefreshNow();
-            ApplyPlaybackPolicy();
-            AppLog.Write($"Start completed. Running={_wallpaperController.IsRunning}; Paused={_wallpaperController.IsPaused}");
-        }
-        catch (Exception exception)
-        {
-            AppLog.WriteException("Start failed", exception);
-            StatusText.Text = "Start failed - check logs";
-        }
-        finally
-        {
-            StartButton.IsEnabled = true;
-        }
-    }
-
-    private void StopButton_Click(object sender, RoutedEventArgs e)
-    {
-        AppLog.Write("Stop clicked");
-        _wallpaperController.Stop();
-        _foregroundMonitor.ExcludedProcessId = null;
-        _foregroundMonitor.RefreshNow();
-        UpdateStatus();
-    }
-
-    private void PolicyChanged(object sender, RoutedEventArgs e)
-    {
-        if (!_isUiInitialized)
-        {
-            return;
-        }
-
-        ApplyPlaybackPolicy();
-    }
-
-    private void PolicyModeChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_isUiInitialized)
-        {
-            return;
-        }
-
-        ApplyPlaybackPolicy();
-    }
-
-    private void FpsComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        var fps = GetSelectedFps();
-        PreviewBackdrop.TargetFramesPerSecond = fps;
-        _wallpaperController.SetFrameCap(fps);
-    }
-
-    private async void WallpaperComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isUiInitialized) UpdateVisualizerSettingsVisibility();
-        if (!_isUiInitialized || !_wallpaperController.IsRunning) return;
-        AppLog.Write($"Wallpaper selection changed. Kind={GetSelectedWallpaperKind()}");
-        await StartSelectedWallpaperAsync();
-    }
-
-    private async Task StartSelectedWallpaperAsync()
-    {
-        StatusText.Text = "Switching wallpaper...";
-        StartButton.IsEnabled = false;
-        await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-        try
-        {
-            _wallpaperController.Start(GetSelectedFps(), GetSelectedWallpaperKind(), ExampleVideoPath);
-            ApplyVisualizerSettings();
-            _foregroundMonitor.ExcludedProcessId = _wallpaperController.ActiveProcessId;
-            _foregroundMonitor.RefreshNow();
-            ApplyPlaybackPolicy();
-        }
-        catch (Exception exception)
-        {
-            AppLog.WriteException("Wallpaper switch failed", exception);
-            StatusText.Text = "Switch failed - check logs";
-        }
-        finally
-        {
-            StartButton.IsEnabled = true;
-        }
-    }
-
-    private int GetSelectedFps()
-    {
-        return FpsComboBox.SelectedItem is ComboBoxItem item &&
-               int.TryParse(item.Tag?.ToString(), out var requested)
-            ? FrameRatePolicy.Normalize(requested)
-            : 30;
-    }
-
-    private WallpaperKind GetSelectedWallpaperKind() => WallpaperComboBox.SelectedIndex switch
-    {
-        1 => WallpaperKind.VisualizerDemo,
-        2 => WallpaperKind.AethelisVisualizer,
-        3 => WallpaperKind.AethelisFlameBurst,
-        4 => WallpaperKind.FlamethrowerRingV2,
-        5 => WallpaperKind.VolumetricFire,
-        6 => WallpaperKind.ExampleVideo,
-        _ => WallpaperKind.BuiltIn
-    };
-
-    private void VisualizerSettingsButton_Click(object sender, RoutedEventArgs e)
-    {
-        VisualizerSettingsPopup.IsOpen = !VisualizerSettingsPopup.IsOpen;
-    }
-
-    private void VisualizerSettingChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_isUiInitialized) ApplyVisualizerSettings();
-    }
-
-    private void VisualizerColorChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isUiInitialized) ApplyVisualizerSettings();
-    }
-
-    private void UpdateVisualizerSettingsVisibility()
-    {
-        var isVisualizer = GetSelectedWallpaperKind() is WallpaperKind.VisualizerDemo or
-            WallpaperKind.AethelisVisualizer or WallpaperKind.AethelisFlameBurst or WallpaperKind.FlamethrowerRingV2 or WallpaperKind.VolumetricFire;
-        VisualizerSettingsButton.Visibility = isVisualizer ? Visibility.Visible : Visibility.Collapsed;
-        if (!isVisualizer) VisualizerSettingsPopup.IsOpen = false;
-        UpdateWallpaperSelectionVisuals();
-    }
-
-    private void AmbientCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 0;
-
-    private void VisualizerCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 1;
-
-    private void AethelisCard_Click(object sender, RoutedEventArgs e)
-    {
-        FpsComboBox.SelectedIndex = 2;
-        WallpaperComboBox.SelectedIndex = 2;
-    }
-
-    private void FlameBurstCard_Click(object sender, RoutedEventArgs e)
-    {
-        FpsComboBox.SelectedIndex = 2;
-        WallpaperComboBox.SelectedIndex = 3;
-    }
-
-    private void FlamethrowerCard_Click(object sender, RoutedEventArgs e)
-    {
-        FpsComboBox.SelectedIndex = 2;
-        WallpaperComboBox.SelectedIndex = 4;
-    }
-
-    private void VolumetricFireCard_Click(object sender, RoutedEventArgs e)
-    {
-        FpsComboBox.SelectedIndex = 2;
-        WallpaperComboBox.SelectedIndex = 5;
-    }
-
-    private void VideoCard_Click(object sender, RoutedEventArgs e) => WallpaperComboBox.SelectedIndex = 6;
-
-    private void UpdateWallpaperSelectionVisuals()
-    {
-        if (AmbientCardBorder is null || VisualizerCardBorder is null || AethelisCardBorder is null ||
-            FlameBurstCardBorder is null || FlamethrowerCardBorder is null || VolumetricFireCardBorder is null || VideoCardBorder is null) return;
-        var accent = (System.Windows.Media.Brush)FindResource("AccentBrush");
-        var transparent = System.Windows.Media.Brushes.Transparent;
-        AmbientCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 0 ? accent : transparent;
-        VisualizerCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 1 ? accent : transparent;
-        AethelisCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 2 ? accent : transparent;
-        FlameBurstCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 3 ? accent : transparent;
-        FlamethrowerCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 4 ? accent : transparent;
-        VolumetricFireCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 5 ? accent : transparent;
-        VideoCardBorder.BorderBrush = WallpaperComboBox.SelectedIndex == 6 ? accent : transparent;
-
-        (ActivePreviewTitle.Text, ActivePreviewSubtitle.Text) = WallpaperComboBox.SelectedIndex switch
-        {
-            1 => ("Audio visualizer", "WASAPI loopback · 64 FFT bands · two displays"),
-            2 => ("Aethelis Audio Reactive", "Bass impact · mid turbulence · high-frequency particles"),
-            3 => ("Fire Burst Experimental", "Approved fire ring · detached bass-driven flames"),
-            4 => ("Flamethrower Ring V2", "EmberGen volumetric jet · 64-frame reactive flipbook"),
-            5 => ("Volumetric Fire 3D Prototype", "Persistent voxel volume · 64-slice ray marching · no flipbooks"),
-            6 => ("Example MP4", "Local video · per-display aspect correction"),
-            _ => ("Built-in ambient", "Native procedural wallpaper")
-        };
-        var previewPath = WallpaperComboBox.SelectedIndex switch
-        {
-            1 => "Assets/Wallpapers/audio-visualizer-classic/preview.png",
-            2 => "Assets/Wallpapers/aethelis-audio-visualizer/preview.png",
-            3 => "Assets/Wallpapers/aethelis-audio-visualizer/preview.png",
-            4 => "Assets/Wallpapers/aethelis-audio-visualizer/preview.png",
-            5 => "Assets/Wallpapers/aethelis-audio-visualizer/preview.png",
-            6 => "Assets/Wallpapers/example-video/preview.jpg",
-            _ => "Assets/Wallpapers/built-in-ambient/preview.jpg"
-        };
-        SelectedPreviewImage.Source = new BitmapImage(new Uri($"pack://application:,,,/{previewPath}"));
-    }
-
     [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int valueSize);
-
-    private void ApplyVisualizerSettings()
-    {
-        if (GetSelectedWallpaperKind() is not (WallpaperKind.VisualizerDemo or WallpaperKind.AethelisVisualizer or
-            WallpaperKind.AethelisFlameBurst or WallpaperKind.FlamethrowerRingV2 or WallpaperKind.VolumetricFire)) return;
-        var (startColor, endColor) = VisualizerColorComboBox.SelectedIndex switch
-        {
-            1 => (System.Drawing.Color.FromArgb(255, 82, 120), System.Drawing.Color.FromArgb(255, 185, 70)),
-            2 => (System.Drawing.Color.FromArgb(70, 255, 185), System.Drawing.Color.FromArgb(20, 160, 120)),
-            3 => (System.Drawing.Color.FromArgb(245, 245, 250), System.Drawing.Color.FromArgb(120, 130, 150)),
-            _ => (System.Drawing.Color.FromArgb(88, 205, 255), System.Drawing.Color.FromArgb(104, 80, 255))
-        };
-        _wallpaperController.UpdateVisualizerSettings(new VisualizerSettings(
-            (float)VisualizerIntensitySlider.Value,
-            (float)VisualizerSensitivitySlider.Value,
-            (float)VisualizerGlowSlider.Value,
-            startColor,
-            endColor));
-    }
-
-    private void ApplyPlaybackPolicy()
-    {
-        var appPauseMode = AppPauseModeComboBox.SelectedIndex;
-        var appShouldPause =
-            appPauseMode == 2 && _foregroundMonitor.IsOtherAppActive ||
-            appPauseMode == 1 && _foregroundMonitor.IsFullscreenActive;
-        var batteryShouldPause = PauseBatteryCheckBox.IsChecked == true && _foregroundMonitor.IsOnBattery;
-
-        if (!_wallpaperController.IsRunning)
-        {
-            UpdateStatus();
-            return;
-        }
-
-        if (appShouldPause && PauseScopeComboBox.SelectedIndex == 1 &&
-            _foregroundMonitor.ForegroundMonitorIndex is int monitorIndex)
-        {
-            _wallpaperController.Resume();
-            _wallpaperController.SetPausedMonitor(monitorIndex);
-        }
-        else if (appShouldPause || batteryShouldPause)
-        {
-            _wallpaperController.SetPausedMonitor(null);
-            _wallpaperController.Pause();
-        }
-        else
-        {
-            _wallpaperController.SetPausedMonitor(null);
-            _wallpaperController.Resume();
-        }
-
-        UpdateStatus();
-    }
-
-    private void UpdateStatus()
-    {
-        var state = _wallpaperController.IsRunning
-            ? _wallpaperController.IsPaused ? "Paused" : "Running"
-            : "Stopped";
-
-        var appPauseMode = AppPauseModeComboBox.SelectedIndex;
-        var perDisplayPause = PauseScopeComboBox.SelectedIndex == 1 &&
-                              _foregroundMonitor.ForegroundMonitorIndex is int;
-        var reason = appPauseMode == 2 && _foregroundMonitor.IsOtherAppActive
-            ? perDisplayPause
-                ? $"display {_foregroundMonitor.ForegroundMonitorIndex!.Value + 1} paused"
-                : "another app is active"
-            : appPauseMode == 1 && _foregroundMonitor.IsFullscreenActive
-            ? perDisplayPause
-                ? $"display {_foregroundMonitor.ForegroundMonitorIndex!.Value + 1} paused"
-                : "fullscreen app detected"
-            : _foregroundMonitor.IsOnBattery ? "battery power" : "ready";
-
-        StatusText.Text = $"{state} - {reason}";
-    }
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 }

@@ -49,8 +49,11 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private readonly PerMonitorVisualizerFreezeState _visualizerFreezeState = new();
     private VisualizerSettings _visualizerSettings = VisualizerSettings.Default;
     private readonly Bitmap? _visualizerBackground;
-    private readonly Bitmap? _aethelisBassState;
-    private readonly Bitmap? _aethelisDecayState;
+    private BufferedGraphics? _backBuffer;
+    private readonly BufferedGraphicsContext _bufferContext = new();
+    private Size _bufferSize;
+    private bool _failed;
+    private bool _paused;
     private AethelisGpuRenderer? _aethelisGpuRenderer;
     private bool _isShown;
     private static readonly object WindowClassLock = new();
@@ -58,18 +61,19 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private static readonly IntPtr ModuleHandle = GetModuleHandle(null);
     private static bool _windowClassRegistered;
 
-    public NativeWallpaperHost(NativeRenderMode renderMode, DesktopWorker.WallpaperTarget[]? renderTargets = null)
+    public NativeWallpaperHost(NativeRenderMode renderMode, DesktopWorker.WallpaperTarget[]? renderTargets = null,
+        string? customBackground = null, PreviewTarget? preview = null)
     {
         _renderMode = renderMode;
         _renderTargets = renderTargets;
-        var backgroundPath = renderMode switch
+        var backgroundPath = customBackground ?? (renderMode switch
         {
             NativeRenderMode.VisualizerDemo => System.IO.Path.Combine(
                 AppContext.BaseDirectory, "Assets", "Wallpapers", "audio-visualizer-classic", "background.png"),
             NativeRenderMode.FlameVisualizer => System.IO.Path.Combine(
                 AppContext.BaseDirectory, "Assets", "Wallpapers", "flame-visualizer", "background.png"),
             _ => null
-        };
+        });
         if (backgroundPath is not null && System.IO.File.Exists(backgroundPath))
         {
             _visualizerBackground = new Bitmap(backgroundPath);
@@ -78,17 +82,17 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
         EnsureWindowClassRegistered();
         var extendedStyle = WsExNoActivate | WsExToolWindow | WsExTransparent;
-        if (renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)) extendedStyle |= WsExLayered;
+        if (preview is null && renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)) extendedStyle |= WsExLayered;
         Handle = CreateWindowEx(
             extendedStyle,
             WindowClassName,
             "Animated Wallpaper Native Host",
-            WsPopup,
+            preview is null ? WsPopup : 0x40000000u,
             0,
             0,
-            1,
-            1,
-            IntPtr.Zero,
+            preview?.Width ?? 1,
+            preview?.Height ?? 1,
+            preview?.Parent ?? IntPtr.Zero,
             IntPtr.Zero,
             ModuleHandle,
             IntPtr.Zero);
@@ -99,17 +103,27 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         Marshal.SetLastPInvokeError(0);
-        var alphaResult = renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire ||
+        var alphaResult = preview is not null || renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire ||
                           SetLayeredWindowAttributes(Handle, 0, 255, LwaAlpha);
         AppLog.Write($"Native host created. Handle=0x{Handle.ToInt64():X}; alphaResult={alphaResult}; " +
                      $"error={Marshal.GetLastPInvokeError()}");
 
-        _renderTimer.Tick += (_, _) => RenderFrame();
+        _renderTimer.Tick += (_, _) =>
+        {
+            try { RenderFrame(); }
+            catch (Exception exception)
+            {
+                _failed = true;
+                _renderTimer.Stop();
+                AppLog.WriteException("Wallpaper renderer failed", exception);
+            }
+        };
     }
 
     public IntPtr Handle { get; private set; }
+    public bool IsHealthy => !_failed && Handle != IntPtr.Zero && IsWindow(Handle);
 
-    public void Start(int framesPerSecond)
+    public void Start(int framesPerSecond, bool reveal = true)
     {
         SetFrameCap(framesPerSecond);
         if (_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)
@@ -129,6 +143,11 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         // Prepare a complete frame while the desktop host is still hidden.
         RenderFrame();
 
+        if (reveal) Show();
+    }
+
+    public void Show()
+    {
         if (!_isShown)
         {
             const int showNoActivate = 8;
@@ -144,10 +163,17 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         _renderTimer.Start();
     }
 
-    public void Pause() => _renderTimer.Stop();
+    public void Pause()
+    {
+        _paused = true;
+        _clock.Stop();
+        _renderTimer.Stop();
+    }
 
     public void Resume()
     {
+        _paused = false;
+        _clock.Start();
         _renderTimer.Start();
         RenderFrame();
     }
@@ -161,8 +187,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     {
         lock (_videoFrameLock)
         {
-            _videoFrame ??= new byte[frame.Length];
-            if (_videoFrame.Length != frame.Length) _videoFrame = new byte[frame.Length];
+            if (_videoFrame is null || _videoFrame.Length != frame.Length) _videoFrame = new byte[frame.Length];
             Buffer.BlockCopy(frame, 0, _videoFrame, 0, frame.Length);
             _videoWidth = width;
             _videoHeight = height;
@@ -200,7 +225,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
     private void RenderFrame()
     {
-        if (Handle == IntPtr.Zero || !GetClientRect(Handle, out var rect))
+        if (_paused || Handle == IntPtr.Zero || !GetClientRect(Handle, out var rect))
         {
             return;
         }
@@ -223,7 +248,14 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         using var target = Graphics.FromHwnd(Handle);
-        using var frame = BufferedGraphicsManager.Current.Allocate(target, new Rectangle(0, 0, width, height));
+        if (_backBuffer is null || _bufferSize != new Size(width, height))
+        {
+            _backBuffer?.Dispose();
+            _bufferContext.MaximumBuffer = new Size(width + 1, height + 1);
+            _backBuffer = _bufferContext.Allocate(target, new Rectangle(0, 0, width, height));
+            _bufferSize = new Size(width, height);
+        }
+        var frame = _backBuffer;
         var graphics = frame.Graphics;
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -234,8 +266,9 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             return;
         }
 
-        if (_renderMode is NativeRenderMode.VisualizerDemo or NativeRenderMode.AethelisVisualizer or
-            NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.FlameVisualizer)
+        // GPU-backed modes (Aethelis/FlameBurst/FlamethrowerRingV2/VolumetricFire) return above via
+        // RenderAethelisGpuFrame; only the GDI visualizers reach here.
+        if (_renderMode is NativeRenderMode.VisualizerDemo or NativeRenderMode.FlameVisualizer)
         {
             if (_renderTargets is { Length: > 0 })
             {
@@ -281,9 +314,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             ? Color.FromArgb(8, 3, 2)
             : Color.FromArgb(3, 4, 10));
 
-        if (_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)
-            RenderAethelisVisualizer(graphics, width, height, time, bands, _visualizerSettings);
-        else if (_renderMode == NativeRenderMode.FlameVisualizer)
+        if (_renderMode == NativeRenderMode.FlameVisualizer)
             RenderFlameVisualizer(graphics, width, height, time, bands, _visualizerSettings);
         else
             RenderVisualizerDemo(graphics, width, height, time, bands, _visualizerSettings, clearBackground: false);
@@ -320,88 +351,6 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         _aethelisGpuRenderer.EndFrame();
-    }
-
-    private Bitmap? LoadOptionalBitmap(string fileName)
-    {
-        var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "Wallpapers",
-            "aethelis-audio-visualizer", fileName);
-        if (!System.IO.File.Exists(path)) return null;
-        var bitmap = new Bitmap(path);
-        AppLog.Write($"Aethelis state loaded. Path={path}; Size={bitmap.Width}x{bitmap.Height}");
-        return bitmap;
-    }
-
-    private void RenderAethelisVisualizer(
-        Graphics graphics, int width, int height, double time, float[] bands, VisualizerSettings settings)
-    {
-        var profile = AethelisAudioProfile.Analyze(bands, settings.Sensitivity);
-        var idleBreath = 1f + 0.008f * (float)Math.Sin(time * Math.PI * 2 / 3);
-        var coreScale = idleBreath + profile.Mids * 0.012f * settings.Intensity;
-
-        if (_visualizerBackground is not null)
-            DrawImageCoverTransformed(graphics, _visualizerBackground, width, height, 1f, coreScale,
-                (float)Math.Sin(time * 0.22) * 0.12f);
-
-        if (_aethelisDecayState is not null)
-        {
-            var veilAlpha = Math.Clamp(0.05f + profile.Mids * 0.42f + profile.Complexity * 0.28f, 0, 0.72f);
-            DrawImageCoverTransformed(graphics, _aethelisDecayState, width, height, veilAlpha,
-                1.01f + profile.Mids * 0.035f, (float)(time * (0.35 + profile.Mids * 0.8)) % 360);
-        }
-
-        if (_aethelisBassState is not null)
-        {
-            var impact = MathF.Pow(profile.Bass, 1.15f) * settings.Intensity;
-            var impactAlpha = Math.Clamp((impact - 0.06f) * 1.25f, 0, 1);
-            var impactScale = 0.78f + Math.Clamp(impact, 0, 1.35f) * 0.30f;
-            DrawImageCoverTransformed(graphics, _aethelisBassState, width, height, impactAlpha,
-                impactScale, (float)Math.Sin(time * 1.7) * profile.Mids * 1.8f);
-        }
-
-        RenderAethelisParticles(graphics, width, height, time, profile.Highs, settings.Glow);
-    }
-
-    private static void DrawImageCoverTransformed(
-        Graphics graphics, Image image, int width, int height, float alpha, float scale, float rotation)
-    {
-        if (alpha <= 0.001f) return;
-        var source = ImageCoverCalculator.CalculateSourceRectangle(image.Width, image.Height, width, height);
-        var state = graphics.Save();
-        graphics.TranslateTransform(width / 2f, height / 2f);
-        graphics.RotateTransform(rotation);
-        graphics.ScaleTransform(scale, scale);
-        using var attributes = new ImageAttributes();
-        var matrix = new ColorMatrix { Matrix33 = Math.Clamp(alpha, 0, 1) };
-        attributes.SetColorMatrix(matrix, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
-        graphics.DrawImage(image,
-            new Rectangle(-width / 2, -height / 2, width, height),
-            source.X, source.Y, source.Width, source.Height,
-            GraphicsUnit.Pixel, attributes);
-        graphics.Restore(state);
-    }
-
-    private static void RenderAethelisParticles(
-        Graphics graphics, int width, int height, double time, float highs, float glow)
-    {
-        if (highs < 0.025f) return;
-        var centerX = width / 2f;
-        var centerY = height / 2f;
-        var radius = Math.Min(width, height) * (0.20f + highs * 0.34f);
-        var count = 18 + (int)(highs * 54);
-        for (var index = 0; index < count; index++)
-        {
-            var seed = Fraction(index * 0.61803398875);
-            var angle = seed * Math.PI * 2 + time * (0.18 + highs * 0.85);
-            var orbit = radius * (0.32f + 0.68f * (float)Fraction(index * 0.381966 + time * (0.08 + highs * 0.22)));
-            var x = centerX + orbit * (float)Math.Cos(angle);
-            var y = centerY + orbit * 0.58f * (float)Math.Sin(angle) - highs * height * 0.035f;
-            var size = Math.Max(1.5f, Math.Min(width, height) * (0.0012f + highs * 0.0032f) * (0.55f + (float)seed));
-            var alpha = (int)Math.Clamp(45 + highs * 175 + glow * 25, 0, 240);
-            var color = index % 3 == 0 ? Color.FromArgb(alpha, 90, 225, 255) : Color.FromArgb(alpha, 255, 221, 155);
-            using var brush = new SolidBrush(color);
-            graphics.FillEllipse(brush, x - size / 2, y - size / 2, size, size);
-        }
     }
 
     private static void RenderAmbient(Graphics graphics, int width, int height, double time)
@@ -740,9 +689,9 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         var handle = Handle;
         Handle = IntPtr.Zero;
         _renderTimer.Stop();
+        _backBuffer?.Dispose();
+        _bufferContext.Dispose();
         _visualizerBackground?.Dispose();
-        _aethelisBassState?.Dispose();
-        _aethelisDecayState?.Dispose();
         _aethelisGpuRenderer?.Dispose();
         var result = DestroyWindow(handle);
         AppLog.Write($"Native host destroyed. Handle=0x{handle.ToInt64():X}; result={result}; error={Marshal.GetLastPInvokeError()}");
@@ -787,6 +736,10 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool GetClientRect(IntPtr hwnd, out NativeRect rect);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool IsWindow(IntPtr hwnd);
 
     private delegate IntPtr WindowProcedure(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 
