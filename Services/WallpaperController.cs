@@ -94,9 +94,9 @@ internal sealed class WallpaperController : IDisposable
         _session?.SetFrameCap(framesPerSecond);
     }
 
-    public void SetPausedMonitor(int? monitorIndex)
+    public void SetPausedMonitors(IReadOnlyList<int> monitorIndices)
     {
-        _session?.SetPausedMonitor(monitorIndex);
+        _session?.SetPausedMonitors(monitorIndices);
     }
 
     public void UpdateVisualizerSettings(VisualizerSettings settings)

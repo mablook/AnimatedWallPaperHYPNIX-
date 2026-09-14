@@ -11,8 +11,10 @@ Win32 desktop hosting, WASAPI and Direct3D 11.
 - Safe replacement: prepare the next wallpaper and its first frame before showing it and disposing the previous one.
   Preparation failures keep the current wallpaper; Stop also cancels pending preparation.
 - Live 15, 30 and 60 FPS presentation caps. Native CPU modes reuse a persistent back buffer.
-- Fullscreen/foreground pause, all-display or active-display scope, and optional battery pause.
-  Battery and session-lock policies take priority over per-display app pause.
+- Per-monitor pause for maximized/fullscreen apps, all-display or active-display scope, and optional battery
+  pause. In active-display scope each covered monitor freezes independently while clean monitors keep animating;
+  transparent/tool overlays (e.g. the NVIDIA GeForce overlay) are ignored. Battery and session-lock policies
+  take priority over per-display app pause.
 - Settings, selected wallpaper, local video references and per-wallpaper visualizer controls persist in
   `%LocalAppData%\HYPNIX\settings.json`. Playback starts explicitly with Start.
 - Explorer/host failure detection, display-change recovery and resume handling recreate active sessions.

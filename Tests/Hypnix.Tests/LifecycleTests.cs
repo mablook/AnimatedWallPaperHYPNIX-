@@ -105,7 +105,7 @@ public sealed class LifecycleTests
         public void Dispose() => Disposed = true;
         public void Pause() { }
         public void Resume() { }
-        public void SetPausedMonitor(int? monitorIndex) { }
+        public void SetPausedMonitors(IReadOnlyList<int> monitorIndices) { }
         public void SetFrameCap(int framesPerSecond) { }
         public void UpdateVisualizerSettings(VisualizerSettings settings) { }
     }

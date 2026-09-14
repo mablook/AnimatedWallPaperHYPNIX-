@@ -39,11 +39,10 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private readonly DesktopWorker.WallpaperTarget[]? _renderTargets;
     private readonly object _videoFrameLock = new();
     private byte[]? _videoFrame;
-    private byte[]? _pausedVideoFrame;
+    private readonly Dictionary<int, byte[]> _pausedVideoFrames = new();
     private int _videoWidth;
     private int _videoHeight;
-    private int? _pausedMonitorIndex;
-    private double _pausedAtSeconds;
+    private IReadOnlyList<int> _pausedMonitors = Array.Empty<int>();
     private readonly object _audioBandsLock = new();
     private float[] _audioBands = new float[64];
     private readonly PerMonitorVisualizerFreezeState _visualizerFreezeState = new();
@@ -194,20 +193,45 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
     }
 
-    public void SetPausedMonitor(int? monitorIndex)
+    public void SetPausedMonitors(IReadOnlyList<int> monitorIndices)
     {
-        if (_pausedMonitorIndex == monitorIndex) return;
-        _pausedMonitorIndex = monitorIndex;
-        _pausedAtSeconds = _clock.Elapsed.TotalSeconds;
+        var incoming = (monitorIndices ?? Array.Empty<int>())
+            .Where(index => index >= 0).Distinct().OrderBy(index => index).ToArray();
+        if (SamePausedMonitors(incoming)) return;
+        _pausedMonitors = incoming;
+        var now = _clock.Elapsed.TotalSeconds;
         lock (_videoFrameLock)
         {
-            _pausedVideoFrame = monitorIndex is not null && _videoFrame is not null
-                ? (byte[])_videoFrame.Clone()
-                : null;
+            foreach (var index in _pausedVideoFrames.Keys.Where(index => Array.IndexOf(incoming, index) < 0).ToArray())
+            {
+                _pausedVideoFrames.Remove(index);
+            }
+
+            if (_videoFrame is not null)
+            {
+                foreach (var index in incoming)
+                {
+                    if (!_pausedVideoFrames.ContainsKey(index))
+                    {
+                        _pausedVideoFrames[index] = (byte[])_videoFrame.Clone();
+                    }
+                }
+            }
         }
-        _visualizerFreezeState.Update(monitorIndex, _pausedAtSeconds, GetAudioBands());
-        AppLog.Write($"Native host monitor pause changed. MonitorIndex={monitorIndex?.ToString() ?? "none"}");
+        _visualizerFreezeState.Update(incoming, now, GetAudioBands());
+        AppLog.Write($"Native host monitor pause changed. Monitors={(incoming.Length == 0 ? "none" : string.Join(",", incoming))}");
         RenderFrame();
+    }
+
+    private bool SamePausedMonitors(IReadOnlyList<int> incoming)
+    {
+        if (_pausedMonitors.Count != incoming.Count) return false;
+        for (var i = 0; i < incoming.Count; i++)
+        {
+            if (_pausedMonitors[i] != incoming[i]) return false;
+        }
+
+        return true;
     }
 
     public void SubmitAudioBands(float[] bands)
@@ -295,13 +319,18 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
         var time = _clock.Elapsed.TotalSeconds;
         RenderAmbient(graphics, width, height, time);
-        if (_pausedMonitorIndex is int pausedIndex && _renderTargets is { Length: > 0 } && pausedIndex < _renderTargets.Length)
+        if (_renderTargets is { Length: > 0 })
         {
-            var pausedTarget = _renderTargets[pausedIndex];
-            var state = graphics.Save();
-            graphics.SetClip(new Rectangle(pausedTarget.X, pausedTarget.Y, pausedTarget.Width, pausedTarget.Height));
-            RenderAmbient(graphics, width, height, _pausedAtSeconds);
-            graphics.Restore(state);
+            foreach (var pausedIndex in _pausedMonitors)
+            {
+                if (pausedIndex < 0 || pausedIndex >= _renderTargets.Length) continue;
+                var frozenTime = _visualizerFreezeState.TryGetFrozenTime(pausedIndex, out var frozen) ? frozen : time;
+                var pausedTarget = _renderTargets[pausedIndex];
+                var state = graphics.Save();
+                graphics.SetClip(new Rectangle(pausedTarget.X, pausedTarget.Y, pausedTarget.Width, pausedTarget.Height));
+                RenderAmbient(graphics, width, height, frozenTime);
+                graphics.Restore(state);
+            }
         }
 
         frame.Render(target);
@@ -415,15 +444,14 @@ internal sealed partial class NativeWallpaperHost : IDisposable
                     for (var index = 0; index < _renderTargets.Length; index++)
                     {
                         var monitorTarget = _renderTargets[index];
-                        if (_pausedMonitorIndex == index && _pausedVideoFrame is not null)
+                        var targetRect = new RectangleF(monitorTarget.X, monitorTarget.Y, monitorTarget.Width, monitorTarget.Height);
+                        if (_pausedVideoFrames.TryGetValue(index, out var frozenFrame))
                         {
-                            DrawRawVideoCover(graphics, _pausedVideoFrame, _videoWidth, _videoHeight,
-                                new RectangleF(monitorTarget.X, monitorTarget.Y, monitorTarget.Width, monitorTarget.Height));
+                            DrawRawVideoCover(graphics, frozenFrame, _videoWidth, _videoHeight, targetRect);
                         }
                         else
                         {
-                            DrawVideoCover(graphics, bitmap,
-                                new RectangleF(monitorTarget.X, monitorTarget.Y, monitorTarget.Width, monitorTarget.Height));
+                            DrawVideoCover(graphics, bitmap, targetRect);
                         }
                     }
                 }

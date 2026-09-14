@@ -107,8 +107,10 @@ Run before releases and Store submissions:
 
 - Switch among ambient, classic visualizer, flame visualizer, and MP4 without manually stopping first.
 - Confirm both visualizers react to real system audio on both displays.
-- Select `Active display only`; foreground an app on display 1 and confirm only display 1 freezes completely.
-- Move the foreground app to display 2 and confirm the frozen visualizer follows it.
+- Select `Active display only` + `Maximized or fullscreen apps`; maximize an app on display 1 and confirm only display 1 freezes while display 2 keeps animating.
+- Maximize an app on display 2 as well and confirm both displays freeze; minimize one and confirm that display resumes while the other stays frozen.
+- Confirm a transparent/tool overlay (e.g. the NVIDIA GeForce overlay) does not pause a monitor that has no real app on it.
+- Or run the automated multi-monitor attestation: `powershell -ExecutionPolicy Bypass -File scripts\e2e-permonitor-pause.ps1` (requires two displays).
 - Confirm backgrounds crop independently without stretching on mixed-resolution monitors.
 - Close the UI: wallpaper remains active and the transparent white tray icon appears.
 - Restore by double-click, test Stop, restart, then Quit and confirm renderer and process disappear.

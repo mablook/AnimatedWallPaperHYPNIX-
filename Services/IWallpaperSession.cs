@@ -8,6 +8,6 @@ internal interface IWallpaperSession : IDisposable
     void SetFrameCap(int framesPerSecond);
     void Resume();
     void Pause();
-    void SetPausedMonitor(int? monitorIndex);
+    void SetPausedMonitors(IReadOnlyList<int> monitorIndices);
     void UpdateVisualizerSettings(VisualizerSettings settings);
 }

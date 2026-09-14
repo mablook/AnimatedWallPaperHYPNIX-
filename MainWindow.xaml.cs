@@ -230,9 +230,9 @@ public partial class MainWindow : Window
     private int GetSelectedFps() => FpsComboBox.SelectedItem is ComboBoxItem item &&
         int.TryParse(item.Tag?.ToString(), out var fps) ? FrameRatePolicy.Normalize(fps) : 30;
     private PlaybackDecision Decision => PlaybackPolicy.Evaluate(AppPauseModeComboBox.SelectedIndex,
-        _foregroundMonitor.IsFullscreenActive, _foregroundMonitor.IsOtherAppActive,
+        _foregroundMonitor.FullscreenMonitors, _foregroundMonitor.CoveredMonitors,
         PauseBatteryCheckBox.IsChecked == true, _foregroundMonitor.IsOnBattery,
-        PauseScopeComboBox.SelectedIndex == 1, _foregroundMonitor.ForegroundMonitorIndex, _environment.SessionLocked);
+        PauseScopeComboBox.SelectedIndex == 1, _environment.SessionLocked);
 
     private void ApplyPlaybackPolicy()
     {
@@ -243,11 +243,11 @@ public partial class MainWindow : Window
             if (decision.PauseAll)
             {
                 _wallpaperController.Pause();
-                _wallpaperController.SetPausedMonitor(null);
+                _wallpaperController.SetPausedMonitors(Array.Empty<int>());
             }
             else
             {
-                _wallpaperController.SetPausedMonitor(decision.PausedMonitor);
+                _wallpaperController.SetPausedMonitors(decision.PausedMonitors);
                 _wallpaperController.Resume();
             }
         }

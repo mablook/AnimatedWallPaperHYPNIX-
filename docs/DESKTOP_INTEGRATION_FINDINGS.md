@@ -147,24 +147,25 @@ Fullscreen detection and background detection are related, mutually exclusive po
 
 The UI now exposes one `Pause animation for apps` selector:
 
-- `Never` ignores application foreground state.
-- `Fullscreen apps only` pauses only when a foreground window covers its monitor.
-- `Any active app` pauses whenever a visible non-shell window owned by another process is foreground.
+- `Never` ignores application windows.
+- `Fullscreen apps only` pauses a monitor when a foreign app window covers the whole monitor (borderless/fullscreen).
+- `Maximized or fullscreen apps` pauses a monitor when a foreign app window covers it (maximized or fullscreen).
 
-Only one mode can be active at a time.
+Detection is per monitor and occupancy-based, not foreground-based: every top-level window is enumerated (`EnumWindows`) and each monitor is judged independently by whether a covering app window sits on it. This is what lets a clean monitor keep animating while an occupied monitor freezes, and lets several monitors freeze at once when each has a covering app.
 
-Foreground eligibility rules:
+Window eligibility rules (applied per window during enumeration):
 
 - `Progman`, `WorkerW`, `Shell_TrayWnd`, and windows owned by this application are excluded.
-- Minimized (`IsIconic`) windows are excluded. Some Windows applications remain foreground after being minimized; without this check, playback resumed only after the user clicked the desktop.
+- Minimized (`IsIconic`) windows are excluded, so minimizing an app releases its monitor.
 - DWM-cloaked windows are excluded because they are not visually active even when Win32 still reports them as visible.
-- The monitor refreshes once per second and emits a state change only when values change.
-- Start forces a synchronous foreground refresh before applying policy, avoiding a stale foreground state that could pause and resume immediately.
-- Logs must contain `OtherAppActive=True`, `Wallpaper paused`, then `OtherAppActive=False`, `Wallpaper resumed` for a complete validation.
+- Tool windows (`WS_EX_TOOLWINDOW`) and click-through layered overlays (`WS_EX_LAYERED` + `WS_EX_TRANSPARENT`) are excluded: they draw over a monitor but are not apps the user is using. The concrete offender is the NVIDIA GeForce overlay (class `CEF-OSC-WIDGET`, process `NVIDIA Overlay`), which ships two full-screen tool windows on the primary monitor and otherwise makes that monitor look permanently covered with no app in the foreground. `AppWindowFilter.IsEligibleAppWindow` centralizes this rule and is unit tested.
+- The monitor refreshes once per second and emits a state change only when the covered sets change.
+- Start forces a synchronous refresh before applying policy, avoiding a stale state that could pause and resume immediately.
+- For a complete validation the log must show `Foreground state changed ... Covered=[...]` followed by `Native host monitor pause changed. Monitors=...` (and `Monitors=none` when every monitor clears).
 
-Resume is idempotent: if the wallpaper is already running, repeated foreground notifications must not restart the timer or render redundant immediate frames.
+Resume is idempotent: if a monitor is already running, repeated notifications must not restart the timer or render redundant immediate frames.
 
-Important semantic detail: minimizing the current app does not guarantee that the desktop becomes foreground. Windows may activate another application underneath it. In `Any active app` mode, playback correctly remains paused if that newly focused window belongs to another process. Playback resumes automatically only when foreground becomes the desktop shell, this application's control window, or no eligible app. Use `Fullscreen apps only` when normal foreground windows should not pause playback.
+Important semantic detail: pausing is occupancy-based, so a monitor stays paused while any covering app sits on it, even if that app is not the foreground window, and resumes only when no covering app remains on it. Use `Fullscreen apps only` when merely maximized windows should not pause a monitor.
 
 Automated validation completed:
 
@@ -229,27 +230,31 @@ Wallpaper selection behavior:
 
 ## Per-monitor foreground pause
 
-The pause policy now has two scopes while retaining `All displays` as the safe default:
+The pause policy has two scopes while retaining `All displays` as the safe default:
 
-- `All displays`: pauses the shared renderer/timer exactly as before.
-- `Active display only`: keeps the shared timer and video decoder running, but freezes presentation on the
-  monitor containing the eligible foreground window.
+- `All displays`: as soon as any monitor is covered by an app, the shared renderer/timer pauses (whole desktop).
+- `Active display only`: keeps the shared timer and video decoder running, and freezes presentation
+  independently on each covered monitor. A clean monitor keeps animating; when every monitor is covered, every
+  monitor freezes.
 
-The foreground window is obtained with `GetForegroundWindow`. Windows `MonitorFromWindow` semantics select
-the monitor with the largest intersection with that window, which gives deterministic behavior for windows
-that cross display boundaries. The app maps that monitor to the same `Screen.AllScreens` ordering used when
-the renderer targets are created. Shell windows, this app, minimized windows, DWM-cloaked windows, and the
-video decoder remain excluded.
+Detection enumerates all top-level windows with `EnumWindows` and, for each eligible window, uses
+`MonitorFromWindow` + `GetMonitorInfo` to decide coverage: covering the full monitor rectangle is fullscreen,
+covering the work area is maximized (`MonitorCoverage.Classify`, unit tested). Each window's monitor is mapped
+to the same `Screen.AllScreens` ordering used when the renderer targets are created, so the paused-monitor
+indices line up with the render targets. The decision is a set of monitor indices
+(`PlaybackDecision.PausedMonitors`), so multiple displays can be frozen at once. Shell windows, this app,
+minimized/cloaked windows, overlay/tool windows, and the video decoder are excluded.
 
 Renderer-specific freeze behavior:
 
-- Ambient and visualizer render the paused monitor using the captured animation timestamp while other monitor
-  targets use current time.
-- Video captures the most recent decoded BGRA frame when the monitor enters the paused state and reuses it only
-  for that display. The other display keeps consuming current frames from the single decoder.
-- Battery pause remains global because its purpose is resource saving, not foreground visibility.
-- Clearing the policy, moving foreground to another display, Stop, or switching wallpapers clears/replaces the
-  per-monitor state without creating extra decoder processes.
+- Ambient and visualizer render each paused monitor using its own captured animation timestamp (frozen at the
+  instant it became occupied) while clean monitor targets use current time. Multiple monitors keep independent
+  freeze instants.
+- Video captures the most recent decoded BGRA frame per monitor when that monitor enters the paused state and
+  reuses it only for that display. Clean displays keep consuming current frames from the single decoder.
+- Battery and session-lock pauses remain global because their purpose is resource saving, not visibility.
+- Clearing the policy, uncovering a display, Stop, or switching wallpapers clears/replaces the per-monitor state
+  without creating extra decoder processes.
 
 Official API references used for this design:
 

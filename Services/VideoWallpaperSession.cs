@@ -86,7 +86,7 @@ internal sealed class VideoWallpaperSession : IWallpaperSession
     public void SetFrameCap(int framesPerSecond) => _host!.SetFrameCap(framesPerSecond);
     public void Pause() { _pauseGate.Pause(); _host!.Pause(); }
     public void Resume() { _pauseGate.Resume(); _host!.Resume(); }
-    public void SetPausedMonitor(int? monitorIndex) => _host!.SetPausedMonitor(monitorIndex);
+    public void SetPausedMonitors(IReadOnlyList<int> monitorIndices) => _host!.SetPausedMonitors(monitorIndices);
     public void UpdateVisualizerSettings(VisualizerSettings settings) { }
     public void Dispose()
     {

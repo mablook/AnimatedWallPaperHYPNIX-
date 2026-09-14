@@ -39,7 +39,7 @@ internal sealed class WallpaperSession : IWallpaperSession
         _audioSubscription?.Dispose();
         _audioSubscription = null;
     }
-    public void SetPausedMonitor(int? monitorIndex) => _host.SetPausedMonitor(monitorIndex);
+    public void SetPausedMonitors(IReadOnlyList<int> monitorIndices) => _host.SetPausedMonitors(monitorIndices);
     public void UpdateVisualizerSettings(VisualizerSettings settings) => _host.UpdateVisualizerSettings(settings);
     public void Dispose()
     {
