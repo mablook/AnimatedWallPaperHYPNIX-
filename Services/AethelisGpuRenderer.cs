@@ -15,9 +15,7 @@ internal sealed class AethelisGpuRenderer : IDisposable
     private static readonly FeatureLevel[] FeatureLevels =
     [
         FeatureLevel.Level_11_1,
-        FeatureLevel.Level_11_0,
-        FeatureLevel.Level_10_1,
-        FeatureLevel.Level_10_0
+        FeatureLevel.Level_11_0
     ];
 
     private readonly IDXGIFactory2 _factory;
@@ -32,6 +30,9 @@ internal sealed class AethelisGpuRenderer : IDisposable
     private readonly ID3D11Buffer _frameBuffer;
     private readonly Dictionary<string, EffekseerBridge> _effekseerByViewport = [];
     private readonly Dictionary<string, FluidResources> _fluidByViewport = [];
+    private readonly HashSet<string> _failedEffectViewports = [];
+    private readonly List<IDisposable> _deviceResources = [];
+    private bool _disposed;
     private readonly bool _usesFireRingEffect;
     private readonly bool _usesFluidSimulation;
     private readonly string _effectPath;
@@ -42,52 +43,65 @@ internal sealed class AethelisGpuRenderer : IDisposable
     {
         _width = width;
         _height = height;
-        _factory = CreateDXGIFactory1<IDXGIFactory2>();
-
-        using var adapter = GetHardwareAdapter(_factory);
-        var flags = DeviceCreationFlags.BgraSupport;
-        D3D11CreateDevice(adapter, DriverType.Unknown, flags, FeatureLevels,
-            out _device, out var featureLevel, out _context).CheckError();
-
-        var description = new SwapChainDescription1
+        try
         {
-            Width = (uint)width,
-            Height = (uint)height,
-            Format = Format.B8G8R8A8_UNorm,
-            BufferCount = 2,
-            BufferUsage = Usage.RenderTargetOutput,
-            SampleDescription = SampleDescription.Default,
-            Scaling = Scaling.Stretch,
-            SwapEffect = SwapEffect.FlipDiscard,
-            AlphaMode = AlphaMode.Ignore
-        };
-        var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
-        _swapChain = _factory.CreateSwapChainForHwnd(_device, hwnd, description, fullscreen);
-        _factory.MakeWindowAssociation(hwnd, WindowAssociationFlags.IgnoreAltEnter);
-        _backBuffer = _swapChain.GetBuffer<ID3D11Texture2D>(0);
-        _renderTarget = _device.CreateRenderTargetView(_backBuffer);
+            _factory = Own(CreateDXGIFactory1<IDXGIFactory2>());
 
-        var shaderPath = Path.Combine(AppContext.BaseDirectory, "Shaders", shaderFileName);
-        var vertexBytecode = Compiler.CompileFromFile(shaderPath, "VSMain", "vs_5_0");
-        var pixelBytecode = Compiler.CompileFromFile(shaderPath, "PSMain", "ps_5_0");
-        _vertexShader = _device.CreateVertexShader(vertexBytecode.Span);
-        _pixelShader = _device.CreatePixelShader(pixelBytecode.Span);
-        _usesFluidSimulation = string.Equals(shaderFileName, "HypnixVolumetricFire.hlsl", StringComparison.OrdinalIgnoreCase);
-        if (_usesFluidSimulation)
-        {
-            var computeBytecode = Compiler.CompileFromFile(shaderPath, "CSMain", "cs_5_0");
-            _computeShader = _device.CreateComputeShader(computeBytecode.Span);
+            using var adapter = GetHardwareAdapter(_factory);
+            var flags = DeviceCreationFlags.BgraSupport;
+            D3D11CreateDevice(adapter, DriverType.Unknown, flags, FeatureLevels,
+                out _device, out var featureLevel, out _context).CheckError();
+            Own(_device);
+            Own(_context);
+
+            var description = new SwapChainDescription1
+            {
+                Width = (uint)width,
+                Height = (uint)height,
+                Format = Format.B8G8R8A8_UNorm,
+                BufferCount = 2,
+                BufferUsage = Usage.RenderTargetOutput,
+                SampleDescription = SampleDescription.Default,
+                Scaling = Scaling.Stretch,
+                SwapEffect = SwapEffect.FlipDiscard,
+                AlphaMode = AlphaMode.Ignore
+            };
+            var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
+            _swapChain = Own(_factory.CreateSwapChainForHwnd(_device, hwnd, description, fullscreen));
+            _factory.MakeWindowAssociation(hwnd, WindowAssociationFlags.IgnoreAltEnter);
+            _backBuffer = Own(_swapChain.GetBuffer<ID3D11Texture2D>(0));
+            _renderTarget = Own(_device.CreateRenderTargetView(_backBuffer));
+
+            var shaderPath = Path.Combine(AppContext.BaseDirectory, "Shaders", shaderFileName);
+            var vertexBytecode = Compiler.CompileFromFile(shaderPath, "VSMain", "vs_5_0");
+            var pixelBytecode = Compiler.CompileFromFile(shaderPath, "PSMain", "ps_5_0");
+            _vertexShader = Own(_device.CreateVertexShader(vertexBytecode.Span));
+            _pixelShader = Own(_device.CreatePixelShader(pixelBytecode.Span));
+            _usesFluidSimulation = string.Equals(shaderFileName, "HypnixVolumetricFire.hlsl", StringComparison.OrdinalIgnoreCase);
+            if (_usesFluidSimulation)
+            {
+                var computeBytecode = Compiler.CompileFromFile(shaderPath, "CSMain", "cs_5_0");
+                _computeShader = Own(_device.CreateComputeShader(computeBytecode.Span));
+            }
+            _frameBuffer = Own(_device.CreateBuffer((uint)Marshal.SizeOf<FrameConstants>(), BindFlags.ConstantBuffer,
+                ResourceUsage.Dynamic, CpuAccessFlags.Write));
+            _usesFireRingEffect = string.Equals(shaderFileName, "AethelisFlameBurst.hlsl", StringComparison.OrdinalIgnoreCase) ||
+                                  string.Equals(shaderFileName, "FlamethrowerRingV2.hlsl", StringComparison.OrdinalIgnoreCase);
+            _effectPath = string.Equals(shaderFileName, "FlamethrowerRingV2.hlsl", StringComparison.OrdinalIgnoreCase)
+                ? Path.Combine(AppContext.BaseDirectory, "Assets", "Effects", "FlamethrowerRingV2", "Runtime", "HypnixFlamethrower.efkefc")
+                : Path.Combine(AppContext.BaseDirectory, "Assets", "Effects", "HypnixFireRing", "HypnixFireRing.efkefc");
+
+            AppLog.Write($"Aethelis GPU renderer initialized. Shader={shaderFileName}; Size={width}x{height}; " +
+                         $"FeatureLevel={featureLevel}; Adapter={adapter.Description1.Description}");
         }
-        _frameBuffer = _device.CreateBuffer((uint)Marshal.SizeOf<FrameConstants>(), BindFlags.ConstantBuffer,
-            ResourceUsage.Dynamic, CpuAccessFlags.Write);
-        _usesFireRingEffect = string.Equals(shaderFileName, "AethelisFlameBurst.hlsl", StringComparison.OrdinalIgnoreCase) ||
-                              string.Equals(shaderFileName, "FlamethrowerRingV2.hlsl", StringComparison.OrdinalIgnoreCase);
-        _effectPath = string.Equals(shaderFileName, "FlamethrowerRingV2.hlsl", StringComparison.OrdinalIgnoreCase)
-            ? Path.Combine(AppContext.BaseDirectory, "Assets", "Effects", "FlamethrowerRingV2", "Runtime", "HypnixFlamethrower.efkefc")
-            : Path.Combine(AppContext.BaseDirectory, "Assets", "Effects", "HypnixFireRing", "HypnixFireRing.efkefc");
+        catch { ReleaseDeviceResources(); throw; }
+    }
 
-        AppLog.Write($"Aethelis GPU renderer initialized. Shader={shaderFileName}; Size={width}x{height}; " +
-                     $"FeatureLevel={featureLevel}; Adapter={adapter.Description1.Description}");
+    private T Own<T>(T resource) where T : IDisposable { _deviceResources.Add(resource); return resource; }
+    private void ReleaseDeviceResources()
+    {
+        for (var i = _deviceResources.Count - 1; i >= 0; i--) _deviceResources[i].Dispose();
+        _deviceResources.Clear();
     }
 
     public void BeginFrame()
@@ -141,7 +155,7 @@ internal sealed class AethelisGpuRenderer : IDisposable
             _context.PSSetConstantBuffer(0, _frameBuffer);
             _context.PSSetShaderResource(0, fluid.CurrentView);
             _context.Draw(3, 0);
-            _context.PSSetShaderResource(0, null);
+            _context.PSSetShaderResource(0, null!);
         }
         else
         {
@@ -150,10 +164,11 @@ internal sealed class AethelisGpuRenderer : IDisposable
         if (_usesFireRingEffect)
         {
             var viewportKey = $"{x}:{y}:{width}:{height}";
-            if (!_effekseerByViewport.TryGetValue(viewportKey, out var effekseer))
+            if (!_effekseerByViewport.TryGetValue(viewportKey, out var effekseer) && !_failedEffectViewports.Contains(viewportKey))
             {
                 effekseer = EffekseerBridge.TryCreate(_device.NativePointer, _context.NativePointer, _effectPath);
                 if (effekseer is not null) _effekseerByViewport.Add(viewportKey, effekseer);
+                else _failedEffectViewports.Add(viewportKey);
             }
 
             if (!freezeEffect) effekseer?.Update(time, profile, settings.Intensity);
@@ -163,7 +178,7 @@ internal sealed class AethelisGpuRenderer : IDisposable
 
     public void EndFrame()
     {
-        _swapChain.Present(0, PresentFlags.None);
+        _swapChain.Present(0, PresentFlags.None).CheckError();
     }
 
     private static IDXGIAdapter1 GetHardwareAdapter(IDXGIFactory2 factory)
@@ -192,22 +207,15 @@ internal sealed class AethelisGpuRenderer : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         _context.ClearState();
         _context.Flush();
         foreach (var effekseer in _effekseerByViewport.Values) effekseer.Dispose();
         _effekseerByViewport.Clear();
         foreach (var fluid in _fluidByViewport.Values) fluid.Dispose();
         _fluidByViewport.Clear();
-        _computeShader?.Dispose();
-        _frameBuffer.Dispose();
-        _pixelShader.Dispose();
-        _vertexShader.Dispose();
-        _renderTarget.Dispose();
-        _backBuffer.Dispose();
-        _swapChain.Dispose();
-        _context.Dispose();
-        _device.Dispose();
-        _factory.Dispose();
+        ReleaseDeviceResources();
     }
 
     [StructLayout(LayoutKind.Sequential)]

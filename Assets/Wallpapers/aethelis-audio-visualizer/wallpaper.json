@@ -7,5 +7,6 @@
   "preview": "preview.png",
   "previewKind": "generated-example",
   "audio": "wasapi-loopback",
-  "multiMonitor": "independent-cover"
+  "multiMonitor": "independent-cover",
+  "kind": "AethelisVisualizer"
 }

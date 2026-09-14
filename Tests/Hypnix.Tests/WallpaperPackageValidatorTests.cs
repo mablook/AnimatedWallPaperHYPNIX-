@@ -61,6 +61,46 @@ public sealed class WallpaperPackageValidatorTests
         Assert.Contains("not recognized", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void OversizedDirectoryTreeIsRejectedBeforeUnboundedTraversal()
+    {
+        using var package = TestPackage.Create("deep-tree", "hypnix.visualizer.classic.v1");
+        var nested = package.DirectoryPath;
+        for (var i = 0; i < 65; i++) nested = Directory.CreateDirectory(Path.Combine(nested, "d")).FullName;
+        var result = WallpaperPackageValidator.Validate(package.DirectoryPath);
+        Assert.Equal(WallpaperPackageStatus.Invalid, result.Status);
+        Assert.Contains("too many", result.Error);
+    }
+
+    [Fact]
+    public void AlternateDataStreamCannotBeUsedAsEntrypoint()
+    {
+        using var package = TestPackage.Create("alternate-stream", "hypnix.visualizer.classic.v1", "content/preset.json:hidden");
+        Assert.Equal(WallpaperPackageStatus.Invalid, WallpaperPackageValidator.Validate(package.DirectoryPath).Status);
+    }
+
+    [Fact]
+    public void ValidPresetFeedsCatalogAndRuntimeSettings()
+    {
+        using var package = TestPackage.Create("custom", "hypnix.visualizer.classic.v1");
+        File.WriteAllText(Path.Combine(package.DirectoryPath, "content", "preset.json"), """{"intensity":2.2,"colorTheme":2}""");
+        var entry = WallpaperCatalog.FromPackage(WallpaperPackageValidator.Validate(package.DirectoryPath));
+        var request = WallpaperCatalog.Request(entry, new AppSettings());
+        Assert.Equal("package:custom", request.Id);
+        Assert.Equal(WallpaperKind.VisualizerDemo, request.Kind);
+        Assert.Equal(2.2f, request.Settings!.Intensity);
+        Assert.Equal(Path.Combine(package.DirectoryPath, "background.png"), request.BackgroundPath);
+    }
+
+    [Fact]
+    public void PackageChangedAfterDiscoveryIsRevalidatedBeforePlayback()
+    {
+        using var package = TestPackage.Create("changed", "hypnix.visualizer.classic.v1");
+        var entry = WallpaperCatalog.FromPackage(WallpaperPackageValidator.Validate(package.DirectoryPath));
+        File.WriteAllText(Path.Combine(package.DirectoryPath, "payload.exe"), "unexpected");
+        Assert.Throws<InvalidDataException>(() => WallpaperCatalog.Request(entry, new AppSettings()));
+    }
+
     private sealed class TestPackage : IDisposable
     {
         private TestPackage(string root, string directoryPath)

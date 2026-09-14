@@ -33,14 +33,24 @@ internal static partial class WallpaperPackageValidator
             if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
                 return Invalid(packageRoot, "Package directory cannot be a reparse point.");
 
-            var files = directory.EnumerateFiles("*", SearchOption.AllDirectories).ToArray();
-            if (files.Length > MaximumFileCount) return Invalid(packageRoot, "Package contains too many files.");
-            if (files.Sum(file => file.Length) > MaximumTotalBytes)
-                return Invalid(packageRoot, "Package exceeds the maximum installed size.");
-            if (files.Any(file => (file.Attributes & FileAttributes.ReparsePoint) != 0))
-                return Invalid(packageRoot, "Package files cannot be reparse points.");
-            if (files.Any(file => !AllowedExtensions.Contains(file.Extension)))
-                return Invalid(packageRoot, "Package contains a forbidden file type.");
+            var pending = new Stack<DirectoryInfo>();
+            pending.Push(directory);
+            var entryCount = 0;
+            long totalBytes = 0;
+            while (pending.TryPop(out var current))
+            {
+                foreach (var entry in current.EnumerateFileSystemInfos())
+                {
+                    if (++entryCount > MaximumFileCount) return Invalid(packageRoot, "Package contains too many files or directories.");
+                    if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+                        return Invalid(packageRoot, "Package entries cannot be reparse points.");
+                    if (entry is DirectoryInfo child) { pending.Push(child); continue; }
+                    var file = (FileInfo)entry;
+                    totalBytes += file.Length;
+                    if (totalBytes > MaximumTotalBytes) return Invalid(packageRoot, "Package exceeds the maximum installed size.");
+                    if (!AllowedExtensions.Contains(file.Extension)) return Invalid(packageRoot, "Package contains a forbidden file type.");
+                }
+            }
 
             var manifestPath = Path.Combine(packageRoot, "wallpaper.json");
             var manifestFile = new FileInfo(manifestPath);
@@ -91,6 +101,11 @@ internal static partial class WallpaperPackageValidator
         if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath))
         {
             error = "Path is missing or rooted.";
+            return false;
+        }
+        if (relativePath.Contains(':') || relativePath.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+        {
+            error = "Path contains invalid characters or an alternate stream.";
             return false;
         }
 

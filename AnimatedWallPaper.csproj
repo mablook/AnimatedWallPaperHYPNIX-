@@ -24,11 +24,13 @@
   <ItemGroup>
     <Resource Include="Assets\Brand\hypnix-icon.png" />
     <Resource Include="Assets\Brand\hypnix-icon-v2.png" />
+    <Resource Include="Assets\Brand\hypnix-v2.ico" />
     <Resource Include="Assets\Brand\hypnix-tray-white.png" />
     <Resource Include="Assets\Wallpapers\**\preview.jpg" />
     <Resource Include="Assets\Wallpapers\**\preview.png" />
+    <Content Include="Assets\Wallpapers\**\preview.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Wallpapers\**\preview.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Brand\hypnix.ico" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\Brand\hypnix-v2.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Brand\hypnix-tray-white.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Wallpapers\**\wallpaper.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Wallpapers\**\background.png" CopyToOutputDirectory="PreserveNewest" />

@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Security.Cryptography;
 using System.Text.Json;
+using AnimatedWallPaper.Services;
 
 namespace Hypnix.Tests;
 
@@ -58,9 +59,10 @@ public sealed class AssetContractTests
     {
         var xaml = File.ReadAllText(Path.Combine(RepositoryRoot, "MainWindow.xaml"));
 
-        Assert.Contains("Visualizer demo", xaml);
-        Assert.Contains("Aethelis Audio Reactive", xaml);
-        Assert.Contains("Fire Burst Experimental", xaml);
+        var catalog = WallpaperCatalog.LoadBuiltIns(Path.Combine(RepositoryRoot, "Assets", "Wallpapers"));
+        Assert.Contains(catalog, entry => entry.Kind == WallpaperKind.VisualizerDemo);
+        Assert.Contains(catalog, entry => entry.Kind == WallpaperKind.AethelisVisualizer);
+        Assert.Contains(catalog, entry => entry.Kind == WallpaperKind.AethelisFlameBurst);
         Assert.DoesNotContain("Flame visualizer", xaml);
         Assert.DoesNotContain("Premium living flame", xaml);
         Assert.DoesNotContain("Aethelis GPU visualizer", xaml);
@@ -160,7 +162,8 @@ public sealed class AssetContractTests
         var research = Path.Combine(RepositoryRoot, "docs", "VOLUMETRIC_FIRE_RESEARCH.md");
         var target = Path.Combine(RepositoryRoot, "docs", "assets", "volumetric-fire-approved-target.png");
 
-        Assert.Contains("<Button Visibility=\"Collapsed\" Style=\"{StaticResource WallpaperCardStyle}\" Click=\"VolumetricFireCard_Click\">", xaml);
+        var catalog = WallpaperCatalog.LoadBuiltIns(Path.Combine(RepositoryRoot, "Assets", "Wallpapers"));
+        Assert.DoesNotContain(catalog, entry => entry.Kind == WallpaperKind.VolumetricFire);
         Assert.True(File.Exists(research));
         Assert.True(File.Exists(target));
         var findings = File.ReadAllText(research);

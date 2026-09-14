@@ -131,3 +131,31 @@ card must remain collapsed in production-facing UI until a new implementation
 passes visual review against `docs/assets/volumetric-fire-approved-target.png`.
 Compilation, nonzero GPU buffers and smooth animation are necessary but are not
 visual acceptance criteria.
+
+## Reliability and library implementation (September 2026)
+
+New behavioral coverage exercises repeated audio retry failures and cancellation, invalid audio samples,
+battery precedence, locked-session pause, per-display transitions, failed preparation/show, stop-during-prepare,
+late selection completion, video reader pause/cancellation, persisted independent settings, malformed settings,
+aspect-preserving video decode dimensions, incremental package limits and revalidation before playback.
+Catalog assertions now inspect loaded wallpaper entries instead of depending on hardcoded XAML labels.
+
+`Tests/Hypnix.NativeSmoke` separately checks real native CPU and GPU hosts, pause/resume and destruction,
+manifest packaging and shell construction at two sizes. Optional arguments run a real ffprobe/ffmpeg first-frame
+and pause/resume check. Run it from the repository root on Windows with Direct3D 11 hardware.
+The check uses hidden parent windows and does not attach to Explorer. Layout PNGs exclude HWND-hosted preview content.
+
+Additional manual release checks:
+
+- Disconnect the default audio output through multiple retry intervals, then reconnect; verify automatic recovery.
+- Change the default endpoint while the old endpoint remains connected.
+- Enable battery pause plus active-display scope; on battery, every desktop target and the preview must stop.
+- Rapidly select videos and press Stop during preparation; no late session may become active.
+- Select a missing/invalid video while another wallpaper runs; the old wallpaper must remain active.
+- Verify preview animation for every selectable renderer, and no preview processing while hidden/minimized.
+- Copy a valid preset to the library, select it and adjust controls; restart and confirm settings remain independent.
+- Restart Explorer, change resolution/DPI, reconnect monitors and resume from sleep; confirm session reconstruction.
+- Confirm three consecutive preparation failures during recovery stop playback with an actionable error.
+
+The native build is pinned and executable through `scripts/build-native.ps1`; `-UpdateRuntime` is an explicit opt-in
+because the existing committed runtime remains the default for ordinary .NET builds.

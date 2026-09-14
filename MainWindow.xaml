@@ -2,294 +2,173 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AnimatedWallPaper"
-        Title="HYPNIX"
-        Icon="Assets/Brand/hypnix-v2.ico"
-        Width="1180" Height="760" MinWidth="920" MinHeight="640"
-        WindowStartupLocation="Manual"
-        Loaded="MainWindow_Loaded"
+        Title="HYPNIX" Icon="pack://application:,,,/HYPNIX;component/Assets/Brand/hypnix-v2.ico"
+        Width="1180" Height="760" MinWidth="800" MinHeight="600"
+        WindowStartupLocation="Manual" Loaded="MainWindow_Loaded"
         Background="#0B0E13" Foreground="{StaticResource TextPrimaryBrush}"
         FontFamily="Segoe UI Variable, Segoe UI">
     <Window.Resources>
         <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="MinWidth" Value="38"/>
             <Setter Property="Width" Value="38"/>
-            <Setter Property="Height" Value="38"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0"/>
-            <Setter Property="FontSize" Value="17"/>
         </Style>
-        <Style x:Key="WallpaperCardStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Width" Value="184"/>
-            <Setter Property="Height" Value="112"/>
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Margin" Value="0,0,10,0"/>
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="0,0,12,0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Card" BorderThickness="2" BorderBrush="Transparent" CornerRadius="8">
+                            <Grid>
+                                <ContentPresenter/>
+                                <TextBlock x:Name="SelectedMark" Visibility="Collapsed" Text="✓" FontSize="20"
+                                           Background="#D0101925" Padding="5,0" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="SelectedMark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Card" Property="BorderBrush" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
-
-    <Grid Margin="28,22,28,24">
+    <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="20"/>
+            <RowDefinition Height="18"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+        <Grid>
             <StackPanel Orientation="Horizontal">
-                <Border Width="58" Height="58" Margin="0,0,15,0" Padding="7"
-                        CornerRadius="12" Background="#141923" BorderBrush="#303B49" BorderThickness="1">
-                    <Image Source="Assets/Brand/hypnix-icon-v2.png" Stretch="Uniform"/>
-                </Border>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock FontSize="30" FontWeight="SemiBold" Text="HYPNIX"/>
-                    <TextBlock Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"
-                               Text="Living backgrounds, shaped by your sound."/>
+                <Image Width="48" Height="48" Source="Assets/Brand/hypnix-icon-v2.png" Margin="0,0,12,0"/>
+                <StackPanel>
+                    <TextBlock Text="HYPNIX" FontSize="27" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="StatusText" Text="Stopped" Foreground="{StaticResource TextSecondaryBrush}"/>
                 </StackPanel>
             </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Margin="0,0,16,0" Padding="12,7" CornerRadius="18"
-                        Background="#18221F" BorderBrush="#285C49" BorderThickness="1">
-                    <StackPanel Orientation="Horizontal">
-                        <Ellipse Width="8" Height="8" Margin="0,0,8,0" Fill="#50E39B"/>
-                        <TextBlock x:Name="StatusText" VerticalAlignment="Center" Text="Stopped"/>
-                    </StackPanel>
-                </Border>
-                <Button x:Name="StartButton" Click="StartButton_Click" Content="Start"/>
-                <Button x:Name="StopButton" Click="StopButton_Click" Content="Stop" Margin="0"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button x:Name="StartButton" Content="Start" Click="StartButton_Click"/>
+                <Button x:Name="StopButton" Content="Stop" Click="StopButton_Click" Margin="0"/>
             </StackPanel>
         </Grid>
-
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2.2*"/>
-                <ColumnDefinition Width="20"/>
-                <ColumnDefinition Width="0.9*" MinWidth="270" MaxWidth="340"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="18"/>
+                <ColumnDefinition Width="260"/>
             </Grid.ColumnDefinitions>
-
-            <Grid Grid.Column="0">
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="18"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-
-                <Border Grid.Row="0" CornerRadius="14" BorderBrush="#35404D" BorderThickness="1"
-                        Background="#07090D" ClipToBounds="True">
-                    <Grid>
-                        <local:AnimatedBackdropControl x:Name="PreviewBackdrop" TargetFramesPerSecond="30"/>
-                        <Image x:Name="SelectedPreviewImage" Stretch="UniformToFill"/>
-                        <Border VerticalAlignment="Bottom" Margin="18" Padding="14,10" CornerRadius="8"
-                                Background="#D0141820" HorizontalAlignment="Left">
-                            <StackPanel>
-                                <TextBlock x:Name="ActivePreviewTitle" FontSize="17" FontWeight="SemiBold"
-                                           Text="Built-in ambient"/>
-                                <TextBlock x:Name="ActivePreviewSubtitle" Margin="0,3,0,0"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                           Text="Native procedural wallpaper"/>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
+                <Border BorderBrush="#35404D" BorderThickness="1" Background="#07090D">
+                    <local:WallpaperPreviewControl x:Name="LivePreview"/>
                 </Border>
-
-                <Grid Grid.Row="2">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="Wallpapers"/>
-                    <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Disabled">
-                        <StackPanel Orientation="Horizontal">
-                            <Button Style="{StaticResource WallpaperCardStyle}" Click="AmbientCard_Click">
-                                <Border x:Name="AmbientCardBorder" CornerRadius="8" BorderThickness="2"
-                                        BorderBrush="{StaticResource AccentBrush}" Background="#111923">
-                                    <Grid>
-                                        <Image Source="Assets/Wallpapers/built-in-ambient/preview.jpg"
-                                               Stretch="UniformToFill"/>
-                                        <Rectangle Fill="#55000000"/>
-                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
-                                                   Text="Built-in ambient"/>
-                                    </Grid>
-                                </Border>
-                            </Button>
-                            <Button Style="{StaticResource WallpaperCardStyle}" Click="VisualizerCard_Click">
-                                <Border x:Name="VisualizerCardBorder" CornerRadius="8" BorderThickness="2"
-                                        BorderBrush="Transparent" Background="#161127">
-                                    <Grid>
-                                        <Image Source="Assets/Wallpapers/audio-visualizer-classic/preview.png"
-                                               Stretch="UniformToFill"/>
-                                        <Rectangle Fill="#44000000"/>
-                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
-                                                   Text="Audio visualizer"/>
-                                    </Grid>
-                                </Border>
-                            </Button>
-                            <Button Style="{StaticResource WallpaperCardStyle}" Click="AethelisCard_Click">
-                                <Border x:Name="AethelisCardBorder" CornerRadius="8" BorderThickness="2"
-                                        BorderBrush="Transparent" Background="#120B16">
-                                    <Grid>
-                                        <Image Source="Assets/Wallpapers/aethelis-audio-visualizer/preview.png"
-                                               Stretch="UniformToFill"/>
-                                        <Rectangle Fill="#33000000"/>
-                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
-                                                   Text="Aethelis reactive"/>
-                                    </Grid>
-                                </Border>
-                            </Button>
-                            <Button Style="{StaticResource WallpaperCardStyle}" Click="FlameBurstCard_Click">
-                                <Border x:Name="FlameBurstCardBorder" CornerRadius="8" BorderThickness="2"
-                                        BorderBrush="Transparent" Background="#1A0905">
-                                    <Grid>
-                                        <Image Source="Assets/Wallpapers/aethelis-audio-visualizer/preview.png"
-                                               Stretch="UniformToFill"/>
-                                        <Rectangle Fill="#33000000"/>
-                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
-                                                   Text="Fire Burst experimental"/>
-                                    </Grid>
-                                </Border>
-                            </Button>
-                            <Button Style="{StaticResource WallpaperCardStyle}" Click="FlamethrowerCard_Click">
-                                <Border x:Name="FlamethrowerCardBorder" CornerRadius="8" BorderThickness="2"
-                                        BorderBrush="Transparent" Background="#1D0B04">
-                                    <Grid>
-                                        <Image Source="Assets/Wallpapers/aethelis-audio-visualizer/preview.png"
-                                               Stretch="UniformToFill"/>
-                                        <Rectangle Fill="#33000000"/>
-                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
-                                                   Text="Flamethrower Ring V2"/>
-                                    </Grid>
-                                </Border>
-                            </Button>
-                            <Button Visibility="Collapsed" Style="{StaticResource WallpaperCardStyle}" Click="VolumetricFireCard_Click">
-                                <Border x:Name="VolumetricFireCardBorder" CornerRadius="8" BorderThickness="2"
-                                        BorderBrush="Transparent" Background="#160603">
-                                    <Grid>
-                                        <Image Source="Assets/Wallpapers/aethelis-audio-visualizer/preview.png"
-                                               Stretch="UniformToFill"/>
-                                        <Rectangle Fill="#52000000"/>
-                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
-                                                   Text="Volumetric Fire 3D Prototype"/>
-                                    </Grid>
-                                </Border>
-                            </Button>
-                            <Button Style="{StaticResource WallpaperCardStyle}" Click="VideoCard_Click">
-                                <Border x:Name="VideoCardBorder" CornerRadius="8" BorderThickness="2"
-                                        BorderBrush="Transparent" Background="#201416">
-                                    <Grid>
-                                        <Image Source="Assets/Wallpapers/example-video/preview.jpg"
-                                               Stretch="UniformToFill"/>
-                                        <Rectangle Fill="#44000000"/>
-                                        <TextBlock Margin="12" VerticalAlignment="Bottom" FontWeight="SemiBold"
-                                                   Text="Example MP4"/>
-                                    </Grid>
-                                </Border>
-                            </Button>
-                        </StackPanel>
-                    </ScrollViewer>
-                </Grid>
+                <StackPanel Grid.Row="1" Margin="0,12,0,14">
+                    <TextBlock x:Name="ActivePreviewTitle" FontSize="17" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="ActivePreviewSubtitle" Margin="0,4,0,0" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBlock x:Name="PreviewStatusText" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                </StackPanel>
+                <StackPanel Grid.Row="2">
+                    <TextBlock Text="Wallpapers" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                    <ListBox x:Name="WallpaperGallery" Background="Transparent" BorderThickness="0"
+                             SelectionChanged="WallpaperGallery_SelectionChanged" Height="132"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                             ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.VirtualizationMode="Recycling" AutomationProperties.Name="Wallpaper library">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate><VirtualizingStackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Width="168" Height="104" Background="#161C26" ToolTip="{Binding Title}">
+                                    <Image Source="{Binding PreviewPath}" Stretch="UniformToFill"/>
+                                    <Border Background="#CF0B1018" VerticalAlignment="Bottom" Padding="8">
+                                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
             </Grid>
-
-            <Border Grid.Column="2" CornerRadius="14" BorderBrush="#303A46" BorderThickness="1"
-                    Background="{StaticResource PanelBrush}" Padding="18">
+            <Border Grid.Column="2" Background="{StaticResource PanelBrush}" CornerRadius="12" Padding="16">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <Grid Margin="0,0,0,18">
-                            <TextBlock FontSize="19" FontWeight="SemiBold" Text="Controls"/>
-                            <Button x:Name="VisualizerSettingsButton" HorizontalAlignment="Right"
-                                    Style="{StaticResource IconButtonStyle}" Visibility="Collapsed"
-                                    Click="VisualizerSettingsButton_Click"
-                                    ToolTip="Audio visualizer settings" Content="⚙"/>
+                        <Grid Margin="0,0,0,16">
+                            <TextBlock Text="Controls" FontSize="19" FontWeight="SemiBold"/>
+                            <Button x:Name="VisualizerSettingsButton" Style="{StaticResource IconButtonStyle}"
+                                    HorizontalAlignment="Right" Visibility="Collapsed" Content="⚙"
+                                    ToolTip="Audio visualizer settings" AutomationProperties.Name="Audio visualizer settings"
+                                    Click="VisualizerSettingsButton_Click"/>
                         </Grid>
-
-                        <TextBlock Margin="0,0,0,7" Foreground="{StaticResource TextSecondaryBrush}"
-                                   Text="Pause animation for apps"/>
-                        <ComboBox x:Name="AppPauseModeComboBox" Margin="0,0,0,14"
-                                  SelectionChanged="PolicyModeChanged">
+                        <TextBlock Text="Pause animation for apps" Margin="0,0,0,6"/>
+                        <ComboBox x:Name="AppPauseModeComboBox" Margin="0,0,0,14" SelectionChanged="PolicyModeChanged"
+                                  AutomationProperties.Name="Pause animation for apps">
                             <ComboBoxItem Content="Never"/>
                             <ComboBoxItem Content="Fullscreen apps only"/>
-                            <ComboBoxItem Content="Any active app" IsSelected="True"/>
+                            <ComboBoxItem Content="Any active app"/>
                         </ComboBox>
-
-                        <TextBlock Margin="0,0,0,7" Foreground="{StaticResource TextSecondaryBrush}"
-                                   Text="Pause scope"/>
-                        <ComboBox x:Name="PauseScopeComboBox" Margin="0,0,0,14"
-                                  SelectionChanged="PolicyModeChanged">
-                            <ComboBoxItem Content="All displays" IsSelected="True"/>
+                        <TextBlock Text="Pause scope" Margin="0,0,0,6"/>
+                        <ComboBox x:Name="PauseScopeComboBox" Margin="0,0,0,14" SelectionChanged="PolicyModeChanged"
+                                  AutomationProperties.Name="Pause scope">
+                            <ComboBoxItem Content="All displays"/>
                             <ComboBoxItem Content="Active display only"/>
                         </ComboBox>
-
-                        <CheckBox x:Name="PauseBatteryCheckBox" IsChecked="False"
-                                  Checked="PolicyChanged" Unchecked="PolicyChanged"
-                                  Content="Pause when running on battery"/>
-
-                        <Separator Margin="0,5,0,16" Background="#34404D"/>
-                        <TextBlock Margin="0,0,0,7" Foreground="{StaticResource TextSecondaryBrush}"
-                                   Text="Frame cap"/>
-                        <ComboBox x:Name="FpsComboBox" SelectionChanged="FpsComboBox_SelectionChanged">
+                        <CheckBox x:Name="PauseBatteryCheckBox" Content="Pause on battery" Checked="PolicyChanged" Unchecked="PolicyChanged"/>
+                        <TextBlock Text="Frame cap" Margin="0,0,0,6"/>
+                        <ComboBox x:Name="FpsComboBox" SelectionChanged="FpsComboBox_SelectionChanged" AutomationProperties.Name="Frame cap">
                             <ComboBoxItem Content="15 FPS" Tag="15"/>
-                            <ComboBoxItem Content="30 FPS" Tag="30" IsSelected="True"/>
+                            <ComboBoxItem Content="30 FPS" Tag="30"/>
                             <ComboBoxItem Content="60 FPS" Tag="60"/>
                         </ComboBox>
-
-                        <Border Margin="0,22,0,0" Padding="13" CornerRadius="8"
-                                Background="{StaticResource PanelAltBrush}" BorderBrush="#34404D"
-                                BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock FontWeight="SemiBold" Text="Rules &amp; safety"/>
-                                <TextBlock Margin="0,7,0,0" TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                           Text="Normal-user permissions. Local content only. Wallpaper closes immediately on Stop or app exit."/>
-                            </StackPanel>
-                        </Border>
+                        <Separator Margin="0,18"/>
+                        <Button Content="Add local video…" Click="AddVideo_Click" Margin="0,0,0,8"/>
+                        <Button Content="Open library folder" Click="OpenLibrary_Click" Margin="0,0,0,8"/>
+                        <Button Content="Media tools…" Click="MediaTools_Click" Margin="0,0,0,8"/>
+                        <Button Content="Open diagnostics" Click="OpenDiagnostics_Click" Margin="0,0,0,8"/>
+                        <TextBlock x:Name="LibraryStatusText" TextWrapping="Wrap" FontSize="11" Margin="0,8,0,0"
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
         </Grid>
-
-        <ComboBox x:Name="WallpaperComboBox" Visibility="Collapsed"
-                  SelectionChanged="WallpaperComboBox_SelectionChanged">
-            <ComboBoxItem Content="Built-in ambient" IsSelected="True"/>
-            <ComboBoxItem Content="Visualizer demo"/>
-            <ComboBoxItem Content="Aethelis Audio Reactive"/>
-            <ComboBoxItem Content="Fire Burst Experimental"/>
-            <ComboBoxItem Content="Flamethrower Ring V2"/>
-            <ComboBoxItem Content="Volumetric Fire 3D Prototype"/>
-            <ComboBoxItem Content="Example MP4"/>
-        </ComboBox>
-
-        <Popup x:Name="VisualizerSettingsPopup"
-               PlacementTarget="{Binding ElementName=VisualizerSettingsButton}"
+        <TextBlock x:Name="ErrorText" Grid.Row="3" Margin="0,12,0,0" TextWrapping="Wrap" Foreground="#FFB9A5"
+                   AutomationProperties.LiveSetting="Polite"/>
+        <Popup x:Name="VisualizerSettingsPopup" PlacementTarget="{Binding ElementName=VisualizerSettingsButton}"
                Placement="Left" StaysOpen="False" AllowsTransparency="True">
-            <Border Width="270" Margin="8" Padding="16" Background="#1D232B"
-                    BorderBrush="#3B4652" BorderThickness="1" CornerRadius="10">
+            <Border Width="270" Margin="8" Padding="16" Background="#1D232B" BorderBrush="#3B4652" BorderThickness="1" CornerRadius="10">
                 <StackPanel>
-                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="Audio visualizer"/>
-                    <TextBlock Margin="0,4,0,14" Foreground="{StaticResource TextSecondaryBrush}"
-                               Text="Settings for this wallpaper only."/>
+                    <TextBlock Text="Audio visualizer" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Text="Saved for this wallpaper." Margin="0,4,0,14" Foreground="{StaticResource TextSecondaryBrush}"/>
                     <TextBlock Text="Intensity"/>
-                    <Slider x:Name="VisualizerIntensitySlider" Margin="0,4,0,12"
-                            Minimum="0.35" Maximum="2.7" Value="1"
-                            ValueChanged="VisualizerSettingChanged"/>
+                    <Slider x:Name="VisualizerIntensitySlider" Minimum="0.35" Maximum="2.7" Value="1" Margin="0,4,0,12"
+                            ValueChanged="VisualizerSettingChanged" AutomationProperties.Name="Intensity"/>
                     <TextBlock Text="Audio sensitivity"/>
-                    <Slider x:Name="VisualizerSensitivitySlider" Margin="0,4,0,12"
-                            Minimum="0.4" Maximum="2.5" Value="1"
-                            ValueChanged="VisualizerSettingChanged"/>
+                    <Slider x:Name="VisualizerSensitivitySlider" Minimum="0.4" Maximum="2.5" Value="1" Margin="0,4,0,12"
+                            ValueChanged="VisualizerSettingChanged" AutomationProperties.Name="Audio sensitivity"/>
                     <TextBlock Text="Glow"/>
-                    <Slider x:Name="VisualizerGlowSlider" Margin="0,4,0,12"
-                            Minimum="0" Maximum="1" Value="0.55"
-                            ValueChanged="VisualizerSettingChanged"/>
-                    <TextBlock Margin="0,0,0,6" Text="Color theme"/>
-                    <ComboBox x:Name="VisualizerColorComboBox" SelectionChanged="VisualizerColorChanged">
-                        <ComboBoxItem Content="Ice blue" IsSelected="True"/>
-                        <ComboBoxItem Content="Neon sunset"/>
-                        <ComboBoxItem Content="Emerald"/>
-                        <ComboBoxItem Content="Monochrome"/>
+                    <Slider x:Name="VisualizerGlowSlider" Minimum="0" Maximum="1" Value="0.55" Margin="0,4,0,12"
+                            ValueChanged="VisualizerSettingChanged" AutomationProperties.Name="Glow"/>
+                    <TextBlock Text="Color theme" Margin="0,0,0,6"/>
+                    <ComboBox x:Name="VisualizerColorComboBox" SelectionChanged="VisualizerColorChanged" AutomationProperties.Name="Color theme">
+                        <ComboBoxItem Content="Ice blue"/><ComboBoxItem Content="Neon sunset"/>
+                        <ComboBoxItem Content="Emerald"/><ComboBoxItem Content="Monochrome"/>
                     </ComboBox>
                 </StackPanel>
             </Border>

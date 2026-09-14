@@ -3,6 +3,15 @@ namespace AnimatedWallPaper.Services;
 internal sealed class WallpaperController : IDisposable
 {
     private IWallpaperSession? _session;
+    private readonly Func<WallpaperRequest, CancellationToken, Task<IWallpaperSession>> _factory;
+    private CancellationTokenSource? _pending;
+    private bool _disposed;
+    public WallpaperRequest? ActiveRequest { get; private set; }
+    public bool IsHealthy => _session?.IsHealthy ?? false;
+    public event Action? StateChanged;
+
+    public WallpaperController(Func<WallpaperRequest, CancellationToken, Task<IWallpaperSession>>? factory = null)
+        => _factory = factory ?? WallpaperSessionFactory.CreateAsync;
 
     public bool IsRunning => _session is not null;
 
@@ -10,28 +19,38 @@ internal sealed class WallpaperController : IDisposable
 
     public int? ActiveProcessId => _session?.ProcessId;
 
-    public void Start(int framesPerSecond, WallpaperKind kind, string? videoPath = null)
+    public async Task StartAsync(WallpaperRequest request)
     {
-        AppLog.Write($"WallpaperController.Start({framesPerSecond}). ExistingSession={_session is not null}");
-        if (_session is not null) Stop();
-
-        _session = kind switch
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _pending?.Cancel();
+        using var pending = new CancellationTokenSource();
+        _pending = pending;
+        IWallpaperSession? next = null;
+        try
         {
-            WallpaperKind.VisualizerDemo => new WallpaperSession(framesPerSecond, NativeRenderMode.VisualizerDemo),
-            WallpaperKind.AethelisVisualizer => new WallpaperSession(framesPerSecond, NativeRenderMode.AethelisVisualizer),
-            WallpaperKind.AethelisFlameBurst => new WallpaperSession(framesPerSecond, NativeRenderMode.AethelisFlameBurst),
-            WallpaperKind.FlamethrowerRingV2 => new WallpaperSession(framesPerSecond, NativeRenderMode.FlamethrowerRingV2),
-            WallpaperKind.VolumetricFire => new WallpaperSession(framesPerSecond, NativeRenderMode.VolumetricFire),
-            WallpaperKind.ExampleVideo when !string.IsNullOrWhiteSpace(videoPath) => new VideoWallpaperSession(videoPath),
-            WallpaperKind.ExampleVideo => throw new InvalidOperationException("The example video path is missing."),
-            _ => new WallpaperSession(framesPerSecond, NativeRenderMode.Ambient)
-        };
-        AppLog.Write("WallpaperSession construction returned");
-        IsPaused = false;
+            next = await _factory(request, pending.Token);
+            pending.Token.ThrowIfCancellationRequested();
+            if (request.Settings is not null) next.UpdateVisualizerSettings(request.Settings);
+            next.Show();
+            var previous = _session;
+            _session = next;
+            next = null;
+            ActiveRequest = request;
+            IsPaused = false;
+            try { previous?.Dispose(); }
+            catch (Exception exception) { AppLog.WriteException("Previous wallpaper cleanup failed", exception); }
+            StateChanged?.Invoke();
+        }
+        finally
+        {
+            if (ReferenceEquals(_pending, pending)) _pending = null;
+            next?.Dispose();
+        }
     }
 
     public void Stop()
     {
+        _pending?.Cancel();
         if (_session is null)
         {
             return;
@@ -39,8 +58,10 @@ internal sealed class WallpaperController : IDisposable
 
         var session = _session;
         _session = null;
+        ActiveRequest = null;
         IsPaused = false;
         session.Dispose();
+        StateChanged?.Invoke();
     }
 
     public void Pause()
@@ -69,6 +90,7 @@ internal sealed class WallpaperController : IDisposable
 
     public void SetFrameCap(int framesPerSecond)
     {
+        if (ActiveRequest is not null) ActiveRequest = ActiveRequest with { FramesPerSecond = framesPerSecond };
         _session?.SetFrameCap(framesPerSecond);
     }
 
@@ -79,11 +101,13 @@ internal sealed class WallpaperController : IDisposable
 
     public void UpdateVisualizerSettings(VisualizerSettings settings)
     {
+        if (ActiveRequest is not null) ActiveRequest = ActiveRequest with { Settings = settings };
         _session?.UpdateVisualizerSettings(settings);
     }
 
     public void Dispose()
     {
+        _disposed = true;
         Stop();
     }
 }

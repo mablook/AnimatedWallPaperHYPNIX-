@@ -251,3 +251,31 @@ Each library card can be built entirely from the manifest/index:
 - Actions: Apply, Preview, Mute, Show in folder, Export, Delete.
 
 The wallpaper detail view should show derived technical information separately from author-provided description.
+
+## Implemented library playback and preset properties
+
+The gallery now consumes built-in manifests with an internal `kind` field and validated user package registrations.
+The experimental volumetric renderer is excluded from the production catalog even if a built-in manifest names it.
+Installed packages are revalidated immediately before preparing playback.
+
+The `native-preset` entrypoint must contain a JSON object, up to 64 KB. Supported classic-renderer properties:
+
+```json
+{
+  "intensity": 1.0,
+  "sensitivity": 1.0,
+  "glow": 0.55,
+  "colorTheme": 0
+}
+```
+
+Intensity is bounded to 0.35–2.7, sensitivity to 0.4–2.5, glow to 0–1, and colorTheme to 0–3
+(ice blue, sunset, emerald, monochrome). Missing properties use defaults. Saved user adjustments override the preset.
+The manifest's background is loaded by the classic renderer; the preview is used by its gallery card.
+An image that the installed Windows codecs cannot decode reports a preparation error and does not replace the current wallpaper.
+
+Validation traverses incrementally, rejects reparse points before descending into directories, and counts both files
+and directories against a 64-entry budget. Alternate data streams cannot be asset paths.
+
+Local videos added through the UI currently remain references to user-selected files in settings, rather than
+installed video packages. The staged/copying import pipeline above is still a future extension.

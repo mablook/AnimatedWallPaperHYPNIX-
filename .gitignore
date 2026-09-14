@@ -16,3 +16,6 @@ tmp/
 Native/EffekseerBridge/build/
 Prototypes/
 Assets/Effects/FlamethrowerRingV2/Exports/
+
+# Atomica Code
+/.atomica

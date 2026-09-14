@@ -4,5 +4,6 @@
   "type": "native",
   "preview": "preview.jpg",
   "previewKind": "example",
-  "audioReactive": false
+  "audioReactive": false,
+  "kind": "BuiltIn"
 }

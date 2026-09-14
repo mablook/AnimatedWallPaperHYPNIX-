@@ -1,0 +1,8 @@
+{
+  "preview": "../aethelis-audio-visualizer/preview.png",
+  "type": "native-audio-visualizer",
+  "kind": "AethelisFlameBurst",
+  "title": "Fire Burst Experimental",
+  "id": "fire-burst",
+  "previewKind": "example"
+}

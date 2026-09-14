@@ -142,3 +142,13 @@ The layout is a presentation shell only:
 5. Move global performance controls into a compact settings surface.
 6. Reuse the existing contextual visualizer popup with the new theme resources.
 7. Run visual, accessibility, DPI, lifecycle, and Store packaging regression checks.
+
+## Current shell implementation (September 2026)
+
+The shell now uses a virtualized manifest-driven ListBox, per-wallpaper persisted settings, local video selection,
+library/diagnostic folder actions and an HWND-hosted live preview. Selection and active playback remain distinct:
+failed replacement leaves the previous wallpaper active. Preview captions sit outside the HWND surface to avoid
+WPF airspace overlap. Hidden/minimized and battery/lock policies release preview work.
+
+The live preview shares native renderer code and the audio source with desktop sessions. The unused animated
+backdrop is no longer instantiated behind a static poster. WPF UI/theme adoption remains a future styling change.

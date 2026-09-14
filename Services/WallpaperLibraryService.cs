@@ -32,6 +32,11 @@ internal sealed class WallpaperLibraryService : IDisposable
         _watcher.Changed += OnLibraryChanged;
         _watcher.Deleted += OnLibraryChanged;
         _watcher.Renamed += OnLibraryChanged;
+        _watcher.Error += (_, args) =>
+        {
+            AppLog.WriteException("Library watcher overflow; rescanning", args.GetException());
+            OnLibraryChanged(this, new FileSystemEventArgs(WatcherChangeTypes.All, PackagesDirectory, ""));
+        };
         Rescan();
     }
 
@@ -47,29 +52,41 @@ internal sealed class WallpaperLibraryService : IDisposable
 
     public void Rescan()
     {
-        if (_disposed) return;
-        var registrations = new DirectoryInfo(PackagesDirectory)
-            .EnumerateDirectories("*", SearchOption.TopDirectoryOnly)
-            .OrderBy(directory => directory.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(directory => WallpaperPackageValidator.Validate(directory.FullName))
-            .ToArray();
-        lock (_sync) _packages = registrations;
-        AppLog.Write($"Wallpaper library scanned. Root={LibraryRoot}; Packages={registrations.Length}; " +
-                     $"Ready={registrations.Count(item => item.Status == WallpaperPackageStatus.Ready)}; " +
-                     $"Invalid={registrations.Count(item => item.Status == WallpaperPackageStatus.Invalid)}");
-        PackagesChanged?.Invoke(registrations);
+        lock (_sync)
+        {
+            if (_disposed) return;
+            try
+            {
+                var registrations = new DirectoryInfo(PackagesDirectory)
+                    .EnumerateDirectories("*", SearchOption.TopDirectoryOnly)
+                    .OrderBy(directory => directory.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(directory => WallpaperPackageValidator.Validate(directory.FullName))
+                    .ToArray();
+                _packages = registrations;
+                AppLog.Write($"Wallpaper library scanned. Root={LibraryRoot}; Packages={registrations.Length}; " +
+                             $"Ready={registrations.Count(item => item.Status == WallpaperPackageStatus.Ready)}; " +
+                             $"Invalid={registrations.Count(item => item.Status == WallpaperPackageStatus.Invalid)}");
+                PackagesChanged?.Invoke(registrations);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            { AppLog.WriteException("Library rescan failed; retaining last valid snapshot", exception); }
+        }
     }
 
     private void OnLibraryChanged(object sender, FileSystemEventArgs args)
     {
-        if (!_disposed) _debounceTimer.Change(350, Timeout.Infinite);
+        lock (_sync) if (!_disposed) _debounceTimer.Change(350, Timeout.Infinite);
     }
 
     public void Dispose()
     {
-        _disposed = true;
-        _watcher.EnableRaisingEvents = false;
-        _watcher.Dispose();
-        _debounceTimer.Dispose();
+        lock (_sync)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _watcher.EnableRaisingEvents = false;
+            _watcher.Dispose();
+            _debounceTimer.Dispose();
+        }
     }
 }
