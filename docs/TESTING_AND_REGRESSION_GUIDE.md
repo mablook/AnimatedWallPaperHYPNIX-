@@ -145,6 +145,63 @@ manifest packaging and shell construction at two sizes. Optional arguments run a
 and pause/resume check. Run it from the repository root on Windows with Direct3D 11 hardware.
 The check uses hidden parent windows and does not attach to Explorer. Layout PNGs exclude HWND-hosted preview content.
 
+## Desktop end-to-end smoke test (`scripts/e2e-desktop-smoke.ps1`)
+
+`Tests/Hypnix.NativeSmoke` deliberately never touches Explorer. The desktop smoke closes that gap: it drives the
+**real, built application** through Windows UI Automation, attaches each wallpaper to the **live Windows desktop**
+exactly as a user would, plays audio into the default render endpoint so the WASAPI-loopback visualizers react,
+and screenshots the desktop for visual attestation. It then presses Stop, restores the user's `settings.json`
+from a backup, and terminates the process.
+
+### Requirements
+
+- **Windows PowerShell 5.1** (the `UIAutomationClient`/`UIAutomationTypes` assemblies are .NET Framework GAC
+  assemblies and are not available under PowerShell 7 / .NET Core; the script refuses to run there).
+- An **interactive desktop session**, **Direct3D 11** hardware, and an **audio render endpoint**.
+- A built `HYPNIX.exe` and **ffmpeg/ffprobe** (auto-detected on `PATH` or under the winget package cache, or
+  passed with `-FfmpegDir`). ffmpeg is used only to generate the throwaway test video and pink-noise clip.
+
+### Running
+
+```powershell
+dotnet build -c Release
+powershell -ExecutionPolicy Bypass -File scripts\e2e-desktop-smoke.ps1 -Configuration Release
+```
+
+Useful switches: `-SkipVideo` (skip the local-video card), `-RefreshMedia` (regenerate the test clip/wav),
+`-Exe` / `-FfmpegDir` / `-OutDir` to override auto-detection. The script prints `E2E-DESKTOP: PASS` and exits
+`0` on success, or lists failures and exits `1`.
+
+### What it does (each step attaches to the real desktop)
+
+1. Backs up `%LOCALAPPDATA%\HYPNIX\settings.json`, then injects a deterministic config: `AppPauseMode = Never`
+   (so captures are not paused by foreground changes) plus a temporary video card pointing at the generated clip.
+2. Launches the app, locates the `HYPNIX` window, `StartButton`/`StopButton`, and the `WallpaperGallery` list.
+3. Captures a baseline, clicks **Start** on *Built-in ambient*, then switches through *Audio Visualizer*,
+   *Aethelis Audio Reactive*, *Fire Burst Experimental*, and the *E2E Test Clip* video — playing pink-noise into
+   the default output during the audio-reactive modes. Wallpaper switches happen live, without pressing Stop.
+4. For each mode it minimizes all windows (`Shell.MinimizeAll`, deterministic — no toggle drift), screenshots the
+   virtual desktop, then restores the windows.
+5. Presses **Stop**, captures the restored desktop, terminates the app, and **always restores** the settings
+   backup in a `finally` block (even on error). It fails if any HYPNIX process survives cleanup.
+
+### Attestation — what each artifact proves
+
+Artifacts are written to `artifacts\e2e-desktop\`:
+
+| Capture | Proves |
+| --- | --- |
+| `00-baseline.png` | Original desktop before attachment. |
+| `01-ambient.png` | Native procedural wallpaper (grid + particles) rendered on the desktop behind icons. |
+| `02-visualizer-audio.png` | Classic GDI visualizer, per-monitor cover-fit background, spectrum bars reacting to system audio. |
+| `03-aethelis-audio.png` | Direct3D 11 GPU visualizer (corona/ring) composited on the desktop on every display. |
+| `04-fireburst-audio.png` | GPU + Effekseer beat-driven burst, audio-triggered, on every display. |
+| `05-video.png` | ffmpeg-decoded video wallpaper playing live (animated frame counter), cover-fit per monitor. |
+| `06-stopped.png` | Desktop restored to baseline after Stop (near-identical size to `00-baseline.png`). |
+
+A run passes attestation when `00`/`06` match the bare desktop, `01`-`05` each show their distinct animated
+wallpaper across all monitors, the two audio-reactive captures show non-flat spectra, and the script exits `0`.
+
 Additional manual release checks:
 
 - Disconnect the default audio output through multiple retry intervals, then reconnect; verify automatic recovery.

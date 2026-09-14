@@ -72,6 +72,18 @@ Run from the repository root. The smoke check does not attach wallpapers to Expl
 native surfaces, shell construction/layout and disposal. Its WPF layout PNGs omit the native preview surface.
 Settings and library fixtures stay under its output directory.
 
+For a full desktop end-to-end check that drives the real app through UI Automation and attaches each wallpaper
+to the live desktop (Windows PowerShell 5.1, interactive session, Direct3D 11, audio endpoint, ffmpeg):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/e2e-desktop-smoke.ps1 -Configuration Release
+```
+
+It switches wallpapers live, plays audio so the visualizers react, captures the desktop to
+`artifacts/e2e-desktop/`, then presses Stop and restores your settings. See the
+[testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md#desktop-end-to-end-smoke-test-scriptse2e-desktop-smokeps1)
+for the per-capture attestation checklist.
+
 ## Engineering notes
 
 - Read [desktop integration findings](docs/DESKTOP_INTEGRATION_FINDINGS.md) before changing Win32 hosting.
