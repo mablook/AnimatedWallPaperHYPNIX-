@@ -1,0 +1,67 @@
+name: Windows build and tests
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Release build and regression tests
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Select .NET 8 for this CI checkout
+        run: |
+          '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}' | Set-Content -Encoding utf8 global.json
+          dotnet --version
+
+      - name: Restore regression tests and application
+        run: dotnet restore Tests/Hypnix.Tests/Hypnix.Tests.csproj
+
+      - name: Restore native smoke project
+        run: dotnet restore Tests/Hypnix.NativeSmoke/Hypnix.NativeSmoke.csproj
+
+      - name: Build regression tests and application
+        run: dotnet build Tests/Hypnix.Tests/Hypnix.Tests.csproj -c Release --no-restore
+
+      # Native rendering runs locally with an interactive Windows session and D3D11 hardware.
+      - name: Build native smoke project
+        run: dotnet build Tests/Hypnix.NativeSmoke/Hypnix.NativeSmoke.csproj -c Release --no-restore
+
+      - name: Run regression tests
+        run: dotnet test Tests/Hypnix.Tests/Hypnix.Tests.csproj -c Release --no-build --no-restore --logger "trx;LogFileName=regression.trx" --results-directory artifacts/test-results
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-regression-results
+          path: artifacts/test-results/*.trx
+          if-no-files-found: warn
+          retention-days: 14
