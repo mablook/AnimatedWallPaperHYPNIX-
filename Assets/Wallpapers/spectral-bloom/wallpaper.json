@@ -1,14 +1,13 @@
 {
-  "id": "aethelis-audio-visualizer",
-  "title": "Aethelis Audio Reactive",
+  "id": "spectral-bloom",
+  "title": "Spectral Bloom",
   "type": "native-audio-visualizer",
-  "renderer": "aethelis-state-mixer-v1",
-  "background": "background.png",
+  "renderer": "spectral-bloom-feedback-v1",
   "preview": "preview.png",
   "previewKind": "generated-example",
   "audio": "wasapi-loopback",
   "multiMonitor": "independent-cover",
-  "kind": "AethelisVisualizer",
+  "kind": "SpectralBloom",
   "author": "Marcelo Bossle",
   "license": "LicenseRef-HYPNIX-Proprietary"
 }

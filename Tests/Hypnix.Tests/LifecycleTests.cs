@@ -94,6 +94,41 @@ public sealed class LifecycleTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled);
     }
 
+    [Fact]
+    public async Task StartupAppliesTheDefaultAudioEnabledStateToNewSession()
+    {
+        var session = new FakeSession();
+        using var controller = new WallpaperController((_, _) => Task.FromResult<IWallpaperSession>(session));
+        await controller.StartAsync(Request("a"));
+        Assert.True(session.AudioEnabled == true);
+        Assert.True(controller.AudioEnabled);
+    }
+
+    [Fact]
+    public async Task DisablingAudioForwardsToActiveSessionAndPersistsToNextSession()
+    {
+        var first = new FakeSession();
+        var second = new FakeSession();
+        using var controller = new WallpaperController((request, _) =>
+            Task.FromResult<IWallpaperSession>(request.Id == "first" ? first : second));
+        await controller.StartAsync(Request("first"));
+        controller.SetAudioEnabled(false);
+        Assert.True(first.AudioEnabled == false);
+        Assert.False(controller.AudioEnabled);
+        await controller.StartAsync(Request("second"));
+        Assert.True(second.AudioEnabled == false); // new session inherits the off state
+    }
+
+    [Fact]
+    public async Task AudioDisabledBeforeStartAppliesToTheFirstSession()
+    {
+        var session = new FakeSession();
+        using var controller = new WallpaperController((_, _) => Task.FromResult<IWallpaperSession>(session));
+        controller.SetAudioEnabled(false);
+        await controller.StartAsync(Request("x"));
+        Assert.True(session.AudioEnabled == false);
+    }
+
     private sealed class FakeSession : IWallpaperSession
     {
         public bool Disposed { get; private set; }
@@ -108,5 +143,7 @@ public sealed class LifecycleTests
         public void SetPausedMonitors(IReadOnlyList<int> monitorIndices) { }
         public void SetFrameCap(int framesPerSecond) { }
         public void UpdateVisualizerSettings(VisualizerSettings settings) { }
+        public bool? AudioEnabled { get; private set; }
+        public void SetAudioEnabled(bool enabled) => AudioEnabled = enabled;
     }
 }

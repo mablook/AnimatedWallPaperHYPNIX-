@@ -1,14 +1,13 @@
 {
-  "id": "audio-visualizer-classic",
-  "title": "Audio Visualizer",
+  "id": "neon-ribbons",
+  "title": "Neon Ribbons",
   "type": "native-audio-visualizer",
-  "renderer": "classic-bars",
-  "background": "background.png",
+  "renderer": "neon-ribbons-hlsl-v1",
   "preview": "preview.png",
-  "previewKind": "generated-example",
+  "previewKind": "rendered-shader",
   "audio": "wasapi-loopback",
   "multiMonitor": "independent-cover",
-  "kind": "VisualizerDemo",
+  "kind": "NeonRibbons",
   "author": "Marcelo Bossle",
   "license": "LicenseRef-HYPNIX-Proprietary"
 }

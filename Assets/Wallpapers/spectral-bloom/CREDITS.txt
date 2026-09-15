@@ -1,0 +1,10 @@
+Spectral Bloom - original HYPNIX wallpaper.
+
+This is an original, clean-room HYPNIX implementation. It renders flowing spectral
+silk using generic, non-copyrightable techniques (linear HDR frame feedback with
+warp/decay, a separable two-pass bloom and a display-only composite), driven by
+the WASAPI audio spectrum.
+
+No third-party shader code is used. All parameters were authored by HYPNIX.
+
+License: proprietary (c) Marcelo Bossle (HYPNIX). See the repository LICENSE.

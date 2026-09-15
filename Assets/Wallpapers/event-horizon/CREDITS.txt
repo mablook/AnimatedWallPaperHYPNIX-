@@ -1,0 +1,14 @@
+Event Horizon - original HYPNIX wallpaper.
+
+This is an original, clean-room HYPNIX implementation of a Schwarzschild black
+hole. It uses only generic, non-copyrightable physics and rendering techniques:
+photon geodesic integration for gravitational lensing (a = -1.5 * h^2 * r / |r|^5),
+an emissive accretion disk with a blackbody-style temperature ramp and Doppler
+beaming, a photon ring near 1.5 r_s, a lensed procedural starfield, HDR emission
+and an ACES filmic tonemap. Audio drives accretion brightness, disk rotation and
+photon-ring energy.
+
+No third-party shader code is used. This replaces the earlier CC BY-NC-SA
+"kerr-newman" port for commercial distribution.
+
+License: proprietary (c) Marcelo Bossle (HYPNIX). See the repository LICENSE.

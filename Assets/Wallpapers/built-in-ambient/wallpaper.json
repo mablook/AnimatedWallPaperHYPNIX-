@@ -5,5 +5,7 @@
   "preview": "preview.jpg",
   "previewKind": "example",
   "audioReactive": false,
-  "kind": "BuiltIn"
+  "kind": "BuiltIn",
+  "author": "Marcelo Bossle",
+  "license": "LicenseRef-HYPNIX-Proprietary"
 }

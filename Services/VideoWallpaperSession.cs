@@ -88,6 +88,7 @@ internal sealed class VideoWallpaperSession : IWallpaperSession
     public void Resume() { _pauseGate.Resume(); _host!.Resume(); }
     public void SetPausedMonitors(IReadOnlyList<int> monitorIndices) => _host!.SetPausedMonitors(monitorIndices);
     public void UpdateVisualizerSettings(VisualizerSettings settings) { }
+    public void SetAudioEnabled(bool enabled) { } // video is muted and not audio-reactive
     public void Dispose()
     {
         if (_disposed) return;

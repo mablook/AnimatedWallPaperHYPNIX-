@@ -9,6 +9,49 @@ public sealed class AssetContractTests
 {
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
+    [Fact]
+    public void EveryWallpaperDeclaresAuthorAndLicenseAndNonCommercialAssetsAreFlaggedForRemoval()
+    {
+        var wallpapersRoot = Path.Combine(RepositoryRoot, "Assets", "Wallpapers");
+
+        // Licenses HYPNIX is allowed to ship in a commercial release.
+        var commercialAllowlist = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "LicenseRef-HYPNIX-Proprietary", "CC0-1.0", "MIT", "Unlicense",
+            "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause"
+        };
+
+        // Non-commercial assets are not shipped. HYPNIX is commercial, so this set must
+        // stay empty; adding any non-commercially licensed wallpaper fails this gate.
+        var expectedNonCommercial = Array.Empty<string>();
+
+        var flaggedNonCommercial = new List<string>();
+        foreach (var manifestPath in Directory.EnumerateFiles(wallpapersRoot, "wallpaper.json", SearchOption.AllDirectories))
+        {
+            using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var root = manifest.RootElement;
+            var id = root.GetProperty("id").GetString();
+            var author = root.TryGetProperty("author", out var a) ? a.GetString() : null;
+            var license = root.TryGetProperty("license", out var l) ? l.GetString() : null;
+            var distribution = root.TryGetProperty("distribution", out var d) ? d.GetString() : null;
+
+            Assert.False(string.IsNullOrWhiteSpace(author), $"{id}: manifest must declare a non-empty 'author'.");
+            Assert.False(string.IsNullOrWhiteSpace(license), $"{id}: manifest must declare a non-empty 'license'.");
+
+            if (!commercialAllowlist.Contains(license!))
+            {
+                // Anything not commercially licensed must be explicitly flagged so it
+                // cannot be shipped silently in the commercial build.
+                Assert.Equal("noncommercial", distribution);
+                flaggedNonCommercial.Add(id!);
+            }
+        }
+
+        Assert.Equal(
+            expectedNonCommercial.OrderBy(x => x, StringComparer.Ordinal),
+            flaggedNonCommercial.OrderBy(x => x, StringComparer.Ordinal));
+    }
+
     [Theory]
     [InlineData("audio-visualizer-classic")]
     [InlineData("aethelis-audio-visualizer")]
@@ -66,7 +109,9 @@ public sealed class AssetContractTests
         Assert.DoesNotContain("Flame visualizer", xaml);
         Assert.DoesNotContain("Premium living flame", xaml);
         Assert.DoesNotContain("Aethelis GPU visualizer", xaml);
-        Assert.Contains("Maximum=\"2.7\"", xaml);
+        Assert.Contains("Maximum=\"8\"", xaml);
+        Assert.Contains("Maximum=\"12\"", xaml);
+        Assert.Contains("Maximum=\"3\"", xaml);
         Assert.Contains("Content=\"60 FPS\"", xaml);
     }
 
@@ -170,6 +215,37 @@ public sealed class AssetContractTests
         Assert.Contains("Repeated failure patterns", findings);
         Assert.Contains("Required architecture for the next credible prototype", findings);
         Assert.Contains("Hide `Volumetric Fire 3D Prototype`", findings);
+    }
+
+    [Fact]
+    public void EventHorizonIsAnOriginalCleanRoomBlackHoleInTheCatalog()
+    {
+        var catalog = WallpaperCatalog.LoadBuiltIns(Path.Combine(RepositoryRoot, "Assets", "Wallpapers"));
+        Assert.Contains(catalog, entry => entry.Kind == WallpaperKind.EventHorizon);
+        var shader = File.ReadAllText(Path.Combine(RepositoryRoot, "Shaders", "EventHorizon.hlsl"));
+        Assert.Contains("float4 PSMain", shader);
+        Assert.Contains("VSMain", shader);
+        Assert.Contains("clean-room", shader);
+        Assert.DoesNotContain("shadertoy", shader.ToLowerInvariant());
+    }
+
+    [Theory]
+    [InlineData("NeonRibbons")]
+    [InlineData("LiquidOrbs")]
+    [InlineData("EventHorizon")]
+    public void RewrittenShadersAreOwnCleanRoomImplementations(string shaderName)
+    {
+        var shader = File.ReadAllText(Path.Combine(RepositoryRoot, "Shaders", shaderName + ".hlsl"));
+        Assert.Contains("clean-room", shader);
+        Assert.DoesNotContain("supplied by the user", shader);
+    }
+
+    [Fact]
+    public void AudioReactiveToggleIsExposedInTheUi()
+    {
+        var xaml = File.ReadAllText(Path.Combine(RepositoryRoot, "MainWindow.xaml"));
+        Assert.Contains("AudioReactiveCheckBox", xaml);
+        Assert.Contains("AudioReactiveChanged", xaml);
     }
 
     private static string FindRepositoryRoot()

@@ -6,6 +6,7 @@ internal sealed class WallpaperController : IDisposable
     private readonly Func<WallpaperRequest, CancellationToken, Task<IWallpaperSession>> _factory;
     private CancellationTokenSource? _pending;
     private bool _disposed;
+    private bool _audioEnabled = true;
     public WallpaperRequest? ActiveRequest { get; private set; }
     public bool IsHealthy => _session?.IsHealthy ?? false;
     public event Action? StateChanged;
@@ -31,6 +32,7 @@ internal sealed class WallpaperController : IDisposable
             next = await _factory(request, pending.Token);
             pending.Token.ThrowIfCancellationRequested();
             if (request.Settings is not null) next.UpdateVisualizerSettings(request.Settings);
+            next.SetAudioEnabled(_audioEnabled);
             next.Show();
             var previous = _session;
             _session = next;
@@ -103,6 +105,15 @@ internal sealed class WallpaperController : IDisposable
     {
         if (ActiveRequest is not null) ActiveRequest = ActiveRequest with { Settings = settings };
         _session?.UpdateVisualizerSettings(settings);
+    }
+
+    // Global audio-capture toggle. When disabled the active and future sessions stop
+    // consuming the WASAPI stream; playing only the animation ("relax" mode).
+    public bool AudioEnabled => _audioEnabled;
+    public void SetAudioEnabled(bool enabled)
+    {
+        _audioEnabled = enabled;
+        _session?.SetAudioEnabled(enabled);
     }
 
     public void Dispose()

@@ -4,5 +4,7 @@
   "type": "native-audio-reactive",
   "preview": "preview.jpg",
   "previewKind": "example",
-  "audioReactive": true
+  "audioReactive": true,
+  "author": "Marcelo Bossle",
+  "license": "LicenseRef-HYPNIX-Proprietary"
 }

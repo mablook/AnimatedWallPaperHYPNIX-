@@ -20,14 +20,25 @@ internal sealed record AethelisAudioProfile(float Bass, float Mids, float Highs,
     {
         var sum = 0f;
         var peak = 0f;
+        end = Math.Min(end, bands.Length);
         for (var index = start; index < end; index++)
         {
-            var value = Math.Clamp(bands[index] * sensitivity, 0, 1);
+            var value = ApplyGain(bands[index], sensitivity);
             sum += value;
             peak = Math.Max(peak, value);
         }
 
         var average = sum / Math.Max(1, end - start);
         return Math.Clamp(average * 0.62f + peak * 0.38f, 0, 1);
+    }
+
+    internal static float ApplyGain(float value, float sensitivity)
+    {
+        if (!float.IsFinite(value) || !float.IsFinite(sensitivity) || sensitivity <= 0) return 0;
+        value = Math.Clamp(value, 0, 1);
+        var gain = 2 * Math.Clamp(sensitivity, 0, 12);
+        // Soft compression boosts quiet bands without flattening every loud band
+        // against a hard ceiling as the user increases sensitivity.
+        return value * gain / Math.Max(0.000001f, 1 + value * (gain - 1));
     }
 }

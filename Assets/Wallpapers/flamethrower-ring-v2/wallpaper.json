@@ -4,5 +4,7 @@
   "kind": "FlamethrowerRingV2",
   "title": "Flamethrower Ring V2",
   "id": "flamethrower-ring-v2",
-  "previewKind": "example"
+  "previewKind": "example",
+  "author": "Marcelo Bossle",
+  "license": "LicenseRef-HYPNIX-Proprietary"
 }

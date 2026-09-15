@@ -29,8 +29,16 @@ internal static class Program
             if (parent == IntPtr.Zero) throw new InvalidOperationException("Hidden native test surface could not be created.");
             try
             {
+                if (args.Contains("--spectral-only"))
+                {
+                    SpectralBloomRenderChecks.Run(parent, output);
+                    return 0;
+                }
+                NeonRibbonsRenderChecks.Run(parent, output);
+                NeonRibbonsRenderChecks.Run(parent, output, "LiquidOrbs.hlsl", "liquid-orbs");
                 foreach (var mode in new[] { NativeRenderMode.Ambient, NativeRenderMode.VisualizerDemo,
-                    NativeRenderMode.AethelisVisualizer, NativeRenderMode.AethelisFlameBurst, NativeRenderMode.FlamethrowerRingV2 })
+                    NativeRenderMode.AethelisVisualizer, NativeRenderMode.AethelisFlameBurst, NativeRenderMode.FlamethrowerRingV2,
+                    NativeRenderMode.SpectralBloom, NativeRenderMode.NeonRibbons, NativeRenderMode.LiquidOrbs })
                 {
                     using var host = new NativeWallpaperHost(mode, preview: new PreviewTarget(parent, 640, 360));
                     host.Start(30, reveal: false);
@@ -38,6 +46,7 @@ internal static class Program
                     host.Show();
                     host.SubmitAudioBands(Enumerable.Repeat(0.4f, 64).ToArray());
                     host.UpdateVisualizerSettings(VisualizerSettings.Default);
+                    host.UpdateVisualizerSettings(VisualizerSettings.Default with { Intensity = 8, Sensitivity = 12, Glow = 3 });
                     host.Pause();
                     host.SetFrameCap(15);
                     host.Resume();

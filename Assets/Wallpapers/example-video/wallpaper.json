@@ -4,5 +4,7 @@
   "type": "video",
   "preview": "preview.jpg",
   "previewKind": "extracted-frame",
-  "audioReactive": false
+  "audioReactive": false,
+  "author": "Marcelo Bossle",
+  "license": "LicenseRef-HYPNIX-Proprietary"
 }

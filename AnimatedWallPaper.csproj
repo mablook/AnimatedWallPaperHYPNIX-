@@ -33,6 +33,7 @@
     <Content Include="Assets\Brand\hypnix.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Brand\hypnix-tray-white.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Wallpapers\**\wallpaper.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Wallpapers\**\CREDITS.txt" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Wallpapers\**\background.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Wallpapers\**\*-state.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Shaders\**\*.hlsl" CopyToOutputDirectory="PreserveNewest" />

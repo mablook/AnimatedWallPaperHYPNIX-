@@ -22,6 +22,10 @@ internal static class WallpaperSessionFactory
         WallpaperKind.AethelisVisualizer => NativeRenderMode.AethelisVisualizer,
         WallpaperKind.AethelisFlameBurst => NativeRenderMode.AethelisFlameBurst,
         WallpaperKind.FlamethrowerRingV2 => NativeRenderMode.FlamethrowerRingV2,
+        WallpaperKind.SpectralBloom => NativeRenderMode.SpectralBloom,
+        WallpaperKind.NeonRibbons => NativeRenderMode.NeonRibbons,
+        WallpaperKind.LiquidOrbs => NativeRenderMode.LiquidOrbs,
+        WallpaperKind.EventHorizon => NativeRenderMode.EventHorizon,
         WallpaperKind.VolumetricFire => NativeRenderMode.VolumetricFire,
         WallpaperKind.ExampleVideo => NativeRenderMode.Video,
         _ => NativeRenderMode.Ambient

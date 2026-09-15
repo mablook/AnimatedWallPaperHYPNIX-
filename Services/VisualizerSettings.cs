@@ -9,8 +9,5 @@ internal sealed record VisualizerSettings(
     Color StartColor,
     Color EndColor)
 {
-    public static VisualizerSettings Default { get; } = new(
-        1f, 1f, 0.55f,
-        Color.FromArgb(88, 205, 255),
-        Color.FromArgb(104, 80, 255));
+    public static VisualizerSettings Default { get; } = new VisualizerPreferences().ToSettings();
 }

@@ -25,6 +25,19 @@ public sealed class PreferencesTests : IDisposable
         Assert.False(File.Exists(FilePath + ".tmp"));
     }
 
+    [Fact]
+    public void AudioReactiveDefaultsTrueRoundTripsAndSurvivesLegacyFiles()
+    {
+        Assert.True(new AppSettings().AudioReactive);                     // default: capture on
+        var store = new AppSettingsStore(FilePath);
+        Assert.True(store.Save(new AppSettings { AudioReactive = false }));
+        Assert.False(store.Load().AudioReactive);                         // explicit off round-trips
+
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(FilePath, "{\"FramesPerSecond\":30}");         // legacy file without the field
+        Assert.True(new AppSettingsStore(FilePath).Load().AudioReactive); // stays enabled
+    }
+
     [Theory]
     [InlineData("{broken")]
     [InlineData("null")]
@@ -44,8 +57,8 @@ public sealed class PreferencesTests : IDisposable
         var settings = new AppSettingsStore(FilePath).Load();
         Assert.Equal(30, settings.FramesPerSecond);
         Assert.Equal(2, settings.AppPauseMode);
-        Assert.Equal(0.35f, settings.Visualizers["a"].Intensity);
-        Assert.Equal(1, settings.Visualizers["a"].Glow);
+        Assert.Equal(0, settings.Visualizers["a"].Intensity);
+        Assert.Equal(3, settings.Visualizers["a"].Glow);
     }
 
     [Theory]
@@ -54,6 +67,43 @@ public sealed class PreferencesTests : IDisposable
     [InlineData(2560, 1080, 1280, 540)]
     public void VideoKeepsItsAspectBeforePerDisplayCrop(int w, int h, int expectedW, int expectedH)
         => Assert.Equal((expectedW, expectedH), MediaTools.CalculateDecodeSize(w, h));
+
+    [Fact]
+    public void LegacyVisualizerDefaultsUpgradeOnceWhileCustomAndPackageSettingsSurvive()
+    {
+        var store = new AppSettingsStore(FilePath);
+        var oldDefaults = new VisualizerPreferences(1, 1, 0.55f, 2);
+        var custom = new VisualizerPreferences(2.7f, 2.064f, 1, 0);
+        var settings = new AppSettings();
+        settings.Visualizers["tunnelwisp"] = oldDefaults;
+        settings.Visualizers["audio-visualizer-classic"] = custom;
+        settings.Visualizers["package:authored"] = oldDefaults;
+        Assert.True(store.Save(settings));
+        var migrated = store.Load();
+        Assert.Equal(new VisualizerPreferences(ColorTheme: 2), migrated.Visualizers["tunnelwisp"]);
+        Assert.Equal(custom, migrated.Visualizers["audio-visualizer-classic"]);
+        Assert.Equal(oldDefaults, migrated.Visualizers["package:authored"]);
+        Assert.Equal(2, migrated.VisualizerDefaultsVersion);
+
+        // A later deliberate return to the old values must not be overwritten on restart.
+        migrated.Visualizers["tunnelwisp"] = oldDefaults;
+        Assert.True(store.Save(migrated));
+        Assert.Equal(oldDefaults, store.Load().Visualizers["tunnelwisp"]);
+    }
+
+    [Fact]
+    public void ExpandedRangesPersistAndPreviousDefaultsUpgradeWithHeadroom()
+    {
+        var store = new AppSettingsStore(FilePath);
+        var settings = new AppSettings { VisualizerDefaultsVersion = 1 };
+        settings.Visualizers["tunnelwisp"] = new(2.1f, 2.3f, 0.8f);
+        settings.Visualizers["neon-ribbons"] = new(7.5f, 11.5f, 2.8f, 1);
+        Assert.True(store.Save(settings));
+        var loaded = store.Load();
+        Assert.Equal(new VisualizerPreferences(), loaded.Visualizers["tunnelwisp"]);
+        Assert.Equal(settings.Visualizers["neon-ribbons"], loaded.Visualizers["neon-ribbons"]);
+        Assert.Equal(new VisualizerPreferences(0, 0, 0), new VisualizerPreferences(0, 0, 0).Normalize());
+    }
 
     [Fact]
     public void RotatedPhoneVideoUsesPortraitDisplayDimensions()

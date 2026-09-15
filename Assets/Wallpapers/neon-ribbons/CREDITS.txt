@@ -1,0 +1,12 @@
+Neon Ribbons - original HYPNIX wallpaper.
+
+This is an original, clean-room HYPNIX implementation. It renders audio-reactive
+neon ribbons using generic, non-copyrightable techniques (aspect-correct radial
+domain warp, sinusoidal ribbon fields, inverse-distance neon cores with analytic
+halos, linear-light accumulation and an ACES-style filmic tonemap).
+
+No third-party shader code is used. All parameters (ribbon count, frequencies,
+amplitudes, phases, palette, audio mapping) were authored by HYPNIX. Any earlier
+externally supplied snippet has been fully replaced.
+
+License: proprietary (c) Marcelo Bossle (HYPNIX). See the repository LICENSE.

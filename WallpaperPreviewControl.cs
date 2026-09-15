@@ -48,6 +48,8 @@ public sealed class WallpaperPreviewControl : HwndHost
         _controller.SetFrameCap(fps);
     }
 
+    internal void SetAudioEnabled(bool enabled) => _controller.SetAudioEnabled(enabled);
+
     private void Schedule()
     {
         _resizeTimer.Stop();

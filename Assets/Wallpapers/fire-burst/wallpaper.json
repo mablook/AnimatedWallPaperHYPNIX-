@@ -4,5 +4,7 @@
   "kind": "AethelisFlameBurst",
   "title": "Fire Burst Experimental",
   "id": "fire-burst",
-  "previewKind": "example"
+  "previewKind": "example",
+  "author": "Marcelo Bossle",
+  "license": "LicenseRef-HYPNIX-Proprietary"
 }

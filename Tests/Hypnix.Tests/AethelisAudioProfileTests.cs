@@ -51,4 +51,16 @@ public sealed class AethelisAudioProfileTests
         Assert.InRange(profile.Highs, 0, 1);
         Assert.InRange(profile.Complexity, 0, 1);
     }
+
+    [Fact]
+    public void HighGainRetainsDynamicsAndZeroSensitivityDisablesReaction()
+    {
+        var low = AethelisAudioProfile.ApplyGain(0.04f, 4);
+        var high = AethelisAudioProfile.ApplyGain(0.04f, 12);
+        Assert.True(high > low + 0.15f);
+        Assert.True(AethelisAudioProfile.ApplyGain(0.1f, 12) < AethelisAudioProfile.ApplyGain(0.4f, 12));
+        Assert.Equal(0, AethelisAudioProfile.ApplyGain(1, 0));
+        Assert.Equal(0, AethelisAudioProfile.ApplyGain(0, 12));
+        Assert.Equal(0, AethelisAudioProfile.ApplyGain(float.NaN, 12));
+    }
 }

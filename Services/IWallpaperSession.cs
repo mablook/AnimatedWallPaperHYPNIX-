@@ -10,4 +10,5 @@ internal interface IWallpaperSession : IDisposable
     void Pause();
     void SetPausedMonitors(IReadOnlyList<int> monitorIndices);
     void UpdateVisualizerSettings(VisualizerSettings settings);
+    void SetAudioEnabled(bool enabled);
 }

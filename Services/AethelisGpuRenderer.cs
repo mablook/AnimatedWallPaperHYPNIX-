@@ -10,7 +10,7 @@ using static Vortice.DXGI.DXGI;
 
 namespace AnimatedWallPaper.Services;
 
-internal sealed class AethelisGpuRenderer : IDisposable
+internal sealed partial class AethelisGpuRenderer : IDisposable
 {
     private static readonly FeatureLevel[] FeatureLevels =
     [
@@ -26,15 +26,22 @@ internal sealed class AethelisGpuRenderer : IDisposable
     private readonly ID3D11RenderTargetView _renderTarget;
     private readonly ID3D11VertexShader _vertexShader;
     private readonly ID3D11PixelShader _pixelShader;
+    private readonly ID3D11PixelShader? _bloomHorizontalShader;
+    private readonly ID3D11PixelShader? _bloomVerticalShader;
+    private readonly ID3D11PixelShader? _compositeShader;
     private readonly ID3D11ComputeShader? _computeShader;
     private readonly ID3D11Buffer _frameBuffer;
     private readonly Dictionary<string, EffekseerBridge> _effekseerByViewport = [];
     private readonly Dictionary<string, FluidResources> _fluidByViewport = [];
+    private readonly Dictionary<string, FeedbackResources> _feedbackByViewport = [];
     private readonly HashSet<string> _failedEffectViewports = [];
     private readonly List<IDisposable> _deviceResources = [];
     private bool _disposed;
     private readonly bool _usesFireRingEffect;
     private readonly bool _usesFluidSimulation;
+    private readonly bool _usesFeedback;
+    private readonly bool _usesLiquidOrbs;
+    private readonly ID3D11SamplerState? _linearSampler;
     private readonly string _effectPath;
     private readonly int _width;
     private readonly int _height;
@@ -83,6 +90,27 @@ internal sealed class AethelisGpuRenderer : IDisposable
                 var computeBytecode = Compiler.CompileFromFile(shaderPath, "CSMain", "cs_5_0");
                 _computeShader = Own(_device.CreateComputeShader(computeBytecode.Span));
             }
+            _usesFeedback = string.Equals(shaderFileName, "SpectralBloom.hlsl", StringComparison.OrdinalIgnoreCase);
+            _usesLiquidOrbs = string.Equals(shaderFileName, "LiquidOrbs.hlsl", StringComparison.OrdinalIgnoreCase);
+            if (_usesFeedback)
+            {
+                _bloomHorizontalShader = Own(_device.CreatePixelShader(Compiler.CompileFromFile(shaderPath, "PSBloomHorizontal", "ps_5_0").Span));
+                _bloomVerticalShader = Own(_device.CreatePixelShader(Compiler.CompileFromFile(shaderPath, "PSBloomVertical", "ps_5_0").Span));
+                _compositeShader = Own(_device.CreatePixelShader(Compiler.CompileFromFile(shaderPath, "PSComposite", "ps_5_0").Span));
+                var samplerDescription = new SamplerDescription
+                {
+                    Filter = Filter.MinMagMipLinear,
+                    AddressU = TextureAddressMode.Clamp,
+                    AddressV = TextureAddressMode.Clamp,
+                    AddressW = TextureAddressMode.Clamp,
+                    MipLODBias = 0,
+                    MaxAnisotropy = 1,
+                    ComparisonFunc = ComparisonFunction.Never,
+                    MinLOD = 0,
+                    MaxLOD = float.MaxValue
+                };
+                _linearSampler = Own(_device.CreateSamplerState(samplerDescription));
+            }
             _frameBuffer = Own(_device.CreateBuffer((uint)Marshal.SizeOf<FrameConstants>(), BindFlags.ConstantBuffer,
                 ResourceUsage.Dynamic, CpuAccessFlags.Write));
             _usesFireRingEffect = string.Equals(shaderFileName, "AethelisFlameBurst.hlsl", StringComparison.OrdinalIgnoreCase) ||
@@ -115,7 +143,7 @@ internal sealed class AethelisGpuRenderer : IDisposable
     }
 
     public unsafe void RenderViewport(int x, int y, int width, int height, double time,
-        AethelisAudioProfile profile, VisualizerSettings settings, bool freezeEffect = false)
+        AethelisAudioProfile profile, VisualizerSettings settings, bool freezeEffect = false, float[]? spectrum = null)
     {
         var frame = new FrameConstants
         {
@@ -128,8 +156,58 @@ internal sealed class AethelisGpuRenderer : IDisposable
             Intensity = settings.Intensity,
             Glow = settings.Glow,
             OriginX = x,
-            OriginY = y
+            OriginY = y,
+            StartColorR = settings.StartColor.R / 255f,
+            StartColorG = settings.StartColor.G / 255f,
+            StartColorB = settings.StartColor.B / 255f,
+            EndColorR = settings.EndColor.R / 255f,
+            EndColorG = settings.EndColor.G / 255f,
+            EndColorB = settings.EndColor.B / 255f
         };
+
+        if (_usesLiquidOrbs)
+        {
+            // HYPNIX-original orb motion: per-orb hashed speed, phase and radius.
+            // Centers depend only on time, so they are computed once per viewport
+            // here (not per ray-march step). xyz = world center; w = base radius.
+            for (var i = 0; i < 16; i++)
+            {
+                var fi = i + 1f;
+                var h1 = MathF.Sin(fi * 12.9898f) * 43758.5453f; h1 -= MathF.Floor(h1);
+                var h2 = MathF.Sin(fi * 78.233f) * 43758.5453f; h2 -= MathF.Floor(h2);
+                var h3 = MathF.Sin(fi * 37.719f) * 43758.5453f; h3 -= MathF.Floor(h3);
+                var phase = (float)time * (0.35f + 0.9f * h1);
+                frame.Spheres[i * 4] = MathF.Sin(phase + h1 * 6.2831853f + i) * 2.1f;
+                frame.Spheres[i * 4 + 1] = MathF.Cos(phase * 0.9f + h2 * 6.2831853f) * 1.9f;
+                frame.Spheres[i * 4 + 2] = MathF.Sin(phase * 0.7f + h3 * 6.2831853f) * 0.8f;
+                frame.Spheres[i * 4 + 3] = 0.55f + 0.35f * h2;
+            }
+        }
+
+        if (_usesFeedback)
+        {
+            var key = $"{x}:{y}:{width}:{height}";
+            if (!_feedbackByViewport.TryGetValue(key, out var feedback))
+            {
+                feedback = new FeedbackResources(_device, _context, width, height);
+                _feedbackByViewport.Add(key, feedback);
+            }
+            // Freeze keeps the history, bloom and audio envelope unchanged for this monitor.
+            var dt = feedback.LastTime is { } last ? Math.Clamp(time - last, 0, 0.1) : 1.0 / 60;
+            frame.PaddingX = (float)dt;
+            if (!freezeEffect)
+            {
+                feedback.LastTime = time;
+                for (var i = 0; i < 64; i++)
+                {
+                    var raw = spectrum is { Length: > 0 } ? spectrum[Math.Min(i * spectrum.Length / 64, spectrum.Length - 1)] : 0;
+                    var target = AethelisAudioProfile.ApplyGain(raw, settings.Sensitivity);
+                    var rate = target > feedback.Spectrum[i] ? 22f : 6f;
+                    feedback.Spectrum[i] += (target - feedback.Spectrum[i]) * (1 - MathF.Exp(-rate * (float)dt));
+                }
+            }
+            for (var i = 0; i < 64; i++) frame.Spectrum[i] = feedback.Spectrum[i];
+        }
 
         var mapped = _context.Map(_frameBuffer, 0, MapMode.WriteDiscard);
         *(FrameConstants*)mapped.DataPointer = frame;
@@ -141,7 +219,11 @@ internal sealed class AethelisGpuRenderer : IDisposable
         _context.PSSetShader(_pixelShader);
         _context.PSSetConstantBuffer(0, _frameBuffer);
         _context.RSSetViewport(new Viewport(x, y, width, height));
-        if (_usesFluidSimulation && _computeShader is not null)
+        if (_usesFeedback)
+        {
+            RenderFeedbackViewport(x, y, width, height, freezeEffect);
+        }
+        else if (_usesFluidSimulation && _computeShader is not null)
         {
             var viewportKey = $"{x}:{y}:{width}:{height}";
             if (!_fluidByViewport.TryGetValue(viewportKey, out var fluid))
@@ -174,6 +256,55 @@ internal sealed class AethelisGpuRenderer : IDisposable
             if (!freezeEffect) effekseer?.Update(time, profile, settings.Intensity);
             effekseer?.Render(width / (float)Math.Max(1, height));
         }
+    }
+
+    // MilkDrop-style feedback: warp/decay the monitor's previous frame and add new emission (SpectralBloom.hlsl),
+    // rendering into a per-viewport ping-pong buffer, then composite it into the shared desktop back buffer.
+    // When frozen the buffer is not advanced; the last frame is simply re-composited, so the monitor holds still.
+    private void RenderFeedbackViewport(int x, int y, int width, int height, bool freezeEffect)
+    {
+        var viewportKey = $"{x}:{y}:{width}:{height}";
+        if (!_feedbackByViewport.TryGetValue(viewportKey, out var feedback))
+        {
+            feedback = new FeedbackResources(_device, _context, width, height);
+            _feedbackByViewport.Add(viewportKey, feedback);
+        }
+
+        if (!freezeEffect)
+        {
+            _context.OMSetRenderTargets(feedback.NextTarget);
+            _context.RSSetViewport(new Viewport(0, 0, width, height));
+            _context.VSSetShader(_vertexShader);
+            _context.PSSetShader(_pixelShader);
+            _context.PSSetConstantBuffer(0, _frameBuffer);
+            _context.PSSetShaderResource(0, feedback.CurrentView);
+            if (_linearSampler is not null) _context.PSSetSampler(0, _linearSampler);
+            _context.Draw(3, 0);
+            _context.PSSetShaderResource(0, null!);
+            feedback.Swap();
+
+            _context.RSSetViewport(new Viewport(0, 0, feedback.BloomWidth, feedback.BloomHeight));
+            _context.OMSetRenderTargets(feedback.BloomTargets[0]);
+            _context.PSSetShader(_bloomHorizontalShader);
+            _context.PSSetShaderResource(0, feedback.CurrentView);
+            _context.Draw(3, 0);
+            _context.PSSetShaderResource(0, null!);
+            _context.OMSetRenderTargets(feedback.BloomTargets[1]);
+            _context.PSSetShader(_bloomVerticalShader);
+            _context.PSSetShaderResource(0, feedback.BloomViews[0]);
+            _context.Draw(3, 0);
+            _context.PSSetShaderResource(0, null!);
+        }
+
+        _context.OMSetRenderTargets(_renderTarget);
+        _context.RSSetViewport(new Viewport(x, y, width, height));
+        _context.PSSetShader(_compositeShader);
+        _context.PSSetSampler(0, _linearSampler);
+        _context.PSSetShaderResource(0, feedback.CurrentView);
+        _context.PSSetShaderResource(1, feedback.BloomViews[1]);
+        _context.Draw(3, 0);
+        _context.PSSetShaderResource(0, null!);
+        _context.PSSetShaderResource(1, null!);
     }
 
     public void EndFrame()
@@ -216,6 +347,8 @@ internal sealed class AethelisGpuRenderer : IDisposable
         _effekseerByViewport.Clear();
         foreach (var fluid in _fluidByViewport.Values) fluid.Dispose();
         _fluidByViewport.Clear();
+        foreach (var feedback in _feedbackByViewport.Values) feedback.Dispose();
+        _feedbackByViewport.Clear();
         ReleaseDeviceResources();
     }
 
@@ -233,7 +366,7 @@ internal sealed class AethelisGpuRenderer : IDisposable
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct FrameConstants
+    private unsafe struct FrameConstants
     {
         public float ResolutionX;
         public float ResolutionY;
@@ -247,6 +380,17 @@ internal sealed class AethelisGpuRenderer : IDisposable
         public float OriginY;
         public float PaddingX;
         public float PaddingY;
+        public float StartColorR;
+        public float StartColorG;
+        public float StartColorB;
+        public float ColorPadA;
+        public float EndColorR;
+        public float EndColorG;
+        public float EndColorB;
+        public float ColorPadB;
+        // float4[16] in HLSL: scalar arrays would have a different cbuffer stride.
+        public fixed float Spectrum[64];
+        public fixed float Spheres[64];
     }
 
     private sealed class FluidResources : IDisposable
@@ -297,6 +441,63 @@ internal sealed class AethelisGpuRenderer : IDisposable
             foreach (var target in _targets) target.Dispose();
             foreach (var view in _views) view.Dispose();
             foreach (var texture in _textures) texture.Dispose();
+        }
+    }
+
+    // Per-viewport ping-pong render targets that hold the previous frame for MilkDrop-style feedback.
+    private sealed class FeedbackResources : IDisposable
+    {
+        private readonly ID3D11Texture2D[] _textures = new ID3D11Texture2D[2];
+        private readonly ID3D11RenderTargetView[] _targets = new ID3D11RenderTargetView[2];
+        private readonly ID3D11ShaderResourceView[] _views = new ID3D11ShaderResourceView[2];
+        private int _current;
+        private readonly List<IDisposable> _owned = [];
+        public double? LastTime { get; set; }
+        public float[] Spectrum { get; } = new float[64];
+        public int BloomWidth { get; }
+        public int BloomHeight { get; }
+        public ID3D11RenderTargetView[] BloomTargets { get; } = new ID3D11RenderTargetView[2];
+        public ID3D11ShaderResourceView[] BloomViews { get; } = new ID3D11ShaderResourceView[2];
+
+        public FeedbackResources(ID3D11Device device, ID3D11DeviceContext context, int width, int height)
+        {
+            BloomWidth = Math.Max(1, width / 2);
+            BloomHeight = Math.Max(1, height / 2);
+            var description = new Texture2DDescription(Format.R16G16B16A16_Float, (uint)width, (uint)height, 1, 1,
+                BindFlags.RenderTarget | BindFlags.ShaderResource);
+            try
+            {
+            for (var i = 0; i < 2; i++)
+            {
+                _textures[i] = Own(device.CreateTexture2D(description));
+                _targets[i] = Own(device.CreateRenderTargetView(_textures[i]));
+                _views[i] = Own(device.CreateShaderResourceView(_textures[i]));
+                context.ClearRenderTargetView(_targets[i], new Color4(0, 0, 0, 1));
+            }
+            description.Width = (uint)BloomWidth;
+            description.Height = (uint)BloomHeight;
+            for (var i = 0; i < 2; i++)
+            {
+                var texture = Own(device.CreateTexture2D(description));
+                BloomTargets[i] = Own(device.CreateRenderTargetView(texture));
+                BloomViews[i] = Own(device.CreateShaderResourceView(texture));
+                context.ClearRenderTargetView(BloomTargets[i], new Color4(0, 0, 0, 1));
+            }
+            }
+            catch { Dispose(); throw; }
+        }
+
+        private T Own<T>(T resource) where T : IDisposable { _owned.Add(resource); return resource; }
+
+        public ID3D11RenderTargetView NextTarget => _targets[1 - _current];
+        public ID3D11ShaderResourceView CurrentView => _views[_current];
+        public ID3D11Texture2D CurrentTexture => _textures[_current];
+        public void Swap() => _current = 1 - _current;
+
+        public void Dispose()
+        {
+            for (var i = _owned.Count - 1; i >= 0; i--) _owned[i].Dispose();
+            _owned.Clear();
         }
     }
 }

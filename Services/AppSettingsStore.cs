@@ -6,11 +6,13 @@ namespace AnimatedWallPaper.Services;
 internal sealed class AppSettings
 {
     public int SchemaVersion { get; set; } = 1;
+    public int VisualizerDefaultsVersion { get; set; }
     public string SelectedWallpaperId { get; set; } = "built-in-ambient";
     public int FramesPerSecond { get; set; } = 30;
     public int AppPauseMode { get; set; } = 2;
     public bool PausePerMonitor { get; set; }
     public bool PauseOnBattery { get; set; }
+    public bool AudioReactive { get; set; } = true;
     public string? MediaToolsDirectory { get; set; }
     public Dictionary<string, VisualizerPreferences> Visualizers { get; set; } = [];
     public List<LocalVideo> Videos { get; set; } = [];
@@ -20,13 +22,13 @@ internal sealed class AppSettings
 internal sealed record LocalVideo(string Id, string Path, string Title);
 internal sealed record SavedDisplay(string DeviceId, string DeviceName, int X, int Y,
     int Width, int Height, uint DpiX, uint DpiY);
-internal sealed record VisualizerPreferences(float Intensity = 1, float Sensitivity = 1,
-    float Glow = 0.55f, int ColorTheme = 0)
+internal sealed record VisualizerPreferences(float Intensity = 3f, float Sensitivity = 4f,
+    float Glow = 1.2f, int ColorTheme = 0)
 {
     public VisualizerPreferences Normalize() => new(
-        float.IsFinite(Intensity) ? Math.Clamp(Intensity, 0.35f, 2.7f) : 1,
-        float.IsFinite(Sensitivity) ? Math.Clamp(Sensitivity, 0.4f, 2.5f) : 1,
-        float.IsFinite(Glow) ? Math.Clamp(Glow, 0, 1) : 0.55f,
+        float.IsFinite(Intensity) ? Math.Clamp(Intensity, 0, 8) : 3,
+        float.IsFinite(Sensitivity) ? Math.Clamp(Sensitivity, 0, 12) : 4,
+        float.IsFinite(Glow) ? Math.Clamp(Glow, 0, 3) : 1.2f,
         Math.Clamp(ColorTheme, 0, 3));
 
     public VisualizerSettings ToSettings()
@@ -62,6 +64,19 @@ internal sealed class AppSettingsStore(string? filePath = null)
             value.SelectedWallpaperId ??= "built-in-ambient";
             value.Visualizers = (value.Visualizers ?? []).Where(item => item.Value is not null)
                 .ToDictionary(item => item.Key, item => item.Value.Normalize());
+            if (value.VisualizerDefaultsVersion < 2)
+            {
+                // Migrate only untouched built-in defaults, once. Retain chosen colors,
+                // custom settings and imported packages' authored parameters.
+                foreach (var (id, preferences) in value.Visualizers.ToArray())
+                {
+                    if (!id.StartsWith("package:", StringComparison.Ordinal) &&
+                        ((value.VisualizerDefaultsVersion < 1 && preferences is { Intensity: 1, Sensitivity: 1, Glow: 0.55f }) ||
+                         preferences is { Intensity: 2.1f, Sensitivity: 2.3f, Glow: 0.8f }))
+                        value.Visualizers[id] = new(ColorTheme: preferences.ColorTheme);
+                }
+                value.VisualizerDefaultsVersion = 2;
+            }
             value.Videos = (value.Videos ?? []).Where(item => item is not null &&
                 !string.IsNullOrWhiteSpace(item.Id) && !string.IsNullOrWhiteSpace(item.Path) &&
                 Path.IsPathFullyQualified(item.Path)).DistinctBy(item => item.Id).ToList();

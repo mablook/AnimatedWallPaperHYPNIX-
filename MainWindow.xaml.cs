@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
     private readonly DispatcherTimer _recoveryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     private System.Windows.Forms.NotifyIcon? _trayIcon;
+    private System.Windows.Forms.ToolStripMenuItem? _trayAudioItem;
     private System.Drawing.Icon? _trayDrawingIcon;
     private bool _isUiInitialized;
     private bool _isQuitting;
@@ -44,6 +45,9 @@ public partial class MainWindow : Window
         AppPauseModeComboBox.SelectedIndex = _settings.AppPauseMode;
         PausePerMonitorToggle.IsChecked = _settings.PausePerMonitor;
         PauseBatteryCheckBox.IsChecked = _settings.PauseOnBattery;
+        AudioReactiveCheckBox.IsChecked = _settings.AudioReactive;
+        _wallpaperController.SetAudioEnabled(_settings.AudioReactive);
+        LivePreview.SetAudioEnabled(_settings.AudioReactive);
         FpsComboBox.SelectedIndex = _settings.FramesPerSecond == 15 ? 0 : _settings.FramesPerSecond == 60 ? 2 : 1;
         UpdatePauseControlsEnabled();
         RefreshGallery();
@@ -218,6 +222,16 @@ public partial class MainWindow : Window
         finally { _recovering = false; }
     }
 
+    private void AudioReactiveChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_isUiInitialized) return;
+        var enabled = AudioReactiveCheckBox.IsChecked == true;
+        _settings.AudioReactive = enabled;
+        _wallpaperController.SetAudioEnabled(enabled);
+        LivePreview.SetAudioEnabled(enabled);
+        if (_trayAudioItem is not null && _trayAudioItem.Checked != enabled) _trayAudioItem.Checked = enabled;
+        QueueSave();
+    }
     private void PolicyChanged(object sender, RoutedEventArgs e) { if (_isUiInitialized) { QueueSave(); ApplyPlaybackPolicy(); } }
     private void PolicyModeChanged(object sender, SelectionChangedEventArgs e) { if (_isUiInitialized) { UpdatePauseControlsEnabled(); QueueSave(); ApplyPlaybackPolicy(); } }
     private void UpdatePauseControlsEnabled() => PausePerMonitorToggle.IsEnabled = AppPauseModeComboBox.SelectedIndex != 0;
@@ -270,6 +284,18 @@ public partial class MainWindow : Window
     private void VisualizerSettingsButton_Click(object sender, RoutedEventArgs e) => VisualizerSettingsPopup.IsOpen = !VisualizerSettingsPopup.IsOpen;
     private void VisualizerSettingChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => ApplyVisualizerSettings();
     private void VisualizerColorChanged(object sender, SelectionChangedEventArgs e) => ApplyVisualizerSettings();
+    private void ResetVisualizerSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (Selected is not { IsVisualizer: true } entry) return;
+        var defaults = entry.Defaults ?? new VisualizerPreferences();
+        _isUiInitialized = false;
+        VisualizerIntensitySlider.Value = defaults.Intensity;
+        VisualizerSensitivitySlider.Value = defaults.Sensitivity;
+        VisualizerGlowSlider.Value = defaults.Glow;
+        VisualizerColorComboBox.SelectedIndex = defaults.ColorTheme;
+        _isUiInitialized = true;
+        ApplyVisualizerSettings();
+    }
     private void ApplyVisualizerSettings()
     {
         if (!_isUiInitialized || Selected is not { IsVisualizer: true } entry) return;
@@ -334,6 +360,7 @@ public partial class MainWindow : Window
         _settings.AppPauseMode = AppPauseModeComboBox.SelectedIndex;
         _settings.PausePerMonitor = PausePerMonitorToggle.IsChecked == true;
         _settings.PauseOnBattery = PauseBatteryCheckBox.IsChecked == true;
+        _settings.AudioReactive = AudioReactiveCheckBox.IsChecked == true;
         _settings.FramesPerSecond = GetSelectedFps();
         _saveTimer.Stop();
         _saveTimer.Start();
@@ -372,6 +399,12 @@ public partial class MainWindow : Window
         var menu = new System.Windows.Forms.ContextMenuStrip();
         menu.Items.Add("Open HYPNIX", null, (_, _) => Dispatcher.Invoke(ShowMainWindow));
         menu.Items.Add("Stop wallpaper", null, (_, _) => Dispatcher.Invoke(StopWallpaper));
+        _trayAudioItem = new System.Windows.Forms.ToolStripMenuItem("Audio reactive") { Checked = _settings.AudioReactive, CheckOnClick = true };
+        _trayAudioItem.CheckedChanged += (_, _) => Dispatcher.Invoke(() =>
+        {
+            if ((AudioReactiveCheckBox.IsChecked == true) != _trayAudioItem!.Checked) AudioReactiveCheckBox.IsChecked = _trayAudioItem.Checked;
+        });
+        menu.Items.Add(_trayAudioItem);
         menu.Items.Add("Quit HYPNIX", null, (_, _) => Dispatcher.Invoke(() => { _isQuitting = true; Close(); }));
         _trayIcon = new System.Windows.Forms.NotifyIcon { Icon = _trayDrawingIcon, Text = "HYPNIX", ContextMenuStrip = menu, Visible = true };
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowMainWindow);

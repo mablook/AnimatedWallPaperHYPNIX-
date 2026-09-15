@@ -15,9 +15,13 @@ internal enum NativeRenderMode
     AethelisVisualizer,
     AethelisFlameBurst,
     FlamethrowerRingV2,
+    SpectralBloom,
     VolumetricFire,
     FlameVisualizer,
-    Video
+    Video,
+    NeonRibbons,
+    LiquidOrbs,
+    EventHorizon
 }
 
 internal sealed partial class NativeWallpaperHost : IDisposable
@@ -81,7 +85,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
         EnsureWindowClassRegistered();
         var extendedStyle = WsExNoActivate | WsExToolWindow | WsExTransparent;
-        if (preview is null && renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)) extendedStyle |= WsExLayered;
+        if (preview is null && renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon)) extendedStyle |= WsExLayered;
         Handle = CreateWindowEx(
             extendedStyle,
             WindowClassName,
@@ -102,7 +106,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         Marshal.SetLastPInvokeError(0);
-        var alphaResult = preview is not null || renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire ||
+        var alphaResult = preview is not null || renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon ||
                           SetLayeredWindowAttributes(Handle, 0, 255, LwaAlpha);
         AppLog.Write($"Native host created. Handle=0x{Handle.ToInt64():X}; alphaResult={alphaResult}; " +
                      $"error={Marshal.GetLastPInvokeError()}");
@@ -125,7 +129,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     public void Start(int framesPerSecond, bool reveal = true)
     {
         SetFrameCap(framesPerSecond);
-        if (_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire)
+        if (_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon)
         {
             if (!GetClientRect(Handle, out var client))
                 throw new InvalidOperationException("Could not read the Direct3D wallpaper client size.");
@@ -133,6 +137,10 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             {
                 NativeRenderMode.AethelisFlameBurst => "AethelisFlameBurst.hlsl",
                 NativeRenderMode.FlamethrowerRingV2 => "FlamethrowerRingV2.hlsl",
+                NativeRenderMode.SpectralBloom => "SpectralBloom.hlsl",
+                NativeRenderMode.NeonRibbons => "NeonRibbons.hlsl",
+                NativeRenderMode.LiquidOrbs => "LiquidOrbs.hlsl",
+                NativeRenderMode.EventHorizon => "EventHorizon.hlsl",
                 NativeRenderMode.VolumetricFire => "HypnixVolumetricFire.hlsl",
                 _ => "Aethelis.hlsl"
             };
@@ -264,7 +272,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         // Direct3D owns the complete frame for both Aethelis modes. Rendering it
         // here avoids the old nested monitor loop (GDI monitor -> all GPU monitors),
         // which updated active effects on displays that were meant to stay frozen.
-        if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire) &&
+        if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon) &&
             _aethelisGpuRenderer is not null)
         {
             RenderAethelisGpuFrame(width, height);
@@ -369,14 +377,15 @@ internal sealed partial class NativeWallpaperHost : IDisposable
                 var sample = _visualizerFreezeState.Resolve(index, _clock.Elapsed.TotalSeconds, GetAudioBands());
                 var profile = AethelisAudioProfile.Analyze(sample.Bands, _visualizerSettings.Sensitivity);
                 _aethelisGpuRenderer.RenderViewport(target.X, target.Y, target.Width, target.Height,
-                    sample.TimeSeconds, profile, _visualizerSettings, sample.IsFrozen);
+                    sample.TimeSeconds, profile, _visualizerSettings, sample.IsFrozen, sample.Bands);
             }
         }
         else
         {
-            var profile = AethelisAudioProfile.Analyze(GetAudioBands(), _visualizerSettings.Sensitivity);
+            var bands = GetAudioBands();
+            var profile = AethelisAudioProfile.Analyze(bands, _visualizerSettings.Sensitivity);
             _aethelisGpuRenderer.RenderViewport(0, 0, width, height, _clock.Elapsed.TotalSeconds,
-                profile, _visualizerSettings);
+                profile, _visualizerSettings, spectrum: bands);
         }
 
         _aethelisGpuRenderer.EndFrame();
@@ -515,7 +524,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         var centerX = width / 2f;
         var centerY = height / 2f;
         var innerRadius = scale * 0.19f;
-        var maxLength = scale * 0.15f * settings.Intensity;
+        var maxLength = scale * 0.28f * (1 - MathF.Exp(-settings.Intensity * 0.55f));
         var barWidth = Math.Max(2f, scale * 0.0032f);
 
         using var halo = new SolidBrush(Color.FromArgb(35, 72, 94, 255));
@@ -526,9 +535,9 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             var angle = Math.PI * 2 * i / bandCount - Math.PI / 2;
             var mirroredBand = i < bandCount / 2 ? i : bandCount - 1 - i;
             var bandIndex = Math.Clamp(mirroredBand * bands.Length / (bandCount / 2), 0, bands.Length - 1);
-            var level = bands.Length == 0 ? 0 : Math.Clamp(bands[bandIndex] * settings.Sensitivity, 0, 1);
+            var level = bands.Length == 0 ? 0 : AethelisAudioProfile.ApplyGain(bands[bandIndex], settings.Sensitivity);
             var amplitude = maxLength * Math.Clamp(0.025f + level * 0.975f, 0, 1);
-            var average = bands.Length == 0 ? 0 : bands.Average();
+            var average = bands.Length == 0 ? 0 : AethelisAudioProfile.ApplyGain(bands.Average(), settings.Sensitivity);
             var inner = innerRadius + scale * 0.018f * average;
             var outer = inner + amplitude;
             var color = Blend(settings.StartColor, settings.EndColor, i / (float)(bandCount - 1));
@@ -566,7 +575,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         var centerY = height / 2f;
         var innerRadius = scale * 0.17f;
         var maxLength = scale * 0.18f * settings.Intensity;
-        var average = bands.Length == 0 ? 0f : bands.Average();
+        var average = bands.Length == 0 ? 0f : AethelisAudioProfile.ApplyGain(bands.Average(), settings.Sensitivity);
 
         using (var halo = new SolidBrush(Color.FromArgb((int)(48 + 45 * settings.Glow), 255, 62, 5)))
             graphics.FillEllipse(halo, centerX - innerRadius * 1.12f, centerY - innerRadius * 1.12f,
@@ -577,7 +586,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             var angle = Math.PI * 2 * i / flameCount - Math.PI / 2;
             var mirroredBand = i < flameCount / 2 ? i : flameCount - 1 - i;
             var bandIndex = Math.Clamp(mirroredBand * bands.Length / (flameCount / 2), 0, bands.Length - 1);
-            var level = bands.Length == 0 ? 0f : Math.Clamp(bands[bandIndex] * settings.Sensitivity, 0, 1);
+            var level = bands.Length == 0 ? 0f : AethelisAudioProfile.ApplyGain(bands[bandIndex], settings.Sensitivity);
             var flicker = 0.92f + 0.08f * (float)Math.Sin(time * 13 + i * 2.17);
             var length = maxLength * Math.Clamp(0.055f + level * 0.945f, 0, 1) * flicker;
             var baseWidth = Math.Max(4f, scale * (0.005f + level * 0.004f));
@@ -586,7 +595,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
             if (settings.Glow > 0.01f)
             {
-                using var glowPen = new Pen(Color.FromArgb((int)(105 * settings.Glow), 255, 48, 3),
+                using var glowPen = new Pen(Color.FromArgb(Math.Clamp((int)(105 * settings.Glow), 0, 255), 255, 48, 3),
                     baseWidth * (1.5f + settings.Glow));
                 graphics.DrawPath(glowPen, flame);
             }

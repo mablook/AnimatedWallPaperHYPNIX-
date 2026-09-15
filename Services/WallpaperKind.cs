@@ -7,6 +7,10 @@ internal enum WallpaperKind
     AethelisVisualizer,
     AethelisFlameBurst,
     FlamethrowerRingV2,
+    SpectralBloom,
     VolumetricFire,
-    ExampleVideo
+    ExampleVideo,
+    NeonRibbons,
+    LiquidOrbs,
+    EventHorizon
 }
