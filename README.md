@@ -108,6 +108,13 @@ It switches wallpapers live, plays audio so the visualizers react, captures the 
 [testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md#desktop-end-to-end-smoke-test-scriptse2e-desktop-smokeps1)
 for the per-capture attestation checklist.
 
+## Portable validation package
+
+Run `./scripts/package-portable.ps1` in PowerShell 7 to create a Windows x64 ZIP with the .NET runtime,
+all nine wallpapers, dependency notices, file hashes and source-build metadata. Output goes to a new
+timestamped folder under `artifacts/distribution`. See [distribution instructions](docs/DISTRIBUTION.md)
+for extraction, shared settings, integrity checks and the remaining release validation.
+
 ## Engineering notes
 
 - Read [desktop integration findings](docs/DESKTOP_INTEGRATION_FINDINGS.md) before changing Win32 hosting.
