@@ -10,6 +10,12 @@ dotnet test Tests\Hypnix.Tests\Hypnix.Tests.csproj -c Release
 ```
 
 Release is recommended while the Debug HYPNIX executable is open because Windows locks the running app host.
+If Release is also running, keep its files separate from validation output:
+
+```powershell
+dotnet test Tests/Hypnix.Tests/Hypnix.Tests.csproj -c Release "-p:OutDir=$PWD/artifacts/validation/unit/"
+```
+
 If feeds are unavailable but packages already exist locally:
 
 ```powershell
@@ -20,6 +26,23 @@ dotnet test Tests\Hypnix.Tests\Hypnix.Tests.csproj -c Release --no-restore
 
 `NU1900` warnings mean NuGet could not retrieve vulnerability data from a configured feed. They are separate
 from compilation and test results; always check the final passed/failed count.
+
+## Continuous integration
+
+The [Windows build and tests workflow](../.github/workflows/ci.yml) runs on pushes to `main` and `codex/**`,
+pull requests targeting `main`, and manual dispatch. It uses Windows Server 2022 and selects the .NET 8 SDK
+inside the CI checkout so newer preinstalled SDKs do not silently change the compiler used for validation.
+
+The job restores and builds `Hypnix.Tests` and `Hypnix.NativeSmoke` with their application reference in Release,
+then executes `Hypnix.Tests`. A restore, build or test failure fails the job. TRX reports are uploaded even after
+a test failure, when available, as `windows-regression-results` with a 14-day retention period.
+It uses the committed native DLL and assets; it does not rebuild the Effekseer runtime.
+
+The job compiles the native smoke project but does not execute GPU rendering, WASAPI capture or desktop
+attachment. Run those gates locally on an interactive Windows machine with Direct3D 11 hardware.
+A green CI run does not certify visual quality, multi-monitor desktop integration or video playback.
+The workflow must be committed and pushed before GitHub can execute it. Requiring its check before merging
+is a separate repository branch-protection setting; adding this file does not enable that setting.
 
 ## Automated regression coverage
 
@@ -54,7 +77,9 @@ pixels at small sizes, and application code referencing the dedicated tray ICO.
 
 ### UI contracts
 
-The suite protects the separate classic/flame visualizer choices and the approved `2.7x` intensity ceiling.
+The suite protects the separate classic/fire visualizer choices and the current control ceilings:
+intensity `8`, audio sensitivity `12` and glow `3`. Preferences also preserve independent wallpaper settings
+and the global Audio reactive toggle across restarts.
 These checks intentionally fail if a future layout rewrite silently removes existing product behavior.
 
 ### Downloaded preset safety
@@ -105,8 +130,10 @@ temporal smoothness on capable hardware, but does not turn the current CPU rende
 
 Run before releases and Store submissions:
 
-- Switch among ambient, classic visualizer, flame visualizer, and MP4 without manually stopping first.
-- Confirm both visualizers react to real system audio on both displays.
+- Switch through all nine built-in wallpapers and a local MP4 without manually stopping first.
+- Confirm every audio-reactive wallpaper reacts to real system audio on both displays.
+- Toggle Audio reactive in both the window and tray; verify desktop and preview return to calm animation,
+  resume reacting when enabled, and retain the preference after restart.
 - Enable `Pause only the display in use` + set `Maximized or fullscreen apps`; maximize an app on display 1 and confirm only display 1 freezes while display 2 keeps animating.
 - Maximize an app on display 2 as well and confirm both displays freeze; minimize one and confirm that display resumes while the other stays frozen.
 - Confirm a transparent/tool overlay (e.g. the NVIDIA GeForce overlay) does not pause a monitor that has no real app on it.
@@ -116,7 +143,7 @@ Run before releases and Store submissions:
 - Restore by double-click, test Stop, restart, then Quit and confirm renderer and process disappear.
 - Test 100%, 125%, 150%, and mixed-DPI layouts with the title bar reachable.
 - Test speakers, Bluetooth, USB, and wireless headsets without forcing 44.1 kHz.
-- Restart Explorer during playback once Explorer-restart recovery is implemented.
+- Restart Explorer during playback and confirm the active wallpaper is reconstructed.
 
 ## Rules for future tests
 
@@ -146,6 +173,22 @@ Catalog assertions now inspect loaded wallpaper entries instead of depending on 
 manifest packaging and shell construction at two sizes. Optional arguments run a real ffprobe/ffmpeg first-frame
 and pause/resume check. Run it from the repository root on Windows with Direct3D 11 hardware.
 The check uses hidden parent windows and does not attach to Explorer. Layout PNGs exclude HWND-hosted preview content.
+
+The default native smoke run retains lifecycle checks for ambient, classic visualizer, Aethelis, Fire Burst
+and Flamethrower Ring V2, and includes Spectral Bloom, Neon Ribbons, Liquid Orbs and Event Horizon.
+It asserts all nine entries are present in the built application's gallery. Additional GPU image checks cover:
+
+| Wallpaper | Checks |
+| --- | --- |
+| Neon Ribbons / Liquid Orbs | Animation in silence, quiet-audio response, intensity/glow range, black output at zero intensity and viewport origin. |
+| Spectral Bloom | Exposure at 15/30/60 FPS, audio response, individual FFT-band influence and pixel-exact independent viewport freeze. |
+| Event Horizon | Non-flat image, animation in silence, audio response, intensity/glow/color controls, return to silence and independent viewport freeze with saved time/audio inputs. |
+
+PNG artifacts are saved under the requested output directory. The `--spectral-only` option still runs the
+Spectral Bloom image checks alone. Its independent-freeze renderer is disposed before another swap chain is
+created for the same HWND. These checks validate renderer behavior; they do not replace visual review or the
+real desktop pause script. The desktop smoke script below covers its listed subset; manually exercise the
+remaining gallery entries before release.
 
 ## Desktop end-to-end smoke test (`scripts/e2e-desktop-smoke.ps1`)
 

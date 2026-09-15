@@ -28,6 +28,17 @@ internal static class SpectralBloomRenderChecks
         if (means.Max() / means.Min() > 1.3) throw new Exception("Spectral Bloom exposure varies excessively with FPS.");
         if (means[1] < Mean(silence) * 1.15) throw new Exception("Spectral Bloom is not responding to audio energy.");
 
+        CheckIndependentFreeze(window, output);
+
+        var reversed = Render(window, 30, true, reverse: true);
+        var forward = Render(window, 30, true);
+        if (forward.SequenceEqual(reversed)) throw new Exception("Individual FFT bands do not affect the image.");
+        Console.WriteLine("PASS: FFT distribution changes the image with identical grouped audio profile");
+    }
+
+    private static void CheckIndependentFreeze(IntPtr window, string output)
+    {
+        // Dispose this swap chain before Render creates another for the same HWND.
         using var renderer = new AethelisGpuRenderer(window, Width, Height, "SpectralBloom.hlsl");
         var bands = Enumerable.Range(0, 64).Select(i => i % 4 == 0 ? 0.9f : 0.1f).ToArray();
         var profile = AethelisAudioProfile.Analyze(bands, 1);
@@ -58,10 +69,6 @@ internal static class SpectralBloomRenderChecks
         Save(after, Path.Combine(output, "spectral-independent-freeze.png"));
         Console.WriteLine("PASS: independent viewport freeze is pixel-exact; adjacent viewport continues moving");
 
-        var reversed = Render(window, 30, true, reverse: true);
-        var forward = Render(window, 30, true);
-        if (forward.SequenceEqual(reversed)) throw new Exception("Individual FFT bands do not affect the image.");
-        Console.WriteLine("PASS: FFT distribution changes the image with identical grouped audio profile");
     }
 
     private static byte[] Render(IntPtr window, int fps, bool audio, bool reverse = false)

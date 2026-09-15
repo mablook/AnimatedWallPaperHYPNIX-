@@ -5,8 +5,12 @@ Win32 desktop hosting, WASAPI and Direct3D 11.
 
 ## Current behavior
 
-- Manifest-driven gallery for ambient, classic audio visualizer, Aethelis, Fire Burst and Flamethrower Ring V2.
+- Nine built-in wallpapers in a manifest-driven gallery: ambient, classic audio visualizer, Aethelis,
+  Fire Burst, Flamethrower Ring V2, Spectral Bloom, Neon Ribbons, Liquid Orbs and Event Horizon.
 - Live preview using the same renderer as the wallpaper. Desktop and preview share one WASAPI capture.
+- **Audio reactive** in the window and tray toggles system-audio reaction for both desktop and preview;
+  the preference persists across restarts. It does not mute other applications or stop animation.
+- Per-wallpaper intensity (0–8), audio sensitivity (0–12), glow (0–3) and four color themes.
 - Preview stops when the window is hidden/minimized, the session is locked, or the battery pause option applies.
 - Safe replacement: prepare the next wallpaper and its first frame before showing it and disposing the previous one.
   Preparation failures keep the current wallpaper; Stop also cancels pending preparation.
@@ -49,6 +53,20 @@ dotnet build AnimatedWallPaper.csproj -c Release
 dotnet test Tests/Hypnix.Tests/Hypnix.Tests.csproj -c Release
 ```
 
+The [Windows build and tests workflow](.github/workflows/ci.yml) runs on pushes to `main` and `codex/**`,
+pull requests targeting `main`, and manual dispatch. It uses .NET 8 on Windows, builds the application and both
+test projects, runs the regression suite, and retains TRX test reports for 14 days. GPU/native and live-desktop
+execution remain separate local checks. The workflow becomes available on GitHub after it is committed and pushed;
+a successful local run does not attest a hosted CI run.
+
+If the Release app is running, use an isolated output directory to avoid replacing its executable:
+
+```powershell
+dotnet test Tests/Hypnix.Tests/Hypnix.Tests.csproj -c Release "-p:OutDir=$PWD/artifacts/validation/unit/"
+dotnet build Tests/Hypnix.NativeSmoke/Hypnix.NativeSmoke.csproj -c Release "-p:OutDir=$PWD/artifacts/validation/native/"
+dotnet artifacts/validation/native/Hypnix.NativeSmoke.dll artifacts/validation/captures
+```
+
 The committed native runtime supports ordinary .NET builds. To rebuild it from pinned source with
 PowerShell 7, CMake and Visual Studio C++ Build Tools:
 
@@ -73,6 +91,10 @@ dotnet run --project Tests/Hypnix.NativeSmoke/Hypnix.NativeSmoke.csproj -c Relea
 Run from the repository root. The smoke check does not attach wallpapers to Explorer; it exercises hidden
 native surfaces, shell construction/layout and disposal. Its WPF layout PNGs omit the native preview surface.
 Settings and library fixtures stay under its output directory.
+The default run checks all nine built-in hosts and gallery entries, plus image checks for Neon Ribbons,
+Liquid Orbs, Spectral Bloom and Event Horizon. These cover animation/audio and renderer-specific controls,
+viewport positioning, FPS exposure or independent freeze. See the [testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md)
+for the exact coverage and remaining desktop checks.
 
 For a full desktop end-to-end check that drives the real app through UI Automation and attaches each wallpaper
 to the live desktop (Windows PowerShell 5.1, interactive session, Direct3D 11, audio endpoint, ffmpeg):
@@ -85,6 +107,13 @@ It switches wallpapers live, plays audio so the visualizers react, captures the 
 `artifacts/e2e-desktop/`, then presses Stop and restores your settings. See the
 [testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md#desktop-end-to-end-smoke-test-scriptse2e-desktop-smokeps1)
 for the per-capture attestation checklist.
+
+## Portable validation package
+
+Run `./scripts/package-portable.ps1` in PowerShell 7 to create a Windows x64 ZIP with the .NET runtime,
+all nine wallpapers, dependency notices, file hashes and source-build metadata. Output goes to a new
+timestamped folder under `artifacts/distribution`. See [distribution instructions](docs/DISTRIBUTION.md)
+for extraction, shared settings, integrity checks and the remaining release validation.
 
 ## Engineering notes
 
