@@ -9,6 +9,8 @@ internal static partial class WallpaperPackageValidator
     private const int MaximumFileCount = 64;
     private const long MaximumTotalBytes = 256L * 1024 * 1024;
     private const long MaximumManifestBytes = 64L * 1024;
+    // JsonSerializerOptions is thread-safe once configured; cache it instead of allocating per call.
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     private static readonly HashSet<string> SupportedRenderers = new(StringComparer.OrdinalIgnoreCase)
     {
         "hypnix.visualizer.classic.v1"
@@ -59,7 +61,7 @@ internal static partial class WallpaperPackageValidator
 
             var manifest = JsonSerializer.Deserialize<WallpaperPackageManifest>(
                 File.ReadAllText(manifestPath),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                JsonOptions);
             if (manifest is null) return Invalid(packageRoot, "Manifest is empty.");
             if (manifest.SchemaVersion != 1) return Invalid(packageRoot, "Unsupported schemaVersion.", manifest);
             if (string.IsNullOrWhiteSpace(manifest.Id) || !PackageIdPattern().IsMatch(manifest.Id))

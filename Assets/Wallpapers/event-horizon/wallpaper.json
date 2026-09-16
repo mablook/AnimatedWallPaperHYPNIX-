@@ -2,7 +2,7 @@
   "id": "event-horizon",
   "title": "Event Horizon",
   "type": "native-audio-visualizer",
-  "renderer": "event-horizon-hlsl-v1",
+  "renderer": "event-horizon-hlsl-v2",
   "preview": "preview.png",
   "previewKind": "rendered-shader",
   "audio": "wasapi-loopback",

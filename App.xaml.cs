@@ -17,7 +17,7 @@ public partial class App : System.Windows.Application
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             Services.AppLog.WriteException(
                 $"Unhandled domain exception (terminating={args.IsTerminating})",
-                args.ExceptionObject as Exception ?? new Exception(args.ExceptionObject?.ToString()));
+                args.ExceptionObject as Exception ?? new InvalidOperationException(args.ExceptionObject?.ToString()));
         // Observe faults from fire-and-forget tasks (audio/video workers) so a stray
         // continuation cannot escalate into a process-level failure; they are logged instead.
         TaskScheduler.UnobservedTaskException += (_, args) =>

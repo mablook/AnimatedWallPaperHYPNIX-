@@ -1,10 +1,6 @@
-// HYPNIX Event Horizon - original clean-room black hole. (c) Marcelo Bossle (HYPNIX).
-// Physics-based technique only (no third-party shader code): a Schwarzschild
-// photon geodesic is integrated (light bending via a = -1.5 * h^2 * r / |r|^5)
-// to lens an emissive accretion disk, a photon ring near 1.5 r_s and a procedural
-// starfield. Disk color uses a blackbody-style temperature ramp with Doppler
-// beaming; the frame is HDR and resolved with an ACES filmic tonemap. Audio
-// drives accretion brightness, disk rotation and photon-ring energy.
+// HYPNIX Event Horizon - independent Schwarzschild visualization.
+// References and implementation boundaries: docs/EVENT_HORIZON_STUDY.md.
+// Dimensionless horizon radius = 1. Art-directed plasma; not a Kerr metric solver.
 cbuffer FrameData : register(b0)
 {
     float2 Resolution; float Time; float Bass;
@@ -12,160 +8,192 @@ cbuffer FrameData : register(b0)
     float2 Origin; float2 Padding;
     float3 StartColor; float ColorPadA;
     float3 EndColor; float ColorPadB;
+    float4 Spectrum[16];
 };
-
+Texture2D<float4> Scene : register(t0);
+Texture2D<float4> Halo : register(t1);
+SamplerState LinearClamp : register(s0);
 struct VertexOutput { float4 Position : SV_Position; float2 UV : TEXCOORD0; };
 VertexOutput VSMain(uint id : SV_VertexID)
 {
-    VertexOutput output;
-    float2 uv = float2((id << 1) & 2, id & 2);
-    output.UV = uv;
-    output.Position = float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);
-    return output;
+    VertexOutput o;
+    o.UV = float2((id << 1) & 2, id & 2);
+    o.Position = float4(o.UV * float2(2, -2) + float2(-1, 1), 0, 1);
+    return o;
 }
-
-static const float PI = 3.14159265;
-
-float Hash21(float2 p) { p = frac(p * float2(123.34, 345.45)); p += dot(p, p + 34.345); return frac(p.x * p.y); }
-float Hash31(float3 p) { p = frac(p * 0.1031); p += dot(p, p.yzx + 33.33); return frac((p.x + p.y) * p.z); }
-
-float Noise3(float3 p)
+float RandomCell(float3 p)
 {
-    float3 i = floor(p), f = frac(p);
-    f = f * f * (3.0 - 2.0 * f);
-    float n000 = Hash31(i + float3(0, 0, 0)), n100 = Hash31(i + float3(1, 0, 0));
-    float n010 = Hash31(i + float3(0, 1, 0)), n110 = Hash31(i + float3(1, 1, 0));
-    float n001 = Hash31(i + float3(0, 0, 1)), n101 = Hash31(i + float3(1, 0, 1));
-    float n011 = Hash31(i + float3(0, 1, 1)), n111 = Hash31(i + float3(1, 1, 1));
-    float x00 = lerp(n000, n100, f.x), x10 = lerp(n010, n110, f.x);
-    float x01 = lerp(n001, n101, f.x), x11 = lerp(n011, n111, f.x);
-    return lerp(lerp(x00, x10, f.y), lerp(x01, x11, f.y), f.z);
+    uint3 q = asuint(int3(p));
+    uint h = q.x * 1597334677u ^ q.y * 3812015801u ^ q.z * 2798796415u;
+    h = (h ^ (h >> 16)) * 2246822519u;
+    h = (h ^ (h >> 13)) * 3266489917u;
+    return float(h ^ (h >> 16)) / 4294967295.0;
 }
-
-// Fewer octaves = smoother disk with less grain.
-float Fbm(float3 p)
+float Cloud(float3 p)
 {
-    float s = 0.0, a = 0.5;
-    [unroll] for (int i = 0; i < 3; i++) { s += a * Noise3(p); p *= 2.02; a *= 0.5; }
-    return s;
-}
-
-float3 Blackbody(float t) // t: 0 = cooler outer (amber), 1 = hotter inner (blue-white)
-{
-    float3 cool = float3(1.0, 0.42, 0.12);
-    float3 mid  = float3(1.0, 0.85, 0.55);
-    float3 hot  = float3(0.75, 0.85, 1.0);
-    return t < 0.5 ? lerp(cool, mid, t * 2.0) : lerp(mid, hot, (t - 0.5) * 2.0);
-}
-
-// Anti-aliased starfield. 'aa' fades stars where gravitational lensing makes the
-// ray direction change quickly between pixels, which would otherwise sparkle as
-// grain around the hole. Stars are soft, jittered and firefly-clamped.
-float3 Starfield(float3 d, float aa)
-{
-    float2 uv = float2(atan2(d.z, d.x) / (2.0 * PI) + 0.5, acos(clamp(d.y, -1.0, 1.0)) / PI);
-    float3 col = float3(0, 0, 0);
-    [unroll] for (int layer = 0; layer < 2; layer++)
+    float3 cell = floor(p), s = frac(p);
+    s = s * s * s * (s * (s * 6 - 15) + 10);
+    float value = 0;
+    [unroll] for (int z = 0; z < 2; z++)
+    [unroll] for (int y = 0; y < 2; y++)
+    [unroll] for (int x = 0; x < 2; x++)
     {
-        float scale = 150.0 + layer * 210.0;
-        float2 g = uv * scale;
-        float2 cell = floor(g);
-        float h = Hash21(cell + layer * 41.7);
-        if (h > 0.955)
-        {
-            float2 jit = 0.5 + 0.4 * (float2(Hash21(cell + 3.1), Hash21(cell + 7.7)) - 0.5);
-            float dstar = length(frac(g) - jit);
-            float soft = smoothstep(0.34, 0.0, dstar);
-            float star = min(soft * soft * (h - 0.955) / 0.045, 1.1);
-            col += star * lerp(float3(0.65, 0.75, 1.0), float3(1.0, 0.9, 0.8), Hash21(cell + 5.5));
-        }
+        float3 corner = float3(x, y, z);
+        float3 w = lerp(1 - s, s, corner);
+        value += RandomCell(cell + corner) * w.x * w.y * w.z;
     }
-    col += Fbm(d * 2.5 + 11.0) * Fbm(d * 1.7 + 5.0) * float3(0.012, 0.016, 0.03); // faint nebula
-    return col * aa * 0.7; // 'aa' fades stars AND nebula where the lens magnifies the background
+    return value;
 }
-
-float3 Aces(float3 x) { return saturate((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14)); }
-
+float Plasma(float radius, float angle, float height, float clock)
+{
+    // Seamless periodic coordinates, differential rotation and no random time jitter.
+    float phase = angle - clock * 2.8 / pow(radius, 1.5);
+    float2 orbit = float2(cos(phase), sin(phase));
+    float3 p = float3(orbit * 2.6, radius * 5.5 + height * 1.8);
+    return saturate(0.12 + Cloud(p) * 0.72
+        + Cloud(p * 2.1 + float3(9, 17, 3)) * 0.30
+        + Cloud(p * 4.3 + float3(21, 5, 13)) * 0.13);
+}
+float3 Gravity(float3 p, float angularMomentumSquared)
+{
+    float rr = max(dot(p, p), 0.1);
+    return -1.5 * angularMomentumSquared * p / (rr * rr * sqrt(rr));
+}
+float3 Sky(float3 direction)
+{
+    float3 p = normalize(direction) * 170;
+    float seed = RandomCell(floor(p));
+    float3 local = frac(p) - 0.5;
+    float stars = step(0.982, seed) * exp(-dot(local, local) * 65) * 0.48;
+    return float3(0.0008, 0.0013, 0.0025) + stars * float3(0.75, 0.84, 1);
+}
+float GaussianIntegral(float x)
+{
+    float xx = x * x;
+    return sign(x) * sqrt(max(0, 1 - exp(-xx * (1.27323954 + 0.147 * xx) / (1 + 0.147 * xx))));
+}
+float DiskFrequency(float radius)
+{
+    // Map the 64 logarithmic FFT bands onto the emitting disk, not screen pixels.
+    float index = saturate((radius - 3.0) / 8.5) * 63;
+    int lo = (int)floor(index);
+    int hi = min(lo + 1, 63);
+    float amplitude = lerp(Spectrum[lo / 4][lo % 4], Spectrum[hi / 4][hi % 4], frac(index));
+    return 1 - exp(-5 * max(amplitude, 0));
+}
+float3 Trace(float2 pixel)
+{
+    float2 p = (pixel * 2 - 1) * float2(Resolution.x / max(Resolution.y, 1), -1);
+    float roll = -0.12;
+    p = float2(cos(roll) * p.x - sin(roll) * p.y, sin(roll) * p.x + cos(roll) * p.y);
+    float azimuth = Time * 0.008;
+    float3 eye = float3(18 * sin(azimuth), 1.45, 18 * cos(azimuth));
+    float3 forward = normalize(-eye);
+    float3 right = normalize(cross(forward, float3(0, 1, 0)));
+    float3 up = cross(right, forward);
+    float3 pos = eye;
+    float3 velocity = normalize(forward * 2.55 + right * p.x + up * p.y);
+    float3 momentum = cross(pos, velocity);
+    float h2 = dot(momentum, momentum);
+    float3 radiance = 0;
+    float transmission = 1;
+    float closestApproach = length(eye);
+    bool escaped = false;
+    float clock = Time * 1.25; // Audio affects light, never accumulated phase.
+    [loop] for (int stepIndex = 0; stepIndex < 360; stepIndex++)
+    {
+        float distance = length(pos);
+        closestApproach = min(closestApproach, distance);
+        if (distance < 1.015 || transmission < 0.004) break;
+        if (distance > 35 && dot(pos, velocity) > 0) { escaped = true; break; }
+        float stepSize = clamp(distance * 0.075, 0.035, 1.25);
+        if (abs(pos.y) < 0.5 && distance > 2.7 && distance < 12)
+            stepSize = min(stepSize, 0.28);
+        // Explicit midpoint integration evaluates curvature at the half step.
+        float3 halfVelocity = velocity + Gravity(pos, h2) * (stepSize * 0.5);
+        float3 midpoint = pos + velocity * (stepSize * 0.5);
+        float3 next = pos + halfVelocity * stepSize;
+        velocity += Gravity(midpoint, h2) * stepSize;
+        float deltaY = next.y - pos.y;
+        float fraction = pos.y * next.y < 0 ? saturate(-pos.y / deltaY) : 0.5;
+        float3 samplePos = lerp(pos, next, fraction);
+        float radius = length(samplePos.xz);
+        if (radius > 3.0 && radius < 11.5 && abs(samplePos.y) < 0.65)
+        {
+            float envelope = smoothstep(3.0, 3.65, radius) * (1 - smoothstep(8.5, 11.5, radius));
+            float localAudio = DiskFrequency(radius);
+            // Shear local filaments without moving the camera or the shadow.
+            float plasma = Plasma(radius, atan2(samplePos.z, samplePos.x) + localAudio * 0.22, samplePos.y, clock);
+            float thickness = 0.035 + 0.003 * radius;
+            // Integrate a Gaussian vertical profile across the segment so even
+            // grazing rays resolve a thin disk without stochastic sampling.
+            float column = abs(deltaY) > 0.0001
+                ? abs(GaussianIntegral(next.y / thickness) - GaussianIntegral(pos.y / thickness))
+                    * thickness * 0.8862269 / abs(deltaY)
+                : exp(-pow(samplePos.y / thickness, 2));
+            float structure = pow(saturate((plasma - 0.18) * 1.5), 3);
+            float density = envelope * (0.06 + 8 * structure);
+            float opacity = 1 - exp(-density * column * length(next - pos) * 7);
+            float heat = pow(3.5 / radius, 1.4);
+            float3 orbit = normalize(float3(-samplePos.z, 0, samplePos.x));
+            float speed = sqrt(0.5 / max(radius - 1, 1));
+            float shift = sqrt(1 - 1 / radius) * sqrt(1 - speed * speed)
+                        / max(0.3, 1 - speed * dot(orbit, -normalize(velocity)));
+            float3 warm = lerp(float3(1.0, 0.32, 0.08), float3(1.0, 0.89, 0.72), saturate(heat * shift));
+            float3 tint = lerp(StartColor, EndColor, saturate((radius - 3) / 8.5));
+            warm *= lerp(float3(1, 1, 1), tint * 1.4, 0.16);
+            float energy = (0.4 + 3.2 * heat) * (0.25 + structure * 1.8) * pow(shift, 3);
+            // Bright ridges and dark troughs remain readable at high exposure.
+            float ridges = smoothstep(0.09, 0.44, structure);
+            energy *= lerp(1, 0.12 + 3.4 * ridges, localAudio);
+            warm = lerp(warm, float3(1.0, 0.67, 0.32), localAudio * (1 - ridges) * 0.4);
+            // Fade higher-order light paths after they wind close to the horizon.
+            // This removes the detached hairline ring without masking foreground
+            // material, altering capture geometry or clipping the primary arcs.
+            // Include the ring's junction tails so no bright teeth remain where
+            // the secondary image met the foreground disk.
+            float primaryVisibility = smoothstep(2.15, 2.6, closestApproach);
+            radiance += transmission * opacity * warm * energy * primaryVisibility;
+            transmission *= 1 - opacity;
+        }
+        pos = next;
+    }
+    // Captured and budget-exhausted rays cannot leak stars through the shadow.
+    if (escaped) radiance += transmission * Sky(velocity);
+    return radiance;
+}
 float4 PSMain(VertexOutput input) : SV_Target
 {
-    float aspect = Resolution.x / max(Resolution.y, 1.0);
-    float2 uv = float2(input.UV.x, 1.0 - input.UV.y);
-    float2 p = (uv * 2.0 - 1.0) * float2(aspect, 1.0);
-
-    float intensity = clamp(Intensity, 0.0, 8.0);
-    float glow = max(Glow, 0.0);
-    float bassE = 1.0 - exp(-3.2 * max(Bass - 0.01, 0.0));
-    float midsE = 1.0 - exp(-3.2 * max(Mids - 0.01, 0.0));
-    float highsE = 1.0 - exp(-3.2 * max(Highs - 0.01, 0.0));
-
-    // Geometry in Schwarzschild radii (r_s = 1).
-    const float rs = 1.0, rPhoton = 1.5, rIn = 3.0, rOut = 13.0, rEscape = 42.0;
-
-    // Slowly orbiting camera; mids nudge the orbit, a slow bob adds life.
-    float ct = Time * 0.04 + midsE * 0.25;
-    float3 camPos = float3(sin(ct) * 15.0, 2.6 + sin(Time * 0.05) * 0.5, cos(ct) * 15.0);
-    float3 fwd = normalize(-camPos);
-    float3 right = normalize(cross(float3(0, 1, 0), fwd));
-    float3 up = cross(fwd, right);
-    float3 pos = camPos;
-    float3 dir = normalize(p.x * right + p.y * up + fwd * 1.6);
-
-    float3 hc = cross(pos, dir);
-    float h2 = dot(hc, hc);
-    float rot = Time * (0.55 + midsE * 0.6);
-
-    float3 col = float3(0, 0, 0);
-    float trans = 1.0;   // transparency remaining toward the background
-    float ring = 0.0;    // photon-ring accumulator
-
-    [loop] for (int i = 0; i < 300; i++)
+    float2 offset = float2(0.25, 0.25) / max(Resolution, 1);
+    float3 color = (Trace(input.UV - offset) + Trace(input.UV + offset)) * 0.5;
+    return float4(min(color * (0.3 + 0.7 * sqrt(clamp(Intensity, 0, 8) / 3)), 24), 1);
+}
+// Separable HDR scattering local to each monitor; tone mapping happens once.
+float4 Blur(VertexOutput input, float2 axis)
+{
+    float3 sum = 0;
+    float weightSum = 0;
+    [unroll] for (int tap = -8; tap <= 8; tap++)
     {
-        float r = length(pos);
-        if (r < rs * 1.02) { trans = 0.0; break; }  // captured by the horizon
-        if (r > rEscape) break;                      // escaped: sample stars below
-
-        float dt = clamp(r * 0.10, 0.02, 0.5);
-        float3 oldPos = pos;
-        float3 accel = -1.5 * h2 * pos / pow(r, 5.0);
-        dir += accel * dt;
-        pos += dir * dt;
-
-        float dd = (r - rPhoton) / 0.10;
-        ring += exp(-dd * dd) * dt;
-
-        // Accretion disk in the equatorial plane (y = 0); accumulate every crossing
-        // so the lensed disk arcs over and under the hole.
-        if (oldPos.y * pos.y < 0.0)
-        {
-            float f = oldPos.y / (oldPos.y - pos.y);
-            float3 hp = lerp(oldPos, pos, f);
-            float rad = length(hp.xz);
-            if (rad > rIn && rad < rOut)
-            {
-                float tR = saturate((rOut - rad) / (rOut - rIn));
-                float ang = atan2(hp.z, hp.x);
-                float turb = Fbm(float3(log(rad) * 3.0, ang * 2.0 - rot, rad * 0.2));
-                turb *= smoothstep(rIn, rIn + 2.5, rad); // calm the strongly-magnified inner edge
-                float bright = pow(tR, 1.5) * (0.6 + 0.7 * turb);
-                float3 vdir = normalize(cross(float3(0, 1, 0), hp)); // orbital velocity
-                float dop = clamp(1.0 + 0.7 * dot(vdir, normalize(camPos - hp)), 0.4, 2.2);
-                float3 emit = lerp(Blackbody(tR), lerp(StartColor, EndColor, tR), 0.45);
-                emit = min(emit * bright * (dop * dop) * (0.8 + 1.3 * bassE), 8.0);
-                float dens = saturate(bright * 1.2);
-                col += trans * emit;
-                trans *= 1.0 - dens * 0.85;
-            }
-        }
-        if (trans < 0.01) break;
+        float weight = exp(-float(tap * tap) / 22);
+        sum += Scene.SampleLevel(LinearClamp, input.UV + axis * tap, 0).rgb * weight;
+        weightSum += weight;
     }
-
-    // Fade the starfield where the lens aliases (screen-space derivative of the ray).
-    float starAA = saturate(1.0 - length(fwidth(dir)) * 14.0);
-    if (trans > 0.001) col += trans * Starfield(dir, starAA);
-    ring = min(ring, 2.5); // tame chaotic photon-sphere spikes into a clean, steady ring
-    col += float3(1.0, 0.9, 0.75) * ring * (0.12 + 0.6 * glow) * (0.6 + 0.9 * highsE);
-
-    col = min(col, 12.0);                       // suppress fireflies before tonemapping
-    col *= 0.6 + 0.9 * sqrt(intensity / 3.0);
-    return float4(Aces(col), 1.0);
+    return float4(sum / weightSum, 1);
+}
+float4 PSBloomHorizontal(VertexOutput input) : SV_Target
+{
+    return Blur(input, float2(0.004 * Resolution.y / max(Resolution.x, 1), 0));
+}
+float4 PSBloomVertical(VertexOutput input) : SV_Target
+{
+    return Blur(input, float2(0, 0.004));
+}
+float4 PSComposite(VertexOutput input) : SV_Target
+{
+    float3 color = Scene.SampleLevel(LinearClamp, input.UV, 0).rgb;
+    color += Halo.SampleLevel(LinearClamp, input.UV, 0).rgb * clamp(Glow, 0, 3) * 0.18;
+    color *= 0.65;
+    color = saturate((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14));
+    return float4(pow(color, 1.0 / 2.2), 1);
 }

@@ -123,3 +123,4 @@ for extraction, shared settings, integrity checks and the remaining release vali
 - The approved FireRingV1 assets remain unchanged. The rejected volumetric prototype remains excluded from the gallery.
 - No microphone capture, stored raw audio, telemetry or administrator requirement in normal operation.
 - MSIX, Store certification, arbitrary per-display assignments and hardware-accelerated video decode remain future work.
+- A [macOS port study](docs/MACOS_PORT_STUDY.md) documents a future, not-yet-started plan (NSWindow desktop hosting, Metal, ScreenCaptureKit audio, notarization). It is design-only and changes no Windows behavior.

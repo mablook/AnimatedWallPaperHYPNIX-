@@ -1,14 +1,15 @@
-Event Horizon - original HYPNIX wallpaper.
+Event Horizon - HYPNIX independent implementation, revision 2.
 
-This is an original, clean-room HYPNIX implementation of a Schwarzschild black
-hole. It uses only generic, non-copyrightable physics and rendering techniques:
-photon geodesic integration for gravitational lensing (a = -1.5 * h^2 * r / |r|^5),
-an emissive accretion disk with a blackbody-style temperature ramp and Doppler
-beaming, a photon ring near 1.5 r_s, a lensed procedural starfield, HDR emission
-and an ACES filmic tonemap. Audio drives accretion brightness, disk rotation and
-photon-ring energy.
+(c) Marcelo Bossle (HYPNIX). Proprietary; see the repository LICENSE.
 
-No third-party shader code is used. This replaces the earlier CC BY-NC-SA
-"kerr-newman" port for commercial distribution.
+Visual and technical study references:
+- Earlier Kerr-Newman reference preserved locally in artifacts/black-hole-source.
+- Gargantua 2 by AIandDesign: https://www.shadertoy.com/view/NfVXDd
+- NASA / Jeremy Schnittman: https://svs.gsfc.nasa.gov/13326/
 
-License: proprietary (c) Marcelo Bossle (HYPNIX). See the repository LICENSE.
+The references were studied for light bending, disk structure and HDR presentation.
+The shipped HLSL is independently written; no reference shader, texture or bloom
+implementation is bundled. It models a non-rotating Schwarzschild exterior with
+midpoint ray integration, a Gaussian emitting layer, periodic plasma noise,
+Doppler brightness and per-monitor HDR blur. This is an artistic visualization,
+not a complete Kerr-Newman simulation. See docs/EVENT_HORIZON_STUDY.md.

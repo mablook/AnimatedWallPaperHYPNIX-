@@ -12,6 +12,10 @@
     <AssemblyName>HYPNIX</AssemblyName>
     <RootNamespace>AnimatedWallPaper</RootNamespace>
     <ApplicationIcon>Assets\Brand\hypnix-v2.ico</ApplicationIcon>
+    <!-- Static analysis: surface resource/dispose/interop defects at build time.
+         Warnings only (no TreatWarningsAsErrors) so they inform without breaking the build. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
   </PropertyGroup>
 
   <ItemGroup>

@@ -31,15 +31,18 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
     private readonly ID3D11PixelShader? _compositeShader;
     private readonly ID3D11ComputeShader? _computeShader;
     private readonly ID3D11Buffer _frameBuffer;
-    private readonly Dictionary<string, EffekseerBridge> _effekseerByViewport = [];
-    private readonly Dictionary<string, FluidResources> _fluidByViewport = [];
-    private readonly Dictionary<string, FeedbackResources> _feedbackByViewport = [];
-    private readonly HashSet<string> _failedEffectViewports = [];
+    // Keyed by the viewport rectangle as a value tuple: lookups allocate nothing, unlike the
+    // former interpolated "{x}:{y}:{w}:{h}" string that was rebuilt every frame per viewport.
+    private readonly Dictionary<(int X, int Y, int Width, int Height), EffekseerBridge> _effekseerByViewport = [];
+    private readonly Dictionary<(int X, int Y, int Width, int Height), FluidResources> _fluidByViewport = [];
+    private readonly Dictionary<(int X, int Y, int Width, int Height), FeedbackResources> _feedbackByViewport = [];
+    private readonly HashSet<(int X, int Y, int Width, int Height)> _failedEffectViewports = [];
     private readonly List<IDisposable> _deviceResources = [];
     private bool _disposed;
     private readonly bool _usesFireRingEffect;
     private readonly bool _usesFluidSimulation;
     private readonly bool _usesFeedback;
+    private readonly bool _usesEventHorizon;
     private readonly bool _usesLiquidOrbs;
     private readonly ID3D11SamplerState? _linearSampler;
     private readonly string _effectPath;
@@ -91,8 +94,9 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
                 _computeShader = Own(_device.CreateComputeShader(computeBytecode.Span));
             }
             _usesFeedback = string.Equals(shaderFileName, "SpectralBloom.hlsl", StringComparison.OrdinalIgnoreCase);
+            _usesEventHorizon = string.Equals(shaderFileName, "EventHorizon.hlsl", StringComparison.OrdinalIgnoreCase);
             _usesLiquidOrbs = string.Equals(shaderFileName, "LiquidOrbs.hlsl", StringComparison.OrdinalIgnoreCase);
-            if (_usesFeedback)
+            if (_usesFeedback || _usesEventHorizon)
             {
                 _bloomHorizontalShader = Own(_device.CreatePixelShader(Compiler.CompileFromFile(shaderPath, "PSBloomHorizontal", "ps_5_0").Span));
                 _bloomVerticalShader = Own(_device.CreatePixelShader(Compiler.CompileFromFile(shaderPath, "PSBloomVertical", "ps_5_0").Span));
@@ -184,9 +188,18 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
             }
         }
 
+        if (_usesEventHorizon)
+        {
+            // Capture already smooths attack/release. No extra audio history here.
+            for (var i = 0; i < 64; i++)
+                frame.Spectrum[i] = spectrum is { Length: > 0 }
+                    ? AethelisAudioProfile.ApplyGain(spectrum[Math.Min(i * spectrum.Length / 64, spectrum.Length - 1)], settings.Sensitivity)
+                    : i < 16 ? profile.Bass : i < 48 ? profile.Mids : profile.Highs;
+        }
+
         if (_usesFeedback)
         {
-            var key = $"{x}:{y}:{width}:{height}";
+            var key = (x, y, width, height);
             if (!_feedbackByViewport.TryGetValue(key, out var feedback))
             {
                 feedback = new FeedbackResources(_device, _context, width, height);
@@ -219,13 +232,13 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
         _context.PSSetShader(_pixelShader);
         _context.PSSetConstantBuffer(0, _frameBuffer);
         _context.RSSetViewport(new Viewport(x, y, width, height));
-        if (_usesFeedback)
+        if (_usesFeedback || _usesEventHorizon)
         {
             RenderFeedbackViewport(x, y, width, height, freezeEffect);
         }
         else if (_usesFluidSimulation && _computeShader is not null)
         {
-            var viewportKey = $"{x}:{y}:{width}:{height}";
+            var viewportKey = (x, y, width, height);
             if (!_fluidByViewport.TryGetValue(viewportKey, out var fluid))
             {
                 fluid = new FluidResources(_device, _context, width, height);
@@ -245,7 +258,7 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
         }
         if (_usesFireRingEffect)
         {
-            var viewportKey = $"{x}:{y}:{width}:{height}";
+            var viewportKey = (x, y, width, height);
             if (!_effekseerByViewport.TryGetValue(viewportKey, out var effekseer) && !_failedEffectViewports.Contains(viewportKey))
             {
                 effekseer = EffekseerBridge.TryCreate(_device.NativePointer, _context.NativePointer, _effectPath);
@@ -258,19 +271,20 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
         }
     }
 
-    // MilkDrop-style feedback: warp/decay the monitor's previous frame and add new emission (SpectralBloom.hlsl),
-    // rendering into a per-viewport ping-pong buffer, then composite it into the shared desktop back buffer.
+    // Per-viewport HDR rendering and bloom. Spectral Bloom uses temporal feedback;
+    // Event Horizon writes an independent frame without sampling previous emission.
     // When frozen the buffer is not advanced; the last frame is simply re-composited, so the monitor holds still.
     private void RenderFeedbackViewport(int x, int y, int width, int height, bool freezeEffect)
     {
-        var viewportKey = $"{x}:{y}:{width}:{height}";
+        var viewportKey = (x, y, width, height);
         if (!_feedbackByViewport.TryGetValue(viewportKey, out var feedback))
         {
             feedback = new FeedbackResources(_device, _context, width, height);
             _feedbackByViewport.Add(viewportKey, feedback);
         }
 
-        if (!freezeEffect)
+        // Initialize a newly created frozen viewport once, then reuse its HDR image.
+        if (!freezeEffect || (_usesEventHorizon && !feedback.HasFrame))
         {
             _context.OMSetRenderTargets(feedback.NextTarget);
             _context.RSSetViewport(new Viewport(0, 0, width, height));
@@ -410,13 +424,17 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
             _depth = 64;
             var description = new Texture3DDescription(Format.R16G16B16A16_Float, _width, _height, _depth, 1,
                 BindFlags.ShaderResource | BindFlags.UnorderedAccess);
-            for (var i = 0; i < 2; i++)
+            try
             {
-                _textures[i] = device.CreateTexture3D(description);
-                _views[i] = device.CreateShaderResourceView(_textures[i]);
-                _targets[i] = device.CreateUnorderedAccessView(_textures[i]);
-                context.ClearUnorderedAccessView(_targets[i], System.Numerics.Vector4.Zero);
+                for (var i = 0; i < 2; i++)
+                {
+                    _textures[i] = device.CreateTexture3D(description);
+                    _views[i] = device.CreateShaderResourceView(_textures[i]);
+                    _targets[i] = device.CreateUnorderedAccessView(_textures[i]);
+                    context.ClearUnorderedAccessView(_targets[i], System.Numerics.Vector4.Zero);
+                }
             }
+            catch { Dispose(); throw; }
             AppLog.Write($"Volumetric GPU state initialized and cleared. Grid={_width}x{_height}x{_depth}; Viewport={viewportWidth}x{viewportHeight}");
         }
 
@@ -438,9 +456,10 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
 
         public void Dispose()
         {
-            foreach (var target in _targets) target.Dispose();
-            foreach (var view in _views) view.Dispose();
-            foreach (var texture in _textures) texture.Dispose();
+            // Null-safe: a failed constructor can leave some slots unassigned.
+            foreach (var target in _targets) target?.Dispose();
+            foreach (var view in _views) view?.Dispose();
+            foreach (var texture in _textures) texture?.Dispose();
         }
     }
 
@@ -453,6 +472,7 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
         private int _current;
         private readonly List<IDisposable> _owned = [];
         public double? LastTime { get; set; }
+        public bool HasFrame { get; private set; }
         public float[] Spectrum { get; } = new float[64];
         public int BloomWidth { get; }
         public int BloomHeight { get; }
@@ -492,7 +512,7 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
         public ID3D11RenderTargetView NextTarget => _targets[1 - _current];
         public ID3D11ShaderResourceView CurrentView => _views[_current];
         public ID3D11Texture2D CurrentTexture => _textures[_current];
-        public void Swap() => _current = 1 - _current;
+        public void Swap() { _current = 1 - _current; HasFrame = true; }
 
         public void Dispose()
         {

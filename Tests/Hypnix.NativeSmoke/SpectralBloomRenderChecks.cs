@@ -102,11 +102,13 @@ internal static class SpectralBloomRenderChecks
         using var staging = device.CreateTexture2D(description);
         context.CopyResource(staging, source);
         var mapped = context.Map(staging, 0, MapMode.Read);
-        var pixels = new byte[Width * Height * 4];
+        var width = checked((int)description.Width);
+        var height = checked((int)description.Height);
+        var pixels = new byte[width * height * 4];
         try
         {
-            for (var y = 0; y < Height; y++)
-                Marshal.Copy(mapped.DataPointer + y * (int)mapped.RowPitch, pixels, y * Width * 4, Width * 4);
+            for (var y = 0; y < height; y++)
+                Marshal.Copy(mapped.DataPointer + y * (int)mapped.RowPitch, pixels, y * width * 4, width * 4);
         }
         finally { context.Unmap(staging, 0); }
         return pixels;
@@ -119,9 +121,9 @@ internal static class SpectralBloomRenderChecks
         return sum / (Width * Height * 3.0);
     }
 
-    internal static void Save(byte[] pixels, string path)
+    internal static void Save(byte[] pixels, string path, int width = Width, int height = Height)
     {
-        var bitmap = BitmapSource.Create(Width, Height, 96, 96, PixelFormats.Bgra32, null, pixels, Width * 4);
+        var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var file = File.Create(path);

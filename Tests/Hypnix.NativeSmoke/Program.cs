@@ -17,6 +17,11 @@ internal static class Program
         Directory.CreateDirectory(output);
         try
         {
+            if (args.Contains("--audio-probe"))
+            {
+                EventHorizonRenderChecks.ProbeLiveAudio(output);
+                return 0;
+            }
             var app = new System.Windows.Application();
             var resourceXml = System.Xml.Linq.XDocument.Load("App.xaml").Root!
                 .Element(System.Xml.Linq.XName.Get("Application.Resources", "http://schemas.microsoft.com/winfx/2006/xaml/presentation"))!;
@@ -29,6 +34,12 @@ internal static class Program
             if (parent == IntPtr.Zero) throw new InvalidOperationException("Hidden native test surface could not be created.");
             try
             {
+                if (args.Contains("--event-horizon-only"))
+                {
+                    EventHorizonRenderChecks.Run(parent, output);
+                    EventHorizonRenderChecks.CaptureReviewFrames(parent, output);
+                    return 0;
+                }
                 if (args.Contains("--spectral-only"))
                 {
                     SpectralBloomRenderChecks.Run(parent, output);

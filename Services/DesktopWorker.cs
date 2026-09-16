@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace AnimatedWallPaper.Services;
 
@@ -223,8 +222,9 @@ internal static partial class DesktopWorker
             return "none";
         }
 
-        var value = new StringBuilder(256);
-        return GetClassName(handle, value, value.Capacity) > 0 ? value.ToString() : "unknown";
+        Span<char> buffer = stackalloc char[256];
+        var length = GetClassName(handle, buffer, buffer.Length);
+        return length > 0 ? new string(buffer[..length]) : "unknown";
     }
 
     private static string GetRectText(IntPtr handle)
@@ -265,8 +265,8 @@ internal static partial class DesktopWorker
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool IsWindowVisible(IntPtr hWnd);
 
-    [DllImport("user32.dll", EntryPoint = "GetClassNameW", CharSet = CharSet.Unicode)]
-    private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+    [LibraryImport("user32.dll", EntryPoint = "GetClassNameW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int GetClassName(IntPtr hWnd, Span<char> lpClassName, int nMaxCount);
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

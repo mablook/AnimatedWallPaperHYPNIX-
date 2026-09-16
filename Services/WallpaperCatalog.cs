@@ -14,6 +14,9 @@ internal sealed record WallpaperEntry(string Id, string Title, WallpaperKind Kin
 
 internal static class WallpaperCatalog
 {
+    // JsonSerializerOptions is thread-safe once configured; cache it instead of allocating per call.
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
     public static IReadOnlyList<WallpaperEntry> LoadBuiltIns(string? root = null)
     {
         root ??= Path.Combine(AppContext.BaseDirectory, "Assets", "Wallpapers");
@@ -47,7 +50,7 @@ internal static class WallpaperCatalog
         var presetPath = Path.Combine(registration.PackageDirectory, manifest.Entrypoint!);
         if (new FileInfo(presetPath).Length > 65536) throw new InvalidDataException("Preset JSON is too large.");
         var preferences = JsonSerializer.Deserialize<VisualizerPreferences>(File.ReadAllText(presetPath),
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })?.Normalize() ?? new();
+            JsonOptions)?.Normalize() ?? new();
         return new("package:" + manifest.Id, manifest.Title!, WallpaperKind.VisualizerDemo,
             Path.Combine(registration.PackageDirectory, manifest.Preview!),
             manifest.Background is null ? null : Path.Combine(registration.PackageDirectory, manifest.Background),

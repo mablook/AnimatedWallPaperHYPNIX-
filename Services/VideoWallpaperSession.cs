@@ -43,7 +43,7 @@ internal sealed class VideoWallpaperSession : IWallpaperSession
             };
             if (!session._decoder.Start()) throw new InvalidOperationException("Unable to start ffmpeg.");
             session._decoder.BeginErrorReadLine();
-            session._readerTask = Task.Run(() => session.ReadFramesAsync(width, height, session._cancellation.Token));
+            session._readerTask = Task.Run(() => session.ReadFramesAsync(width, height, session._cancellation.Token), session._cancellation.Token);
             await session._firstFrame.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
             token.ThrowIfCancellationRequested();
             session._host.Start(request.FramesPerSecond, reveal: false);

@@ -218,14 +218,14 @@ public sealed class AssetContractTests
     }
 
     [Fact]
-    public void EventHorizonIsAnOriginalCleanRoomBlackHoleInTheCatalog()
+    public void EventHorizonDocumentsItsIndependentImplementationInTheCatalog()
     {
         var catalog = WallpaperCatalog.LoadBuiltIns(Path.Combine(RepositoryRoot, "Assets", "Wallpapers"));
         Assert.Contains(catalog, entry => entry.Kind == WallpaperKind.EventHorizon);
         var shader = File.ReadAllText(Path.Combine(RepositoryRoot, "Shaders", "EventHorizon.hlsl"));
         Assert.Contains("float4 PSMain", shader);
         Assert.Contains("VSMain", shader);
-        Assert.Contains("clean-room", shader);
+        Assert.Contains("independent Schwarzschild", shader);
         Assert.DoesNotContain("shadertoy", shader.ToLowerInvariant());
     }
 
@@ -233,10 +233,10 @@ public sealed class AssetContractTests
     [InlineData("NeonRibbons")]
     [InlineData("LiquidOrbs")]
     [InlineData("EventHorizon")]
-    public void RewrittenShadersAreOwnCleanRoomImplementations(string shaderName)
+    public void RewrittenShadersDocumentTheirImplementationOrigin(string shaderName)
     {
         var shader = File.ReadAllText(Path.Combine(RepositoryRoot, "Shaders", shaderName + ".hlsl"));
-        Assert.Contains("clean-room", shader);
+        Assert.Contains(shaderName == "EventHorizon" ? "independent Schwarzschild" : "clean-room", shader);
         Assert.DoesNotContain("supplied by the user", shader);
     }
 

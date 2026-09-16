@@ -17,8 +17,9 @@ internal sealed class AudioSpectrumService : IDisposable
     private readonly float[] _nextBands = new float[BandCount];
     private readonly CancellationTokenSource _shutdown = new();
     private Task? _worker;
-    private MMDevice? _device;
-    private WasapiLoopbackCapture? _capture;
+    // Written on the worker/StartCapture thread, read on the NAudio capture thread.
+    private volatile MMDevice? _device;
+    private volatile WasapiLoopbackCapture? _capture;
     private int _sampleCount;
     private volatile bool _disposed;
     private volatile bool _captureStopped;
@@ -218,6 +219,7 @@ internal sealed class AudioSpectrumService : IDisposable
             next[band] = Math.Clamp((float)(Math.Log10(1 + peak * 18) / 1.15), 0, 1);
         }
 
+        float[] snapshot;
         lock (_sync)
         {
             for (var i = 0; i < BandCount; i++)
@@ -225,8 +227,11 @@ internal sealed class AudioSpectrumService : IDisposable
                 var smoothing = next[i] > _bands[i] ? 0.62f : 0.16f;
                 _bands[i] += (next[i] - _bands[i]) * smoothing;
             }
-            BandsAvailable?.Invoke((float[])_bands.Clone());
+            snapshot = (float[])_bands.Clone();
         }
+        // Raise outside the FFT lock: subscribers take their own locks, so invoking under
+        // _sync created a nested lock-ordering hazard and ran subscriber work under the lock.
+        BandsAvailable?.Invoke(snapshot);
     }
 
     public void Dispose()

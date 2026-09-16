@@ -10,6 +10,10 @@ using AnimatedWallPaper.Services;
 
 namespace AnimatedWallPaper;
 
+// CA1001: the disposable fields are owned for the whole app lifetime and released in OnClosed,
+// which is the WPF window teardown hook; a Window is not expected to implement IDisposable.
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA1001",
+    Justification = "Owned services are disposed in OnClosed, the WPF window teardown path.")]
 public partial class MainWindow : Window
 {
     private readonly WallpaperController _wallpaperController = new();
@@ -346,7 +350,7 @@ public partial class MainWindow : Window
     private void OpenDiagnostics_Click(object sender, RoutedEventArgs e) => OpenFolder(AppLog.LogDirectory);
     private void OpenFolder(string path)
     {
-        try { Directory.CreateDirectory(path); Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+        try { Directory.CreateDirectory(path); using var _ = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
         catch (Exception exception) { ReportError("Folder could not be opened", exception); }
     }
     private void ReportError(string context, Exception exception)
@@ -449,7 +453,10 @@ public partial class MainWindow : Window
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         var enabled = 1;
-        DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, ref enabled, sizeof(int));
+        // DWMWA_USE_IMMERSIVE_DARK_MODE (20). Best-effort: unsupported on older Windows builds,
+        // so a non-zero HRESULT just means the title bar stays light; log it rather than ignore it.
+        var darkTitleBar = DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, ref enabled, sizeof(int));
+        if (darkTitleBar != 0) AppLog.Write($"Dark title bar unavailable (HRESULT=0x{darkTitleBar:X8})");
         var work = SystemParameters.WorkArea;
         MinWidth = Math.Min(MinWidth, Math.Max(320, work.Width - 32));
         MinHeight = Math.Min(MinHeight, Math.Max(320, work.Height - 32));

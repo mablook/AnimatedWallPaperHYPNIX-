@@ -1,21 +1,24 @@
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using System.Windows.Threading;
 
 namespace AnimatedWallPaper.Services;
 
 internal sealed partial class ForegroundAppMonitor : IDisposable
 {
-    private readonly DispatcherTimer _timer;
-    private bool _disposed;
+    // Periodic detection runs on a background timer so the heavy EnumWindows sweep (many P/Invokes
+    // per top-level window, once a second) no longer stalls the UI thread. The resulting state is
+    // applied back on the UI thread via the captured SynchronizationContext, so the properties and
+    // StateChanged stay single-threaded for subscribers. RefreshNow() stays synchronous for callers
+    // that read the state immediately after (wallpaper start/recovery).
+    private readonly System.Threading.Timer _timer;
+    private readonly SynchronizationContext _uiContext;
+    private int _ticking;
+    private volatile bool _disposed;
 
     public ForegroundAppMonitor()
     {
-        _timer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(1)
-        };
-        _timer.Tick += (_, _) => Refresh();
+        _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
+        _timer = new System.Threading.Timer(_ => BackgroundTick(), null, Timeout.Infinite, Timeout.Infinite);
     }
 
     public event EventHandler? StateChanged;
@@ -34,7 +37,7 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
     public void Start()
     {
         Refresh();
-        _timer.Start();
+        _timer.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
 
     public void RefreshNow() => Refresh();
@@ -46,15 +49,45 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
             return;
         }
 
-        _timer.Stop();
         _disposed = true;
+        _timer.Dispose();
     }
 
+    // Background timer callback: does the heavy detection off the UI thread, then marshals the
+    // state application back to the UI. The _ticking guard drops a tick if the previous one is
+    // still running (e.g. a very busy desktop), so ticks never pile up.
+    private void BackgroundTick()
+    {
+        if (_disposed || Interlocked.Exchange(ref _ticking, 1) == 1) return;
+        try
+        {
+            var (fullscreen, covered) = DetectCoveredMonitors();
+            var onBattery = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Offline;
+            _uiContext.Post(_ => Apply(fullscreen, covered, onBattery), null);
+        }
+        catch (Exception exception)
+        {
+            AppLog.WriteException("Foreground detection failed", exception);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _ticking, 0);
+        }
+    }
+
+    // Synchronous detection + apply on the calling (UI) thread; used at startup and on demand.
     private void Refresh()
     {
         var (fullscreen, covered) = DetectCoveredMonitors();
         var onBattery = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Offline;
+        Apply(fullscreen, covered, onBattery);
+    }
 
+    // Always runs on the UI thread (direct from Refresh, or posted from BackgroundTick), so the
+    // state fields and StateChanged are never touched concurrently.
+    private void Apply(IReadOnlyList<int> fullscreen, IReadOnlyList<int> covered, bool onBattery)
+    {
+        if (_disposed) return;
         if (onBattery == IsOnBattery && SameSet(fullscreen, FullscreenMonitors) && SameSet(covered, CoveredMonitors))
         {
             return;
