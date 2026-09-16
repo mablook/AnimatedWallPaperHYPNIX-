@@ -79,7 +79,7 @@ float DiskFrequency(float radius)
     int lo = (int)floor(index);
     int hi = min(lo + 1, 63);
     float amplitude = lerp(Spectrum[lo / 4][lo % 4], Spectrum[hi / 4][hi % 4], frac(index));
-    return 1 - exp(-5 * max(amplitude, 0));
+    return 1 - exp(-9 * max(amplitude, 0));
 }
 float3 Trace(float2 pixel)
 {
@@ -123,7 +123,7 @@ float3 Trace(float2 pixel)
             float envelope = smoothstep(3.0, 3.65, radius) * (1 - smoothstep(8.5, 11.5, radius));
             float localAudio = DiskFrequency(radius);
             // Shear local filaments without moving the camera or the shadow.
-            float plasma = Plasma(radius, atan2(samplePos.z, samplePos.x) + localAudio * 0.22, samplePos.y, clock);
+            float plasma = Plasma(radius, atan2(samplePos.z, samplePos.x) + localAudio * 0.35, samplePos.y, clock);
             float thickness = 0.035 + 0.003 * radius;
             // Integrate a Gaussian vertical profile across the segment so even
             // grazing rays resolve a thin disk without stochastic sampling.
@@ -143,9 +143,10 @@ float3 Trace(float2 pixel)
             float3 tint = lerp(StartColor, EndColor, saturate((radius - 3) / 8.5));
             warm *= lerp(float3(1, 1, 1), tint * 1.4, 0.16);
             float energy = (0.4 + 3.2 * heat) * (0.25 + structure * 1.8) * pow(shift, 3);
-            // Bright ridges and dark troughs remain readable at high exposure.
+            // Bright ridges and dark troughs remain readable at high exposure. Audio pushes
+            // the ridges harder so the disk visibly answers the spectrum, not just its contrast.
             float ridges = smoothstep(0.09, 0.44, structure);
-            energy *= lerp(1, 0.12 + 3.4 * ridges, localAudio);
+            energy *= lerp(1, 0.10 + 5.5 * ridges, localAudio);
             warm = lerp(warm, float3(1.0, 0.67, 0.32), localAudio * (1 - ridges) * 0.4);
             // Fade higher-order light paths after they wind close to the horizon.
             // This removes the detached hairline ring without masking foreground
@@ -193,7 +194,8 @@ float4 PSComposite(VertexOutput input) : SV_Target
 {
     float3 color = Scene.SampleLevel(LinearClamp, input.UV, 0).rgb;
     color += Halo.SampleLevel(LinearClamp, input.UV, 0).rgb * clamp(Glow, 0, 3) * 0.18;
-    color *= 0.65;
+    // Lower base exposure so the disk no longer starts blown out at default intensity.
+    color *= 0.48;
     color = saturate((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14));
     return float4(pow(color, 1.0 / 2.2), 1);
 }

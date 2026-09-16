@@ -121,6 +121,7 @@ for extraction, shared settings, integrity checks and the remaining release vali
 - [Testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md) covers automated and manual regression gates.
 - [Product direction](docs/PRODUCT_DIRECTION.md) and [UI architecture](docs/UI_ARCHITECTURE.md) distinguish future work.
 - [Relaxing animation design](docs/RELAXING_ANIMATION_DESIGN.md) turns the neuroscience of relaxation into authoring rules for calm wallpapers.
+- [Shader wallpaper authoring](docs/SHADER_WALLPAPER_AUTHORING.md) is the step-by-step recipe for adding a new GPU wallpaper (contracts, template, audio, wiring, preview, tests).
 - The approved FireRingV1 assets remain unchanged. The rejected volumetric prototype remains excluded from the gallery.
 - No microphone capture, stored raw audio, telemetry or administrator requirement in normal operation.
 - MSIX, Store certification, arbitrary per-display assignments and hardware-accelerated video decode remain future work.

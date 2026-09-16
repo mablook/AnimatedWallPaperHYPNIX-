@@ -133,3 +133,15 @@ aggregate levels. This confirms system output reaches capture, not subjective mu
 acceptance. Test results, captured frames and a settings backup are in
 `artifacts/event-horizon-study/spectral-response`. Its `bin/HYPNIX.exe` is the new
 review application; the preceding test executable is preserved in the parent `bin`.
+
+## Follow-up: brighter default was toned down, audio strengthened
+
+User review found the default too bright and the audio response too weak. Two shader-only
+changes, kept inside the existing native checks: base exposure in the composite lowered
+(`color *= 0.65` to `0.48`) so the disk no longer starts blown out at default intensity; and
+the audio made more assertive by raising the disk-frequency response (`1 - exp(-5*a)` to
+`-9*a`), the filament shear (`0.22` to `0.35`) and the ridge push (`0.12 + 3.4*ridges` to
+`0.10 + 5.5*ridges`). Camera, shadow geometry and silence reset are unchanged. Native Event
+Horizon checks pass with the audio response roughly doubled (overall change 11.4 -> 19.3;
+bass/mids/highs 0.76/1.18/2.87 -> 1.38/2.26/5.38; max-controls 11.1 -> 17.3) while the dark
+shadow and lensed arc contract still holds.
