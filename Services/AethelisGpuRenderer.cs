@@ -43,6 +43,8 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
     private readonly bool _usesFluidSimulation;
     private readonly bool _usesFeedback;
     private readonly bool _usesEventHorizon;
+    private readonly bool _usesFractalPyramid;
+    private readonly bool _usesKaleidoscope;
     private readonly bool _usesLiquidOrbs;
     private readonly ID3D11SamplerState? _linearSampler;
     private readonly string _effectPath;
@@ -95,6 +97,8 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
             }
             _usesFeedback = string.Equals(shaderFileName, "SpectralBloom.hlsl", StringComparison.OrdinalIgnoreCase);
             _usesEventHorizon = string.Equals(shaderFileName, "EventHorizon.hlsl", StringComparison.OrdinalIgnoreCase);
+            _usesFractalPyramid = string.Equals(shaderFileName, "FractalPyramid.hlsl", StringComparison.OrdinalIgnoreCase);
+            _usesKaleidoscope = string.Equals(shaderFileName, "Kaleidoscope.hlsl", StringComparison.OrdinalIgnoreCase);
             _usesLiquidOrbs = string.Equals(shaderFileName, "LiquidOrbs.hlsl", StringComparison.OrdinalIgnoreCase);
             if (_usesFeedback || _usesEventHorizon)
             {
@@ -188,9 +192,10 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
             }
         }
 
-        if (_usesEventHorizon)
+        if (_usesEventHorizon || _usesFractalPyramid || _usesKaleidoscope)
         {
-            // Capture already smooths attack/release. No extra audio history here.
+            // Feed the 64 logarithmic bands so the shader can drive brightness per frequency.
+            // Capture already smooths attack/release; no extra audio history here.
             for (var i = 0; i < 64; i++)
                 frame.Spectrum[i] = spectrum is { Length: > 0 }
                     ? AethelisAudioProfile.ApplyGain(spectrum[Math.Min(i * spectrum.Length / 64, spectrum.Length - 1)], settings.Sensitivity)

@@ -1,0 +1,13 @@
+{
+  "id": "kaleidoscope",
+  "title": "Kaleidoscope",
+  "type": "native-audio-visualizer",
+  "renderer": "kaleidoscope-hlsl-v1",
+  "preview": "preview.png",
+  "previewKind": "rendered-shader",
+  "audio": "wasapi-loopback",
+  "multiMonitor": "independent-cover",
+  "kind": "Kaleidoscope",
+  "author": "Marcelo Bossle",
+  "license": "LicenseRef-HYPNIX-Proprietary"
+}

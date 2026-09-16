@@ -1,0 +1,14 @@
+Kaleidoscope - original HYPNIX wallpaper.
+
+This is an original, clean-room HYPNIX implementation. It renders an audio-reactive
+kaleidoscopic mandala using generic, non-copyrightable techniques (a polar kaleidoscope
+fold into N mirrored wedges, a layered concentric ring x angular petal field built from
+a few rotated/zoomed octaves, a subtle radial chromatic split, palette tinting, a soft
+vignette and an ACES-style filmic tonemap).
+
+The visual concept - an evolving kaleidoscopic mandala - is a general idea. No third-party
+shader code is used: the fold, the mandala field, the motion and the audio mapping were all
+authored by HYPNIX. Motion is time-based and calm; the 64 audio bands only modulate the
+brightness of the rings by frequency, and the scene stays coherent in silence.
+
+License: proprietary (c) Marcelo Bossle (HYPNIX). See the repository LICENSE.

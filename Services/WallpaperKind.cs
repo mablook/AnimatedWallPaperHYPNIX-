@@ -13,5 +13,6 @@ internal enum WallpaperKind
     NeonRibbons,
     LiquidOrbs,
     EventHorizon,
-    FractalPyramid
+    FractalPyramid,
+    Kaleidoscope
 }
