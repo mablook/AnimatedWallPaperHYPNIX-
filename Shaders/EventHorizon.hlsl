@@ -5,9 +5,9 @@ cbuffer FrameData : register(b0)
 {
     float2 Resolution; float Time; float Bass;
     float Mids; float Highs; float Intensity; float Glow;
-    float2 Origin; float2 Padding;
-    float3 StartColor; float ColorPadA;
-    float3 EndColor; float ColorPadB;
+    float2 Origin; float PaddingX; float OffsetY;
+    float3 StartColor; float Scale;
+    float3 EndColor; float OffsetX;
     float4 Spectrum[16];
 };
 Texture2D<float4> Scene : register(t0);
@@ -84,6 +84,7 @@ float DiskFrequency(float radius)
 float3 Trace(float2 pixel)
 {
     float2 p = (pixel * 2 - 1) * float2(Resolution.x / max(Resolution.y, 1), -1);
+    p = (p - float2(OffsetX, OffsetY)) / max(Scale, 0.05); // user size/position (identity at defaults)
     float roll = -0.12;
     p = float2(cos(roll) * p.x - sin(roll) * p.y, sin(roll) * p.x + cos(roll) * p.y);
     float azimuth = Time * 0.008;
