@@ -126,6 +126,19 @@ internal static class Program
                 png.Save(file);
             }
             Console.WriteLine($"PASS: shell construction and layout; {gallery.Items.Count} manifest-driven cards");
+
+            // The dedicated visualizer settings window: verify its XAML loads and the size/position
+            // controls round-trip through the preferences (it is opened on demand in the real app).
+            var settingsWindow = new VisualizerSettingsWindow();
+            settingsWindow.SetWallpaper("Fractal Pyramid");
+            settingsWindow.LoadValues(new VisualizerPreferences(3f, 4f, 1.2f, 2, 1.5f, 0.25f, -0.35f));
+            var roundTrip = settingsWindow.ReadValues();
+            if (Math.Abs(roundTrip.Scale - 1.5f) > 0.001f || Math.Abs(roundTrip.OffsetX - 0.25f) > 0.001f
+                || Math.Abs(roundTrip.OffsetY + 0.35f) > 0.001f || roundTrip.ColorTheme != 2)
+                throw new InvalidOperationException("Visualizer settings window did not round-trip size/position/color.");
+            settingsWindow.Close();
+            Console.WriteLine("PASS: visualizer settings window loads and round-trips size/position/color");
+
             typeof(MainWindow).GetField("_isQuitting", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(window, true);
             window.Close();
             Console.WriteLine("PASS: shell shutdown");

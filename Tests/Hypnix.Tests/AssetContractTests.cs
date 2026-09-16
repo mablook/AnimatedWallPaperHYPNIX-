@@ -101,6 +101,8 @@ public sealed class AssetContractTests
     public void UiKeepsOnlyApprovedVisualizerAndExpectedIntensityCeiling()
     {
         var xaml = File.ReadAllText(Path.Combine(RepositoryRoot, "MainWindow.xaml"));
+        // The per-wallpaper visualizer sliders live in the dedicated settings window.
+        var settingsXaml = File.ReadAllText(Path.Combine(RepositoryRoot, "VisualizerSettingsWindow.xaml"));
 
         var catalog = WallpaperCatalog.LoadBuiltIns(Path.Combine(RepositoryRoot, "Assets", "Wallpapers"));
         Assert.Contains(catalog, entry => entry.Kind == WallpaperKind.VisualizerDemo);
@@ -109,9 +111,9 @@ public sealed class AssetContractTests
         Assert.DoesNotContain("Flame visualizer", xaml);
         Assert.DoesNotContain("Premium living flame", xaml);
         Assert.DoesNotContain("Aethelis GPU visualizer", xaml);
-        Assert.Contains("Maximum=\"8\"", xaml);
-        Assert.Contains("Maximum=\"12\"", xaml);
-        Assert.Contains("Maximum=\"3\"", xaml);
+        Assert.Contains("Maximum=\"8\"", settingsXaml);   // intensity ceiling
+        Assert.Contains("Maximum=\"12\"", settingsXaml);  // sensitivity ceiling
+        Assert.Contains("Maximum=\"3\"", settingsXaml);   // glow ceiling
         Assert.Contains("Content=\"60 FPS\"", xaml);
     }
 

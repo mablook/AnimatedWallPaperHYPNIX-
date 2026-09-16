@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private System.Windows.Forms.ToolStripMenuItem? _trayAudioItem;
     private System.Drawing.Icon? _trayDrawingIcon;
+    private VisualizerSettingsWindow? _settingsWindow;
     private bool _isUiInitialized;
     private bool _isQuitting;
     private bool _trayHintShown;
@@ -123,15 +124,18 @@ public partial class MainWindow : Window
         ActivePreviewTitle.Text = entry.Title;
         ActivePreviewSubtitle.Text = entry.Description;
         VisualizerSettingsButton.Visibility = entry.IsVisualizer ? Visibility.Visible : Visibility.Collapsed;
-        VisualizerSettingsPopup.IsOpen = false;
-        var initialized = _isUiInitialized;
-        _isUiInitialized = false;
-        var value = _settings.Visualizers.GetValueOrDefault(entry.Id) ?? entry.Defaults ?? new();
-        VisualizerIntensitySlider.Value = value.Intensity;
-        VisualizerSensitivitySlider.Value = value.Sensitivity;
-        VisualizerGlowSlider.Value = value.Glow;
-        VisualizerColorComboBox.SelectedIndex = value.ColorTheme;
-        _isUiInitialized = initialized;
+        if (_settingsWindow is not null)
+        {
+            if (entry.IsVisualizer)
+            {
+                _settingsWindow.SetWallpaper(entry.Title);
+                _settingsWindow.LoadValues(CurrentPreferencesFor(entry));
+            }
+            else
+            {
+                _settingsWindow.Close();
+            }
+        }
         try { LivePreview.Select(WallpaperCatalog.Request(entry, _settings)); }
         catch (Exception exception) { LivePreview.Select(null); ReportError("Preview", exception); }
         UpdatePreviewSuspension();
@@ -285,28 +289,51 @@ public partial class MainWindow : Window
         StatusText.ToolTip = _wallpaperController.ActiveRequest?.Id;
     }
 
-    private void VisualizerSettingsButton_Click(object sender, RoutedEventArgs e) => VisualizerSettingsPopup.IsOpen = !VisualizerSettingsPopup.IsOpen;
-    private void VisualizerSettingChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => ApplyVisualizerSettings();
-    private void VisualizerColorChanged(object sender, SelectionChangedEventArgs e) => ApplyVisualizerSettings();
-    private void ResetVisualizerSettings_Click(object sender, RoutedEventArgs e)
+    private void VisualizerSettingsButton_Click(object sender, RoutedEventArgs e) => OpenVisualizerSettingsWindow();
+
+    private void OpenVisualizerSettingsWindow()
+    {
+        if (Selected is not { IsVisualizer: true } entry) return;
+        if (_settingsWindow is null)
+        {
+            _settingsWindow = new VisualizerSettingsWindow { Owner = this };
+            _settingsWindow.Changed += OnVisualizerWindowChanged;
+            _settingsWindow.ResetRequested += OnVisualizerWindowReset;
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+        }
+        _settingsWindow.SetWallpaper(entry.Title);
+        _settingsWindow.LoadValues(CurrentPreferencesFor(entry));
+        _settingsWindow.Show();
+        _settingsWindow.Activate();
+    }
+
+    private VisualizerPreferences CurrentPreferencesFor(WallpaperEntry entry)
+        => _settings.Visualizers.GetValueOrDefault(entry.Id) ?? entry.Defaults ?? new VisualizerPreferences();
+
+    private void OnVisualizerWindowChanged(VisualizerPreferences preferences) => ApplyVisualizerPreferences(preferences);
+
+    private void OnVisualizerWindowReset()
     {
         if (Selected is not { IsVisualizer: true } entry) return;
         var defaults = entry.Defaults ?? new VisualizerPreferences();
-        _isUiInitialized = false;
-        VisualizerIntensitySlider.Value = defaults.Intensity;
-        VisualizerSensitivitySlider.Value = defaults.Sensitivity;
-        VisualizerGlowSlider.Value = defaults.Glow;
-        VisualizerColorComboBox.SelectedIndex = defaults.ColorTheme;
-        _isUiInitialized = true;
-        ApplyVisualizerSettings();
+        _settingsWindow?.LoadValues(defaults);
+        ApplyVisualizerPreferences(defaults);
     }
+
+    // Applies the selected wallpaper's stored preferences to the live session and preview
+    // (used when a wallpaper starts). Live edits come through ApplyVisualizerPreferences.
     private void ApplyVisualizerSettings()
     {
-        if (!_isUiInitialized || Selected is not { IsVisualizer: true } entry) return;
-        var preferences = new VisualizerPreferences((float)VisualizerIntensitySlider.Value,
-            (float)VisualizerSensitivitySlider.Value, (float)VisualizerGlowSlider.Value, VisualizerColorComboBox.SelectedIndex).Normalize();
-        _settings.Visualizers[entry.Id] = preferences;
-        var settings = preferences.ToSettings();
+        if (Selected is not { IsVisualizer: true } entry) return;
+        ApplyVisualizerPreferences(CurrentPreferencesFor(entry));
+    }
+
+    private void ApplyVisualizerPreferences(VisualizerPreferences preferences)
+    {
+        if (Selected is not { IsVisualizer: true } entry) return;
+        var normalized = preferences.Normalize();
+        _settings.Visualizers[entry.Id] = normalized;
+        var settings = normalized.ToSettings();
         if (_wallpaperController.ActiveRequest?.Id == entry.Id) _wallpaperController.UpdateVisualizerSettings(settings);
         LivePreview.UpdateSettings(settings);
         QueueSave();
@@ -425,6 +452,7 @@ public partial class MainWindow : Window
         {
             e.Cancel = true;
             SavePreferences();
+            _settingsWindow?.Close();
             Hide();
             if (!_trayHintShown)
             {
@@ -439,6 +467,7 @@ public partial class MainWindow : Window
     {
         _isQuitting = true;
         SavePreferences();
+        _settingsWindow?.Close();
         _recoveryTimer.Stop();
         _wallpaperLibrary.PackagesChanged -= OnPackagesChanged;
         _environment.Dispose();

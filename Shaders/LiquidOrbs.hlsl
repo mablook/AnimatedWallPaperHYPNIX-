@@ -8,9 +8,9 @@ cbuffer FrameData : register(b0)
 {
     float2 Resolution; float Time; float Bass;
     float Mids; float Highs; float Intensity; float Glow;
-    float2 Origin; float2 Padding;
-    float3 StartColor; float ColorPadA;
-    float3 EndColor; float ColorPadB;
+    float2 Origin; float PaddingX; float OffsetY;
+    float3 StartColor; float Scale;
+    float3 EndColor; float OffsetX;
     float4 Spectrum[16]; // reserved (layout parity with the shared constant buffer)
     float4 Spheres[16];  // xyz = animated center; w = base radius.
 };
@@ -81,6 +81,7 @@ float4 PSMain(VertexOutput input) : SV_Target
 
     // Perspective camera with a slow bass-reactive dolly.
     float2 ndc = (uv - 0.5) * float2(aspect, 1.0);
+    ndc = (ndc - float2(OffsetX, OffsetY) * 0.5) / max(Scale, 0.05); // user size/position
     float3 ro = float3(0.0, 0.0, 6.2 - bass * 0.6 * motion);
     float3 rd = normalize(float3(ndc * 1.15, -1.0));
 

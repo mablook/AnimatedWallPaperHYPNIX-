@@ -7,9 +7,9 @@ cbuffer FrameData : register(b0)
 {
     float2 Resolution; float Time; float Bass;
     float Mids; float Highs; float Intensity; float Glow;
-    float2 Origin; float2 Padding;
-    float3 StartColor; float ColorPadA;
-    float3 EndColor; float ColorPadB;
+    float2 Origin; float PaddingX; float OffsetY;
+    float3 StartColor; float Scale;
+    float3 EndColor; float OffsetX;
 };
 
 struct VertexOutput { float4 Position : SV_Position; float2 UV : TEXCOORD0; };
@@ -48,6 +48,7 @@ float4 PSMain(VertexOutput input) : SV_Target
 {
     float aspect = Resolution.x / max(Resolution.y, 1.0);
     float2 u = (float2(input.UV.x, 1.0 - input.UV.y) * 2.0 - 1.0) * float2(aspect, 1.0);
+    u = (u - float2(OffsetX, OffsetY)) / max(Scale, 0.05); // user size/position
 
     float intensity = clamp(Intensity, 0.0, 8.0);
     float drive = intensity / (1.0 + 0.12 * intensity);

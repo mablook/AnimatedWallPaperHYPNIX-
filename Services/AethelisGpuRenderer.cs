@@ -167,6 +167,9 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
             Glow = settings.Glow,
             OriginX = x,
             OriginY = y,
+            Scale = settings.Scale <= 0 ? 1f : settings.Scale, // user size/zoom
+            OffsetX = settings.OffsetX,                         // user horizontal position
+            OffsetY = settings.OffsetY,                         // user vertical position
             StartColorR = settings.StartColor.R / 255f,
             StartColorG = settings.StartColor.G / 255f,
             StartColorB = settings.StartColor.B / 255f,
@@ -399,16 +402,16 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
         public float Glow;
         public float OriginX;
         public float OriginY;
-        public float PaddingX;
-        public float PaddingY;
+        public float PaddingX;   // reused as feedback delta-time for the bloom modes
+        public float OffsetY;    // free padding slot -> user vertical position
         public float StartColorR;
         public float StartColorG;
         public float StartColorB;
-        public float ColorPadA;
+        public float Scale;      // free padding slot -> user size/zoom
         public float EndColorR;
         public float EndColorG;
         public float EndColorB;
-        public float ColorPadB;
+        public float OffsetX;    // free padding slot -> user horizontal position
         // float4[16] in HLSL: scalar arrays would have a different cbuffer stride.
         public fixed float Spectrum[64];
         public fixed float Spheres[64];

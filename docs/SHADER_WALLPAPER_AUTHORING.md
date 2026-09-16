@@ -152,6 +152,28 @@ Read a band with the `Band(f)` helper. Conventions we follow:
 If your shader is purely ambient, you can ignore audio entirely — but it still must clear the
 "audio response" gate, so at least let one band nudge brightness.
 
+### Size and position (optional)
+
+The user can zoom and move a wallpaper from the settings window. Three extra cbuffer fields
+carry this: `Scale` (0.3..3, default 1), `OffsetX` and `OffsetY` (-1..1, default 0). They sit
+in previously-unused padding slots, so declaring them does not change the layout:
+
+```hlsl
+    float2 Origin; float PaddingX; float OffsetY;   // was: float2 Origin; float2 Padding;
+    float3 StartColor; float Scale;                 // was: ... float ColorPadA;
+    float3 EndColor; float OffsetX;                 // was: ... float ColorPadB;
+```
+
+Apply them right after your centered, aspect-corrected uv — at the defaults it is the identity,
+so the render contracts are unaffected:
+
+```hlsl
+uv = (uv - float2(OffsetX, OffsetY) * H) / max(Scale, 0.05); // H = your vertical half-extent
+```
+
+Support it wherever it makes sense (the abstract shaders do); leave it out of shaders with a
+fixed framing (Event Horizon keeps a fixed lens so its shadow/arc stays put).
+
 ## 6. The wiring, file by file
 
 ### 6.1 `Services/WallpaperKind.cs`

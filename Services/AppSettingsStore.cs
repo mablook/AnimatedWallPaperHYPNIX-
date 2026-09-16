@@ -23,13 +23,16 @@ internal sealed record LocalVideo(string Id, string Path, string Title);
 internal sealed record SavedDisplay(string DeviceId, string DeviceName, int X, int Y,
     int Width, int Height, uint DpiX, uint DpiY);
 internal sealed record VisualizerPreferences(float Intensity = 3f, float Sensitivity = 4f,
-    float Glow = 1.2f, int ColorTheme = 0)
+    float Glow = 1.2f, int ColorTheme = 0, float Scale = 1f, float OffsetX = 0f, float OffsetY = 0f)
 {
     public VisualizerPreferences Normalize() => new(
         float.IsFinite(Intensity) ? Math.Clamp(Intensity, 0, 8) : 3,
         float.IsFinite(Sensitivity) ? Math.Clamp(Sensitivity, 0, 12) : 4,
         float.IsFinite(Glow) ? Math.Clamp(Glow, 0, 3) : 1.2f,
-        Math.Clamp(ColorTheme, 0, 3));
+        Math.Clamp(ColorTheme, 0, 3),
+        float.IsFinite(Scale) ? Math.Clamp(Scale, 0.3f, 3f) : 1f,
+        float.IsFinite(OffsetX) ? Math.Clamp(OffsetX, -1f, 1f) : 0f,
+        float.IsFinite(OffsetY) ? Math.Clamp(OffsetY, -1f, 1f) : 0f);
 
     public VisualizerSettings ToSettings()
     {
@@ -41,7 +44,7 @@ internal sealed record VisualizerPreferences(float Intensity = 3f, float Sensiti
             3 => (System.Drawing.Color.FromArgb(245, 245, 250), System.Drawing.Color.FromArgb(120, 130, 150)),
             _ => (System.Drawing.Color.FromArgb(88, 205, 255), System.Drawing.Color.FromArgb(104, 80, 255))
         };
-        return new(value.Intensity, value.Sensitivity, value.Glow, start, end);
+        return new(value.Intensity, value.Sensitivity, value.Glow, start, end, value.Scale, value.OffsetX, value.OffsetY);
     }
 }
 

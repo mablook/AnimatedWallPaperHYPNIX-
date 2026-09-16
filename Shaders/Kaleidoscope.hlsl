@@ -11,9 +11,9 @@ cbuffer FrameData : register(b0)
 {
     float2 Resolution; float Time; float Bass;
     float Mids; float Highs; float Intensity; float Glow;
-    float2 Origin; float2 Padding;
-    float3 StartColor; float ColorPadA;
-    float3 EndColor; float ColorPadB;
+    float2 Origin; float PaddingX; float OffsetY;
+    float3 StartColor; float Scale;
+    float3 EndColor; float OffsetX;
     float4 Spectrum[16]; // 64 normalized logarithmic bands (low -> high).
 };
 
@@ -68,6 +68,7 @@ float4 PSMain(VertexOutput input) : SV_Target
     // Aspect-correct, centered coordinates. Independent of the monitor origin.
     float2 uv = float2(input.UV.x, 1.0 - input.UV.y) * 2.0 - 1.0;
     uv.x *= Resolution.x / max(Resolution.y, 1.0);
+    uv = (uv - float2(OffsetX, OffsetY)) / max(Scale, 0.05); // user size/position
 
     float intensity = clamp(Intensity, 0.0, 8.0);
     float glow = max(Glow, 0.0);
