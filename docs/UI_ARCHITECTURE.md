@@ -57,9 +57,10 @@ Recommended desktop composition:
      running wallpaper using the already validated lifecycle.
    - Cards show thumbnail, concise title, and small capability badges only.
 4. **Contextual settings**
-   - Keep the validated small settings entrypoint.
-   - Open a flyout/drawer only for options supported by the selected wallpaper.
-   - Audio visualizer intensity, sensitivity, glow, and colors remain scoped to that wallpaper.
+   - Keep the validated small settings entrypoint (the gear beside the header).
+   - It opens a dedicated, resizable settings window scoped to the selected visualizer wallpaper.
+   - Controls: size (zoom), on-screen position (X/Y), color theme, glow, intensity, and audio
+     sensitivity, all bounded and applied live to the running wallpaper and the preview.
 5. **Responsive behavior**
    - Wide: centered preview with optional contextual drawer overlaying/adjacent without shifting the library.
    - Medium: narrower preview and horizontal filmstrip; contextual settings use a flyout.
@@ -140,7 +141,7 @@ The layout is a presentation shell only:
 3. Build the centered stage and static bottom filmstrip using the three existing wallpapers.
 4. Connect selection through the existing controller and preserve automatic safe replacement.
 5. Move global performance controls into a compact settings surface.
-6. Reuse the existing contextual visualizer popup with the new theme resources.
+6. Reuse the dedicated visualizer settings window with the new theme resources.
 7. Run visual, accessibility, DPI, lifecycle, and Store packaging regression checks.
 
 ## Current shell implementation (September 2026)
@@ -152,3 +153,9 @@ WPF airspace overlap. Hidden/minimized and battery/lock policies release preview
 
 The live preview shares native renderer code and the audio source with desktop sessions. The unused animated
 backdrop is no longer instantiated behind a static poster. WPF UI/theme adoption remains a future styling change.
+
+Per-wallpaper visualizer controls now live in a dedicated, resizable and scrollable settings window
+(`VisualizerSettingsWindow`), opened from the gear entrypoint, replacing the earlier popup that clipped its
+lower controls. It groups Appearance (color theme, size/zoom, on-screen position X/Y, glow, intensity) and
+Audio (sensitivity), all bounded, and applies every change live to the running wallpaper and the preview.
+Size and position are carried to the GPU through previously unused constant-buffer slots (no layout change).

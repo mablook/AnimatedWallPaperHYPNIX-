@@ -226,18 +226,23 @@ when loopback fails or produces unusable data for that specific endpoint.
 
 ### Contextual visualizer controls
 
-Visualizer customization is intentionally scoped to the audio-reactive wallpaper. A small settings button is
-shown beside the wallpaper selector only while `Visualizer demo` is selected; selecting ambient or video hides
-and closes the panel. Current live controls are intensity, audio sensitivity, glow, and curated color themes.
+Visualizer customization is intentionally scoped to the audio-reactive wallpaper. A small gear button is shown
+beside the header only while a visualizer wallpaper is selected; selecting ambient or video hides it. The button
+opens a **dedicated, resizable settings window** (`VisualizerSettingsWindow`) scoped to the selected wallpaper,
+replacing the earlier popup that clipped its lower controls. Live controls are size (zoom), on-screen position
+(X/Y), color theme, glow, intensity, and audio sensitivity.
 
 Rules:
 
-- Defaults reproduce the previously validated visualizer before the user changes anything.
-- Settings update the active visualizer host without restarting WASAPI capture or the wallpaper session.
+- Defaults reproduce the previously validated visualizer before the user changes anything (size 1, centered).
+- Settings update the active visualizer host and the preview without restarting WASAPI capture or the session.
 - Ambient and video sessions accept no visualizer side effects.
-- Use bounded sliders and curated themes so invalid colors, negative geometry, or extreme FFT amplification
+- Use bounded sliders and curated themes so invalid colors, extreme size/position, or extreme FFT amplification
   cannot destabilize rendering.
-- Future persistence belongs to the visualizer wallpaper's settings, not global performance settings.
+- Size and position ride previously unused constant-buffer padding slots (Scale/OffsetX/OffsetY), so the shared
+  buffer layout is unchanged; shaders apply `uv = (uv - offset) / scale`.
+- Color themes should drive each visualizer's look (not just tint it), so switching theme visibly recolors it.
+- Persistence lives in the visualizer wallpaper's own settings, not global performance settings.
 
 Manual UX validation completed on 2026-07-11:
 

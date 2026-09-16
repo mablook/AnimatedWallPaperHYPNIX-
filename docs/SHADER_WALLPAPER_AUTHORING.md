@@ -171,8 +171,18 @@ so the render contracts are unaffected:
 uv = (uv - float2(OffsetX, OffsetY) * H) / max(Scale, 0.05); // H = your vertical half-extent
 ```
 
-Support it wherever it makes sense (the abstract shaders do); leave it out of shaders with a
-fixed framing (Event Horizon keeps a fixed lens so its shadow/arc stays put).
+Support it wherever it makes sense (all the abstract shaders and Event Horizon do). The
+transform is the identity at the defaults, so the render contracts are unaffected.
+
+### Color theme (make it actually recolor)
+
+`StartColor` and `EndColor` come from the user's chosen theme, so the theme must **visibly
+recolor** the shader, not just tint it. Drive the dominant color from them (as the template's
+`Palette` does) rather than blending them a few percent over a hardcoded palette. Event Horizon
+was the cautionary case: it used a fixed orange blackbody and mixed the theme at 16%, so the
+theme control did nothing until the plasma color itself was made theme-driven (hot inner =
+`StartColor`, cooling to `EndColor`, with a near-white core). A quick check: swapping the theme
+should obviously change the hue on screen.
 
 ## 6. The wiring, file by file
 

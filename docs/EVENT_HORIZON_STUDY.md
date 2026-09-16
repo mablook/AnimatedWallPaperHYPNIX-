@@ -145,3 +145,25 @@ the audio made more assertive by raising the disk-frequency response (`1 - exp(-
 Horizon checks pass with the audio response roughly doubled (overall change 11.4 -> 19.3;
 bass/mids/highs 0.76/1.18/2.87 -> 1.38/2.26/5.38; max-controls 11.1 -> 17.3) while the dark
 shadow and lensed arc contract still holds.
+
+## Follow-up: size/position, connected rings, and working color themes
+
+Three more user-driven, shader-only refinements, all inside the existing native checks:
+
+- **Size and position.** Event Horizon now honors the settings window's size (zoom) and
+  position controls by transforming the camera ray, `p = (p - float2(OffsetX, OffsetY)) /
+  max(Scale, 0.05)`. It is the identity at the defaults (Scale 1, Offset 0), so the checks,
+  which run at the defaults, are unchanged.
+- **Connected rings, not segments.** The disk looked like short dotted segments because the
+  plasma noise varied too fast around each ring and the strengthened audio contrast darkened
+  the troughs to near-zero. The plasma is now stretched tangentially (`orbit * 2.6` -> `1.5`)
+  for long connected arcs, the ridges are broader and lower-power (`pow(...,3)` -> `pow(...,2)`,
+  lower threshold, density `8x` -> `6x`) so filaments join into lines, and audio keeps the
+  troughs lit (`0.10 + 7.5*ridges` -> `0.65 + 2.2*ridges`) while driving an overall brightness
+  lift (`1 + 1.6*localAudio`) for response. Audio stays strong and connected (overall ~21).
+- **Working color themes.** The disk used a fixed orange blackbody and mixed the theme at only
+  16%, so the color theme did almost nothing. The theme now drives the plasma: hot inner
+  material takes the first (Start) color, cooling to the second (End) color outward, with a
+  near-white core; the audio warm-shift follows the theme too. Every theme visibly recolors the
+  disk while the first color stays the plasma color. The native color-control check now passes
+  meaningfully, and the shadow/arc, per-band response and silence-reset contracts still hold.
