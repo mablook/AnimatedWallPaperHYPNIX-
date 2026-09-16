@@ -130,7 +130,8 @@ The existing HYPNIX built-ins already fall into the two families. Use this to pl
 
 - **Abstract / fluid (trance, sleep):** Ambient gradient drift, **Neon Ribbons**, **Liquid
   Orbs** (organic metaballs), **Spectral Bloom** (audio-reactive; keep the response gentle),
-  **Event Horizon** (symmetric, organic plasma with a calm dark center).
+  **Event Horizon** (symmetric, organic plasma with a calm dark center), **Fractal Pyramid**
+  (kaleidoscopic space-folding glow that stays calm at silence and reacts gently to audio).
 - **Organic / near-real (nature texture):** the Aethelis flame ring, the fire-ring/flamethrower
   Effekseer effects, and **Volumetric Fire** read as a natural element. Fire relaxes through
   flicker and warmth; keep ember motion alive at silence and let bass raise height/pressure

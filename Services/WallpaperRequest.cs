@@ -26,6 +26,7 @@ internal static class WallpaperSessionFactory
         WallpaperKind.NeonRibbons => NativeRenderMode.NeonRibbons,
         WallpaperKind.LiquidOrbs => NativeRenderMode.LiquidOrbs,
         WallpaperKind.EventHorizon => NativeRenderMode.EventHorizon,
+        WallpaperKind.FractalPyramid => NativeRenderMode.FractalPyramid,
         WallpaperKind.VolumetricFire => NativeRenderMode.VolumetricFire,
         WallpaperKind.ExampleVideo => NativeRenderMode.Video,
         _ => NativeRenderMode.Ambient

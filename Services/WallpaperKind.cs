@@ -12,5 +12,6 @@ internal enum WallpaperKind
     ExampleVideo,
     NeonRibbons,
     LiquidOrbs,
-    EventHorizon
+    EventHorizon,
+    FractalPyramid
 }

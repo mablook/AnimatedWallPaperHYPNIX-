@@ -1,0 +1,15 @@
+Fractal Pyramid - original HYPNIX wallpaper.
+
+This is an original, clean-room HYPNIX implementation. It renders an audio-reactive
+kaleidoscopic space-folding fractal using generic, non-copyrightable techniques
+(iterated rotate + absolute-fold + translate distance field, an octahedral/L1 raymarch
+bound, inverse-distance volumetric glow accumulation, palette tinting and an ACES-style
+filmic tonemap).
+
+No third-party shader code is used. All parameters (fold count, rotation rates, fold
+offset, camera orbit, emission and audio mapping) were authored by HYPNIX. The
+space-folding raymarch technique is a common, widely documented method; only the
+technique was studied, never any specific shader source. The scene stays calm and
+coherent in silence and reacts gently to system audio.
+
+License: proprietary (c) Marcelo Bossle (HYPNIX). See the repository LICENSE.
