@@ -143,9 +143,12 @@ float3 Trace(float2 pixel)
             float speed = sqrt(0.5 / max(radius - 1, 1));
             float shift = sqrt(1 - 1 / radius) * sqrt(1 - speed * speed)
                         / max(0.3, 1 - speed * dot(orbit, -normalize(velocity)));
-            float3 warm = lerp(float3(1.0, 0.32, 0.08), float3(1.0, 0.89, 0.72), saturate(heat * shift));
-            float3 tint = lerp(StartColor, EndColor, saturate((radius - 3) / 8.5));
-            warm *= lerp(float3(1, 1, 1), tint * 1.4, 0.16);
+            // Theme-driven plasma: the hot inner material takes the first (Start) colour and cools
+            // to the second (End) colour outward, keeping a near-white plasma core at the peak, so
+            // every colour theme recolours the disk while the first colour stays the plasma colour.
+            float temp = saturate(heat * shift);
+            float3 warm = lerp(EndColor, StartColor, temp);
+            warm = lerp(warm, float3(1.0, 0.95, 0.88), smoothstep(0.72, 1.1, temp) * 0.65);
             float energy = (0.4 + 3.2 * heat) * (0.25 + structure * 1.8) * pow(shift, 3);
             // Bright ridges and dark troughs remain readable at high exposure. Audio pushes
             // the ridges harder, and adds an overall lift, so the disk clearly answers the sound.
@@ -154,7 +157,7 @@ float3 Trace(float2 pixel)
             float ridges = smoothstep(0.09, 0.44, structure);
             energy *= lerp(1, 0.65 + 2.2 * ridges, localAudio);
             energy *= 1 + 1.6 * localAudio;
-            warm = lerp(warm, float3(1.0, 0.67, 0.32), localAudio * (1 - ridges) * 0.4);
+            warm = lerp(warm, StartColor, localAudio * (1 - ridges) * 0.35);
             // Fade higher-order light paths after they wind close to the horizon.
             // This removes the detached hairline ring without masking foreground
             // material, altering capture geometry or clipping the primary arcs.
