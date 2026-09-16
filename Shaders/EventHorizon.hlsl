@@ -49,7 +49,9 @@ float Plasma(float radius, float angle, float height, float clock)
     // Seamless periodic coordinates, differential rotation and no random time jitter.
     float phase = angle - clock * 2.8 / pow(radius, 1.5);
     float2 orbit = float2(cos(phase), sin(phase));
-    float3 p = float3(orbit * 2.6, radius * 5.5 + height * 1.8);
+    // Lower angular frequency stretches features along the orbit, so the disk reads as long
+    // connected arcs/rings rather than many short segments.
+    float3 p = float3(orbit * 1.5, radius * 5.5 + height * 1.8);
     return saturate(0.12 + Cloud(p) * 0.72
         + Cloud(p * 2.1 + float3(9, 17, 3)) * 0.30
         + Cloud(p * 4.3 + float3(21, 5, 13)) * 0.13);
@@ -132,8 +134,9 @@ float3 Trace(float2 pixel)
                 ? abs(GaussianIntegral(next.y / thickness) - GaussianIntegral(pos.y / thickness))
                     * thickness * 0.8862269 / abs(deltaY)
                 : exp(-pow(samplePos.y / thickness, 2));
-            float structure = pow(saturate((plasma - 0.18) * 1.5), 3);
-            float density = envelope * (0.06 + 8 * structure);
+            // Broader, lower-power ridges connect into continuous filaments instead of dots.
+            float structure = pow(saturate((plasma - 0.14) * 1.35), 2);
+            float density = envelope * (0.06 + 6 * structure);
             float opacity = 1 - exp(-density * column * length(next - pos) * 7);
             float heat = pow(3.5 / radius, 1.4);
             float3 orbit = normalize(float3(-samplePos.z, 0, samplePos.x));
@@ -146,9 +149,11 @@ float3 Trace(float2 pixel)
             float energy = (0.4 + 3.2 * heat) * (0.25 + structure * 1.8) * pow(shift, 3);
             // Bright ridges and dark troughs remain readable at high exposure. Audio pushes
             // the ridges harder, and adds an overall lift, so the disk clearly answers the sound.
+            // Keep the troughs lit (0.65) so the rings stay connected; the strong response now
+            // comes from an overall brightness lift with the sound rather than deep dark gaps.
             float ridges = smoothstep(0.09, 0.44, structure);
-            energy *= lerp(1, 0.10 + 7.5 * ridges, localAudio);
-            energy *= 1 + 1.4 * localAudio;
+            energy *= lerp(1, 0.65 + 2.2 * ridges, localAudio);
+            energy *= 1 + 1.6 * localAudio;
             warm = lerp(warm, float3(1.0, 0.67, 0.32), localAudio * (1 - ridges) * 0.4);
             // Fade higher-order light paths after they wind close to the horizon.
             // This removes the detached hairline ring without masking foreground
