@@ -120,6 +120,7 @@ for extraction, shared settings, integrity checks and the remaining release vali
 - Read [desktop integration findings](docs/DESKTOP_INTEGRATION_FINDINGS.md) before changing Win32 hosting.
 - [Testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md) covers automated and manual regression gates.
 - [Product direction](docs/PRODUCT_DIRECTION.md) and [UI architecture](docs/UI_ARCHITECTURE.md) distinguish future work.
+- [Relaxing animation design](docs/RELAXING_ANIMATION_DESIGN.md) turns the neuroscience of relaxation into authoring rules for calm wallpapers.
 - The approved FireRingV1 assets remain unchanged. The rejected volumetric prototype remains excluded from the gallery.
 - No microphone capture, stored raw audio, telemetry or administrator requirement in normal operation.
 - MSIX, Store certification, arbitrary per-display assignments and hardware-accelerated video decode remain future work.
