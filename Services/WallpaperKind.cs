@@ -14,5 +14,6 @@ internal enum WallpaperKind
     LiquidOrbs,
     EventHorizon,
     FractalPyramid,
-    Kaleidoscope
+    Kaleidoscope,
+    Lotus
 }

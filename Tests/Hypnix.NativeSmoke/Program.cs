@@ -49,12 +49,14 @@ internal static class Program
                 NeonRibbonsRenderChecks.Run(parent, output, "LiquidOrbs.hlsl", "liquid-orbs");
                 NeonRibbonsRenderChecks.Run(parent, output, "FractalPyramid.hlsl", "fractal-pyramid");
                 NeonRibbonsRenderChecks.Run(parent, output, "Kaleidoscope.hlsl", "kaleidoscope");
+                NeonRibbonsRenderChecks.Run(parent, output, "Lotus.hlsl", "lotus");
                 SpectralBloomRenderChecks.Run(parent, output);
                 EventHorizonRenderChecks.Run(parent, output);
                 foreach (var mode in new[] { NativeRenderMode.Ambient, NativeRenderMode.VisualizerDemo,
                     NativeRenderMode.AethelisVisualizer, NativeRenderMode.AethelisFlameBurst, NativeRenderMode.FlamethrowerRingV2,
                     NativeRenderMode.SpectralBloom, NativeRenderMode.NeonRibbons, NativeRenderMode.LiquidOrbs,
-                    NativeRenderMode.EventHorizon, NativeRenderMode.FractalPyramid, NativeRenderMode.Kaleidoscope })
+                    NativeRenderMode.EventHorizon, NativeRenderMode.FractalPyramid, NativeRenderMode.Kaleidoscope,
+                    NativeRenderMode.Lotus })
                 {
                     using var host = new NativeWallpaperHost(mode, preview: new PreviewTarget(parent, 640, 360));
                     host.Start(30, reveal: false);
@@ -105,7 +107,7 @@ internal static class Program
             foreach (var kind in new[] { WallpaperKind.BuiltIn, WallpaperKind.VisualizerDemo,
                 WallpaperKind.AethelisVisualizer, WallpaperKind.AethelisFlameBurst, WallpaperKind.FlamethrowerRingV2,
                 WallpaperKind.SpectralBloom, WallpaperKind.NeonRibbons, WallpaperKind.LiquidOrbs, WallpaperKind.EventHorizon,
-                WallpaperKind.FractalPyramid, WallpaperKind.Kaleidoscope })
+                WallpaperKind.FractalPyramid, WallpaperKind.Kaleidoscope, WallpaperKind.Lotus })
             {
                 if (!gallery.Items.OfType<WallpaperEntry>().Any(entry => entry.Kind == kind))
                     throw new InvalidOperationException($"Built-in wallpaper missing from the gallery: {kind}");

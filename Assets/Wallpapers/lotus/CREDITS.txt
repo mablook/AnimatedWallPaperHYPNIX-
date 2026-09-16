@@ -1,0 +1,15 @@
+Lotus - original HYPNIX wallpaper.
+
+This is an original, clean-room HYPNIX implementation. It renders an audio-reactive
+blooming lotus using generic, non-copyrightable techniques (a stack of rotated, scaled
+petal layers with a time-based breeze, a glowing center, palette tinting, edge
+desaturation, a soft vignette and a tanh softening curve).
+
+The visual concept - a layered flower blooming and swaying - is a general idea. No
+third-party shader code is used: the petal field, the breeze, the layer accumulation, the
+center glow and the audio mapping were all authored by HYPNIX, with our own parameters
+(calmer, slower motion). Motion is time-based; the 64 audio bands only modulate the
+brightness of the petals by frequency, and the scene stays coherent in silence. Colors
+come from the theme palette, so the pink/amber theme yields a warm rose.
+
+License: proprietary (c) Marcelo Bossle (HYPNIX). See the repository LICENSE.

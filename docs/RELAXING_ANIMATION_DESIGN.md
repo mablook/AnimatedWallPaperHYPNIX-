@@ -133,7 +133,8 @@ The existing HYPNIX built-ins already fall into the two families. Use this to pl
   **Event Horizon** (symmetric, organic plasma with a calm dark center), **Fractal Pyramid**
   (kaleidoscopic space-folding glow that stays calm at silence and reacts gently to audio),
   **Kaleidoscope** (symmetric evolving mandala; time-based motion with audio driving ring
-  brightness by frequency).
+  brightness by frequency), **Lotus** (a layered flower blooming and swaying in a slow
+  breeze; audio drives petal brightness by frequency).
 - **Organic / near-real (nature texture):** the Aethelis flame ring, the fire-ring/flamethrower
   Effekseer effects, and **Volumetric Fire** read as a natural element. Fire relaxes through
   flicker and warmth; keep ember motion alive at silence and let bass raise height/pressure

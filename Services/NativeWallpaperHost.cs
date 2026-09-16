@@ -22,7 +22,8 @@ internal enum NativeRenderMode
     LiquidOrbs,
     EventHorizon,
     FractalPyramid,
-    Kaleidoscope
+    Kaleidoscope,
+    Lotus
 }
 
 internal sealed partial class NativeWallpaperHost : IDisposable
@@ -125,7 +126,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
         EnsureWindowClassRegistered();
         var extendedStyle = WsExNoActivate | WsExToolWindow | WsExTransparent;
-        if (preview is null && renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope)) extendedStyle |= WsExLayered;
+        if (preview is null && renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus)) extendedStyle |= WsExLayered;
         Handle = CreateWindowEx(
             extendedStyle,
             WindowClassName,
@@ -146,7 +147,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         Marshal.SetLastPInvokeError(0);
-        var alphaResult = preview is not null || renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope ||
+        var alphaResult = preview is not null || renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus ||
                           SetLayeredWindowAttributes(Handle, 0, 255, LwaAlpha);
         AppLog.Write($"Native host created. Handle=0x{Handle.ToInt64():X}; alphaResult={alphaResult}; " +
                      $"error={Marshal.GetLastPInvokeError()}");
@@ -199,7 +200,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
     private void InitializeGpuRenderer()
     {
-        if (_renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope))
+        if (_renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus))
             return;
         if (!GetClientRect(Handle, out var client))
             throw new InvalidOperationException("Could not read the Direct3D wallpaper client size.");
@@ -213,6 +214,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             NativeRenderMode.EventHorizon => "EventHorizon.hlsl",
             NativeRenderMode.FractalPyramid => "FractalPyramid.hlsl",
             NativeRenderMode.Kaleidoscope => "Kaleidoscope.hlsl",
+            NativeRenderMode.Lotus => "Lotus.hlsl",
             NativeRenderMode.VolumetricFire => "HypnixVolumetricFire.hlsl",
             _ => "Aethelis.hlsl"
         };
@@ -360,7 +362,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         // Direct3D owns the complete frame for both Aethelis modes. Rendering it
         // here avoids the old nested monitor loop (GDI monitor -> all GPU monitors),
         // which updated active effects on displays that were meant to stay frozen.
-        if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope) &&
+        if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus) &&
             _aethelisGpuRenderer is not null)
         {
             RenderAethelisGpuFrame(width, height);

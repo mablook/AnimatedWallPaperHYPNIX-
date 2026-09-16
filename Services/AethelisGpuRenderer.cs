@@ -45,6 +45,7 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
     private readonly bool _usesEventHorizon;
     private readonly bool _usesFractalPyramid;
     private readonly bool _usesKaleidoscope;
+    private readonly bool _usesLotus;
     private readonly bool _usesLiquidOrbs;
     private readonly ID3D11SamplerState? _linearSampler;
     private readonly string _effectPath;
@@ -99,6 +100,7 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
             _usesEventHorizon = string.Equals(shaderFileName, "EventHorizon.hlsl", StringComparison.OrdinalIgnoreCase);
             _usesFractalPyramid = string.Equals(shaderFileName, "FractalPyramid.hlsl", StringComparison.OrdinalIgnoreCase);
             _usesKaleidoscope = string.Equals(shaderFileName, "Kaleidoscope.hlsl", StringComparison.OrdinalIgnoreCase);
+            _usesLotus = string.Equals(shaderFileName, "Lotus.hlsl", StringComparison.OrdinalIgnoreCase);
             _usesLiquidOrbs = string.Equals(shaderFileName, "LiquidOrbs.hlsl", StringComparison.OrdinalIgnoreCase);
             if (_usesFeedback || _usesEventHorizon)
             {
@@ -192,7 +194,7 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
             }
         }
 
-        if (_usesEventHorizon || _usesFractalPyramid || _usesKaleidoscope)
+        if (_usesEventHorizon || _usesFractalPyramid || _usesKaleidoscope || _usesLotus)
         {
             // Feed the 64 logarithmic bands so the shader can drive brightness per frequency.
             // Capture already smooths attack/release; no extra audio history here.
