@@ -21,7 +21,8 @@ internal sealed class WallpaperSession : IWallpaperSession
             if (_usesAudio) _audioSubscription = AudioSpectrumSource.Subscribe(_host.SubmitAudioBands);
             if (request.Preview is null)
                 DesktopWorker.AttachWallpaperWindow(_host.Handle,
-                    useLayeredWindow: mode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus));
+                    useLayeredWindow: mode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire));
+            _host.UpdateVisualizerSettings(request.Settings??VisualizerSettings.Default);
             _host.Start(request.FramesPerSecond, reveal: false);
         }
         catch { Dispose(); throw; }

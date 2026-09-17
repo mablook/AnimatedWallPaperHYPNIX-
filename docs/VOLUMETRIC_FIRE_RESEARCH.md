@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Follow-up: [Realistic fire study, 17 September 2026](FIRE_RENDERING_STUDY.md) directly inspects the
+three newly supplied Shadertoy references, compares procedural and simulated fire, and proposes
+implementation stages and explicit memory budgets. It is a design study, not a newly validated renderer.
+It also refines the rendering guidance below: a blue reaction-zone contribution is distinct from
+blackbody emission and must not be modeled merely by increasing a thermal palette's temperature.
+
 This document records the complete fire-visualizer investigation so future work does not repeat failed approaches.
 The goal is an audio-reactive, realistic line of campfire flames across the bottom of each monitor. The approved visual
 target is [`assets/volumetric-fire-approved-target.png`](assets/volumetric-fire-approved-target.png): a narrow shared

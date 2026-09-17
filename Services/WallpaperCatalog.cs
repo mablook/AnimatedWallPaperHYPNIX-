@@ -8,6 +8,10 @@ internal sealed record WallpaperEntry(string Id, string Title, WallpaperKind Kin
     VisualizerPreferences? Defaults = null)
 {
     public bool IsVisualizer => Kind is not (WallpaperKind.BuiltIn or WallpaperKind.ExampleVideo);
+    public bool SupportsBackground => Kind == WallpaperKind.LivingFire;
+    public bool SupportsSparks => Kind == WallpaperKind.LivingFire;
+    public bool SupportsLayoutControls => Kind is WallpaperKind.NeonRibbons or WallpaperKind.LiquidOrbs
+        or WallpaperKind.EventHorizon or WallpaperKind.FractalPyramid or WallpaperKind.Kaleidoscope or WallpaperKind.Lotus or WallpaperKind.LivingFire;
     public string Description => Kind == WallpaperKind.ExampleVideo ? "Local video · muted · fit per display" :
         IsVisualizer ? "Audio reactive · system output" : "Native procedural wallpaper";
 }
@@ -35,7 +39,8 @@ internal static class WallpaperCatalog
                 var folder = Path.GetDirectoryName(path)!;
                 entries.Add(new(json.GetProperty("id").GetString()!, json.GetProperty("title").GetString()!, kind,
                     Path.GetFullPath(Path.Combine(folder, json.GetProperty("preview").GetString()!)),
-                    json.TryGetProperty("background", out var background) ? Path.Combine(folder, background.GetString()!) : null));
+                    json.TryGetProperty("background", out var background) ? Path.Combine(folder, background.GetString()!) : null,
+                    Defaults: kind==WallpaperKind.LivingFire?new VisualizerPreferences(Glow:0,ColorTheme:1):null));
             }
             catch (Exception exception) when (exception is IOException or JsonException or ArgumentException or InvalidOperationException)
             { AppLog.WriteException($"Built-in manifest skipped: {path}", exception); }

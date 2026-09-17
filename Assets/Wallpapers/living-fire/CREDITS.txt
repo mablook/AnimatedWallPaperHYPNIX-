@@ -1,0 +1,9 @@
+Living Fire — criado por Marcelo Bossle.
+Copyright (c) 2026 Marcelo Bossle. Todos os direitos reservados.
+Autor e titular dos direitos: Marcelo Bossle.
+Licença proprietária: LicenseRef-HYPNIX-Proprietary. Consulte LICENSE.txt.
+
+GPU fluid transport, reduced combustion and persistent embers are original project code.
+Research references and limitations are documented in docs/FIRE_RENDERING_STUDY.md.
+No Shadertoy source code, textures or third-party fire footage are included.
+Preview image rendered from the HYPNIX simulation.

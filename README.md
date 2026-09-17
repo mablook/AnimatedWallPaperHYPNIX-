@@ -5,15 +5,29 @@ Win32 desktop hosting, WASAPI and Direct3D 11.
 
 ## Current behavior
 
-- Nine built-in wallpapers in a manifest-driven gallery: ambient, classic audio visualizer, Aethelis,
-  Fire Burst, Flamethrower Ring V2, Spectral Bloom, Neon Ribbons, Liquid Orbs and Event Horizon.
+- Thirteen built-in wallpapers in a manifest-driven gallery: ambient, classic audio visualizer, Aethelis,
+  Fire Burst, Flamethrower Ring V2, Spectral Bloom, Neon Ribbons, Liquid Orbs, Event Horizon,
+  Fractal Pyramid, Kaleidoscope, Lotus and Living Fire.
 - Live preview using the same renderer as the wallpaper. Desktop and preview share one WASAPI capture.
 - **Audio reactive** in the window and tray toggles system-audio reaction for both desktop and preview;
   the preference persists across restarts. It does not mute other applications or stop animation.
 - Per-wallpaper intensity (0–8), audio sensitivity (0–12), glow (0–3) and four color themes.
+- Graphite visualizer settings with **View / Effects / More** tabs and a matching custom title bar.
+  View combines a circular position pad, numeric values and zoom; Effects groups palettes, glow,
+  intensity and audio; More manages named presets, wallpaper defaults and undoing the last reset.
+  Presets are independent per wallpaper and persist across restarts.
+- Living Fire runs at four times its original simulation speed, distributes sources across the full
+  monitor width according to aspect ratio, and routes treble left through mids to bass right.
+  Its settings support an original, solid-color or local-image background and a sparks toggle.
+  Imported backgrounds are copied into the local library; moving the fire leaves its background fixed.
+- A dedicated settings window exposes size (0.3–3) and position X/Y (-1–1) for Neon Ribbons,
+  Liquid Orbs, Event Horizon, Fractal Pyramid, Kaleidoscope, Lotus and Living Fire. These controls are hidden for
+  renderers without layout support; preferences remain independent and persist across restarts.
 - Preview stops when the window is hidden/minimized, the session is locked, or the battery pause option applies.
 - Safe replacement: prepare the next wallpaper and its first frame before showing it and disposing the previous one.
-  Preparation failures keep the current wallpaper; Stop also cancels pending preparation.
+  Preparation failures, including a 15-second first-frame timeout, keep the current wallpaper.
+  Stop also cancels pending preparation. A slow render thread retains its resources until it exits;
+  late completion cannot reveal a failed replacement or signal disposed synchronization objects.
 - Live 15, 30 and 60 FPS presentation caps. Native CPU modes reuse a persistent back buffer.
 - Per-monitor pause for maximized/fullscreen apps, all-display or active-display scope, and optional battery
   pause. In active-display scope each covered monitor freezes independently while clean monitors keep animating;
@@ -27,6 +41,9 @@ Win32 desktop hosting, WASAPI and Direct3D 11.
 - Diagnostics are kept under `%LocalAppData%\HYPNIX\logs`, with a 2 MB active log and three rotated files.
 
 ## Local videos
+
+Implementation details and validation: [visual settings](docs/VISUAL_SETTINGS_DESIGN_PLAN.md),
+[Living Fire](docs/LIVING_FIRE.md), and [regression guide](docs/TESTING_AND_REGRESSION_GUIDE.md).
 
 Use **Media tools…** to select an existing `ffmpeg.exe` with `ffprobe.exe` in the same folder.
 HYPNIX also checks `MediaTools` beside the application and absolute PATH directories. Nothing is downloaded automatically.
@@ -91,8 +108,8 @@ dotnet run --project Tests/Hypnix.NativeSmoke/Hypnix.NativeSmoke.csproj -c Relea
 Run from the repository root. The smoke check does not attach wallpapers to Explorer; it exercises hidden
 native surfaces, shell construction/layout and disposal. Its WPF layout PNGs omit the native preview surface.
 Settings and library fixtures stay under its output directory.
-The default run checks all nine built-in hosts and gallery entries, plus image checks for Neon Ribbons,
-Liquid Orbs, Spectral Bloom and Event Horizon. These cover animation/audio and renderer-specific controls,
+The default run checks all twelve built-in hosts and gallery entries, plus image checks for Neon Ribbons,
+Liquid Orbs, Fractal Pyramid, Kaleidoscope, Lotus, Spectral Bloom, Event Horizon and Living Fire. These cover animation/audio and renderer-specific controls,
 viewport positioning, FPS exposure or independent freeze. See the [testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md)
 for the exact coverage and remaining desktop checks.
 
@@ -111,7 +128,7 @@ for the per-capture attestation checklist.
 ## Portable validation package
 
 Run `./scripts/package-portable.ps1` in PowerShell 7 to create a Windows x64 ZIP with the .NET runtime,
-all nine wallpapers, dependency notices, file hashes and source-build metadata. Output goes to a new
+all twelve wallpapers, dependency notices, file hashes and source-build metadata. Output goes to a new
 timestamped folder under `artifacts/distribution`. See [distribution instructions](docs/DISTRIBUTION.md)
 for extraction, shared settings, integrity checks and the remaining release validation.
 
@@ -122,7 +139,11 @@ for extraction, shared settings, integrity checks and the remaining release vali
 - [Product direction](docs/PRODUCT_DIRECTION.md) and [UI architecture](docs/UI_ARCHITECTURE.md) distinguish future work.
 - [Relaxing animation design](docs/RELAXING_ANIMATION_DESIGN.md) turns the neuroscience of relaxation into authoring rules for calm wallpapers.
 - [Shader wallpaper authoring](docs/SHADER_WALLPAPER_AUTHORING.md) is the step-by-step recipe for adding a new GPU wallpaper (contracts, template, audio, wiring, preview, tests).
+- [Realistic fire study](docs/FIRE_RENDERING_STUDY.md) analyzes the three supplied Shadertoy examples and proposes a volumetric fire pipeline, GPU budgets and visual validation gates (Portuguese; design only).
+- [Standalone fire preview](Tests/Hypnix.FirePreview/README.md) exercises the shared Living Fire renderer with system-audio response, limited MacCormack transport, flow-driven embers and GPU state checks.
 - The approved FireRingV1 assets remain unchanged. The rejected volumetric prototype remains excluded from the gallery.
 - No microphone capture, stored raw audio, telemetry or administrator requirement in normal operation.
 - MSIX, Store certification, arbitrary per-display assignments and hardware-accelerated video decode remain future work.
 - A [macOS port study](docs/MACOS_PORT_STUDY.md) documents a future, not-yet-started plan (NSWindow desktop hosting, Metal, ScreenCaptureKit audio, notarization). It is design-only and changes no Windows behavior.
+
+- [Living Fire integration](docs/LIVING_FIRE.md) documents the gallery effect, per-monitor simulation, controls and measured GPU cost.

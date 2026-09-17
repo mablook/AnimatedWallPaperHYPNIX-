@@ -12,8 +12,8 @@ public sealed class PreferencesTests : IDisposable
     {
         var store = new AppSettingsStore(FilePath);
         var settings = new AppSettings { FramesPerSecond = 60, SelectedWallpaperId = "a", PauseOnBattery = true };
-        settings.Visualizers["a"] = new(2.1f, 1.5f, 0.8f, 2);
-        settings.Visualizers["b"] = new(0.5f, 0.4f, 0.1f, 1);
+        settings.Visualizers["a"] = new(2.1f, 1.5f, 0.8f, 2, 1.7f, 0.4f, -0.6f);
+        settings.Visualizers["b"] = new(0.5f, 0.4f, 0.1f, 1, 0.5f, -0.3f, 0.8f);
         settings.Videos.Add(new("video:1", Path.Combine(_directory, "clip.mp4"), "Clip"));
         Assert.True(store.Save(settings));
         var restored = store.Load();

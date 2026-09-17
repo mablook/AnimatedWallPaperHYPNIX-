@@ -1,0 +1,15 @@
+{
+  "id": "living-fire",
+  "title": "Living Fire",
+  "type": "native-audio-visualizer",
+  "renderer": "living-fire-directcompute-v1",
+  "preview": "preview.png",
+  "previewKind": "rendered-shader",
+  "audio": "wasapi-loopback",
+  "multiMonitor": "independent-cover",
+  "kind": "LivingFire",
+  "author": "Marcelo Bossle",
+  "copyright": "Copyright (c) 2026 Marcelo Bossle. Todos os direitos reservados.",
+  "copyrightHolder": "Marcelo Bossle",
+  "license": "LicenseRef-HYPNIX-Proprietary"
+}

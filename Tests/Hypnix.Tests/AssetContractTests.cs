@@ -10,6 +10,19 @@ public sealed class AssetContractTests
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     [Fact]
+    public void PortablePackageInventoryMatchesTheVisibleGallery()
+    {
+        var script = File.ReadAllText(Path.Combine(RepositoryRoot, "scripts", "package-portable.ps1"));
+        var kinds = System.Text.RegularExpressions.Regex.Match(script, @"(?s)\$kinds\s*=\s*@\((.*?)\)");
+        Assert.True(kinds.Success, "Portable package catalog declaration was not found.");
+        var packaged = System.Text.RegularExpressions.Regex.Matches(kinds.Groups[1].Value, "'([^']+)'")
+            .Select(match => match.Groups[1].Value).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        var gallery = WallpaperCatalog.LoadBuiltIns(Path.Combine(RepositoryRoot, "Assets", "Wallpapers"))
+            .Select(entry => entry.Kind.ToString()).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        Assert.Equal(gallery, packaged);
+    }
+
+    [Fact]
     public void EveryWallpaperDeclaresAuthorAndLicenseAndNonCommercialAssetsAreFlaggedForRemoval()
     {
         var wallpapersRoot = Path.Combine(RepositoryRoot, "Assets", "Wallpapers");

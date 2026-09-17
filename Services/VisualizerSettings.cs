@@ -10,7 +10,7 @@ internal sealed record VisualizerSettings(
     Color EndColor,
     float Scale = 1f,
     float OffsetX = 0f,
-    float OffsetY = 0f)
+    float OffsetY = 0f, VisualizerBackground? Background = null, bool Sparks = true)
 {
     public static VisualizerSettings Default { get; } = new VisualizerPreferences().ToSettings();
 }

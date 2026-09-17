@@ -54,7 +54,7 @@ try {
     }
 
     $kinds = @('BuiltIn', 'VisualizerDemo', 'AethelisVisualizer', 'AethelisFlameBurst', 'FlamethrowerRingV2',
-        'SpectralBloom', 'NeonRibbons', 'LiquidOrbs', 'EventHorizon')
+        'SpectralBloom', 'NeonRibbons', 'LiquidOrbs', 'EventHorizon', 'FractalPyramid', 'Kaleidoscope', 'Lotus', 'LivingFire')
     $catalog = @(Get-ChildItem (Join-Path $staging 'Assets/Wallpapers') -Filter wallpaper.json -Recurse |
         ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json } |
         Where-Object { $_.kind -in $kinds -and !$_.hidden })

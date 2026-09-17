@@ -15,6 +15,7 @@ internal sealed class AppSettings
     public bool AudioReactive { get; set; } = true;
     public string? MediaToolsDirectory { get; set; }
     public Dictionary<string, VisualizerPreferences> Visualizers { get; set; } = [];
+    public List<VisualizerPreset> VisualizerPresets { get; set; } = [];
     public List<LocalVideo> Videos { get; set; } = [];
     public List<SavedDisplay> Displays { get; set; } = [];
 }
@@ -23,7 +24,8 @@ internal sealed record LocalVideo(string Id, string Path, string Title);
 internal sealed record SavedDisplay(string DeviceId, string DeviceName, int X, int Y,
     int Width, int Height, uint DpiX, uint DpiY);
 internal sealed record VisualizerPreferences(float Intensity = 3f, float Sensitivity = 4f,
-    float Glow = 1.2f, int ColorTheme = 0, float Scale = 1f, float OffsetX = 0f, float OffsetY = 0f)
+    float Glow = 1.2f, int ColorTheme = 0, float Scale = 1f, float OffsetX = 0f, float OffsetY = 0f,
+    VisualizerBackground? Background = null, bool Sparks = true)
 {
     public VisualizerPreferences Normalize() => new(
         float.IsFinite(Intensity) ? Math.Clamp(Intensity, 0, 8) : 3,
@@ -32,7 +34,8 @@ internal sealed record VisualizerPreferences(float Intensity = 3f, float Sensiti
         Math.Clamp(ColorTheme, 0, 3),
         float.IsFinite(Scale) ? Math.Clamp(Scale, 0.3f, 3f) : 1f,
         float.IsFinite(OffsetX) ? Math.Clamp(OffsetX, -1f, 1f) : 0f,
-        float.IsFinite(OffsetY) ? Math.Clamp(OffsetY, -1f, 1f) : 0f);
+        float.IsFinite(OffsetY) ? Math.Clamp(OffsetY, -1f, 1f) : 0f,
+        Background?.Normalize(), Sparks);
 
     public VisualizerSettings ToSettings()
     {
@@ -44,7 +47,7 @@ internal sealed record VisualizerPreferences(float Intensity = 3f, float Sensiti
             3 => (System.Drawing.Color.FromArgb(245, 245, 250), System.Drawing.Color.FromArgb(120, 130, 150)),
             _ => (System.Drawing.Color.FromArgb(88, 205, 255), System.Drawing.Color.FromArgb(104, 80, 255))
         };
-        return new(value.Intensity, value.Sensitivity, value.Glow, start, end, value.Scale, value.OffsetX, value.OffsetY);
+        return new(value.Intensity, value.Sensitivity, value.Glow, start, end, value.Scale, value.OffsetX, value.OffsetY, value.Background, value.Sparks);
     }
 }
 
@@ -67,6 +70,7 @@ internal sealed class AppSettingsStore(string? filePath = null)
             value.SelectedWallpaperId ??= "built-in-ambient";
             value.Visualizers = (value.Visualizers ?? []).Where(item => item.Value is not null)
                 .ToDictionary(item => item.Key, item => item.Value.Normalize());
+            value.VisualizerPresets = VisualizerPresetLibrary.Normalize(value.VisualizerPresets);
             if (value.VisualizerDefaultsVersion < 2)
             {
                 // Migrate only untouched built-in defaults, once. Retain chosen colors,

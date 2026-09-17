@@ -10,6 +10,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>HYPNIX</AssemblyName>
+    <Authors>Marcelo Bossle</Authors>
+    <Company>Marcelo Bossle</Company>
+    <Copyright>Copyright (c) 2026 Marcelo Bossle. Todos os direitos reservados.</Copyright>
     <RootNamespace>AnimatedWallPaper</RootNamespace>
     <ApplicationIcon>Assets\Brand\hypnix-v2.ico</ApplicationIcon>
     <!-- Static analysis: surface resource/dispose/interop defects at build time.
@@ -26,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
     <Resource Include="Assets\Brand\hypnix-icon.png" />
     <Resource Include="Assets\Brand\hypnix-icon-v2.png" />
     <Resource Include="Assets\Brand\hypnix-v2.ico" />

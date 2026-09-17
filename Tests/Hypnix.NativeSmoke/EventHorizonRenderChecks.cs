@@ -37,6 +37,14 @@ internal static class EventHorizonRenderChecks
         if (baseline.SequenceEqual(Frame(9, silence)))
             throw new Exception("Event Horizon did not animate in silence.");
         var active = Frame(8, music);
+        foreach (var settings in new[] {
+            VisualizerSettings.Default with { Scale = 1.6f },
+            VisualizerSettings.Default with { OffsetX = 0.4f },
+            VisualizerSettings.Default with { OffsetY = -0.4f } })
+        {
+            if (active.SequenceEqual(Frame(8, music, settings)))
+                throw new Exception("Event Horizon size/position control has no visible effect.");
+        }
         Save(active, Path.Combine(output, "event-horizon-audio.png"));
         var difference = active.Select((v, i) => i % 4 == 3 ? 0 : Math.Abs(v - baseline[i])).Sum() / (640 * 360 * 3.0);
         if (difference < 1)

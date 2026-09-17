@@ -1,5 +1,21 @@
 # UI architecture and layout direction
 
+## Visual settings implementation — 17 September 2026
+
+The requested View / Effects / More controls, graphite styling, matching title-bar
+color, background support and presets are described in
+[Visual settings — study and strategy](VISUAL_SETTINGS_DESIGN_PLAN.md).
+The settings redesign is implemented. It uses a scoped graphite resource dictionary,
+three tabs, a circular position pad, live controls, per-wallpaper presets and reset undo.
+Living Fire also supports solid/image backgrounds and a sparks toggle. Other renderers
+only expose supported controls. Settings additions are optional and preserve schema-1 files.
+
+The settings window uses WPF WindowChrome with a solid custom caption from the start,
+so the caption and content share the same background even when inactive. This replaces
+the proposed DWM-first approach for this window and the older best-effort title-bar
+fallback guidance below. MainWindow retains its existing DWM treatment. High contrast
+uses system brushes. The wider WPF UI/Mica redesign remains a separate future project.
+
 ## Decision
 
 Keep the existing .NET 8 WPF application and adopt **WPF UI 4.3.x** for the future visual-shell redesign.
@@ -59,7 +75,7 @@ Recommended desktop composition:
 4. **Contextual settings**
    - Keep the validated small settings entrypoint (the gear beside the header).
    - It opens a dedicated, resizable settings window scoped to the selected visualizer wallpaper.
-   - Controls: size (zoom), on-screen position (X/Y), color theme, glow, intensity, and audio
+   - Controls: size (zoom) and on-screen position (X/Y) where supported, color theme, glow, intensity, and audio
      sensitivity, all bounded and applied live to the running wallpaper and the preview.
 5. **Responsive behavior**
    - Wide: centered preview with optional contextual drawer overlaying/adjacent without shifting the library.
@@ -156,6 +172,12 @@ backdrop is no longer instantiated behind a static poster. WPF UI/theme adoption
 
 Per-wallpaper visualizer controls now live in a dedicated, resizable and scrollable settings window
 (`VisualizerSettingsWindow`), opened from the gear entrypoint, replacing the earlier popup that clipped its
-lower controls. It groups Appearance (color theme, size/zoom, on-screen position X/Y, glow, intensity) and
-Audio (sensitivity), all bounded, and applies every change live to the running wallpaper and the preview.
+lower controls. View groups geometry, background and quick presets; Effects groups color, glow, intensity,
+sparks and audio; More groups preset management, defaults, reset undo and credits. Values are bounded,
+and changes apply live to the matching running wallpaper and preview.
 Size and position are carried to the GPU through previously unused constant-buffer slots (no layout change).
+
+Size and position are shown only for Neon Ribbons, Liquid Orbs, Event Horizon, Fractal Pyramid,
+Kaleidoscope, Lotus and Living Fire. Classic, Aethelis, Fire Burst, Flamethrower Ring V2 and Spectral Bloom
+retain their existing appearance/audio controls; no ineffective layout controls are presented.
+The same settings window updates its available controls when the selected wallpaper changes.

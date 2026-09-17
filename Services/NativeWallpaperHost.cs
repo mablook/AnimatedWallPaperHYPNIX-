@@ -23,7 +23,8 @@ internal enum NativeRenderMode
     EventHorizon,
     FractalPyramid,
     Kaleidoscope,
-    Lotus
+    Lotus,
+    LivingFire
 }
 
 internal sealed partial class NativeWallpaperHost : IDisposable
@@ -41,14 +42,12 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private const uint LwaAlpha = 0x00000002;
     // Rendering runs on a dedicated background thread per host so heavy GPU/GDI frames and Present
     // no longer share the WPF UI thread with layout. The loop free-runs at the frame cap while shown
-    // and blocks on _frameSignal otherwise; on-demand updates (settings, pause, resume) pulse the
+    // and blocks on the worker signal otherwise; on-demand updates (settings, pause, resume) pulse the
     // signal to render promptly. The window itself is still created and destroyed on the UI thread.
-    private Thread? _renderThread;
-    private readonly AutoResetEvent _frameSignal = new(false);
-    private readonly ManualResetEventSlim _firstFrameReady = new(false);
-    private volatile bool _stopRequested;
+    private WallpaperRenderWorker? _renderWorker;
+    private readonly System.Windows.Threading.Dispatcher _ownerDispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+    private bool _disposed;
     private int _frameIntervalMs = 1000 / 30;
-    private Exception? _initException;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly NativeRenderMode _renderMode;
     private readonly DesktopWorker.WallpaperTarget[]? _renderTargets;
@@ -99,6 +98,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private volatile bool _failed;
     private volatile bool _paused;
     private AethelisGpuRenderer? _aethelisGpuRenderer;
+    private FireGpuRenderer? _fireGpuRenderer;
+    private long _fireAudioReceived;
     private volatile bool _isShown;
     private static readonly object WindowClassLock = new();
     private static readonly WindowProcedure WindowProcedureDelegate = HostWindowProcedure;
@@ -126,7 +127,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
         EnsureWindowClassRegistered();
         var extendedStyle = WsExNoActivate | WsExToolWindow | WsExTransparent;
-        if (preview is null && renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus)) extendedStyle |= WsExLayered;
+        if (preview is null && renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire)) extendedStyle |= WsExLayered;
         Handle = CreateWindowEx(
             extendedStyle,
             WindowClassName,
@@ -147,7 +148,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         Marshal.SetLastPInvokeError(0);
-        var alphaResult = preview is not null || renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus ||
+        var alphaResult = preview is not null || renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire ||
                           SetLayeredWindowAttributes(Handle, 0, 255, LwaAlpha);
         AppLog.Write($"Native host created. Handle=0x{Handle.ToInt64():X}; alphaResult={alphaResult}; " +
                      $"error={Marshal.GetLastPInvokeError()}");
@@ -156,7 +157,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
     // Central render entry point with recovery. Any renderer fault flips _failed (surfaced via
     // IsHealthy) so the health check drives session recovery instead of escaping to the global
-    // handler; the loop then parks on _frameSignal until the session is torn down and rebuilt.
+    // handler; the loop then parks until the session is torn down and rebuilt.
     private void SafeRenderFrame()
     {
         if (_failed) return;
@@ -168,9 +169,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
     }
 
-    // Background render loop. Free-runs at the frame cap while the host is shown and not paused;
-    // otherwise it blocks on _frameSignal until a state change or an on-demand render is requested.
-    private void RenderThreadBody()
+    private void PrepareFirstFrame()
     {
         try
         {
@@ -179,31 +178,23 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
         catch (Exception exception)
         {
-            _initException = exception;
             _failed = true;
-            _firstFrameReady.Set();
             AppLog.WriteException("Wallpaper renderer initialization failed", exception);
-            return;
-        }
-
-        _firstFrameReady.Set();
-
-        while (!_stopRequested)
-        {
-            var running = _isShown && !_paused && !_failed;
-            if (running) _frameSignal.WaitOne(Volatile.Read(ref _frameIntervalMs));
-            else _frameSignal.WaitOne();
-            if (_stopRequested) break;
-            SafeRenderFrame();
+            throw;
         }
     }
 
     private void InitializeGpuRenderer()
     {
-        if (_renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus))
+        if (_renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire))
             return;
         if (!GetClientRect(Handle, out var client))
             throw new InvalidOperationException("Could not read the Direct3D wallpaper client size.");
+        if (_renderMode==NativeRenderMode.LivingFire)
+        {
+            _fireGpuRenderer=new FireGpuRenderer(Handle,client.Right-client.Left,client.Bottom-client.Top);
+            return;
+        }
         var shader = _renderMode switch
         {
             NativeRenderMode.AethelisFlameBurst => "AethelisFlameBurst.hlsl",
@@ -223,24 +214,25 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     }
 
     public IntPtr Handle { get; private set; }
-    public bool IsHealthy => !_failed && Handle != IntPtr.Zero && IsWindow(Handle);
+    public bool IsHealthy => !_disposed && !_failed && Handle != IntPtr.Zero && IsWindow(Handle);
 
     public void Start(int framesPerSecond, bool reveal = true)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_renderWorker is not null) throw new InvalidOperationException("Native host already started.");
         SetFrameCap(framesPerSecond);
         // The render thread creates the GPU device and renders the first frame; wait for it so the
         // "complete frame before reveal" guarantee holds, then surface any init fault to the caller
         // (WallpaperSession fails fast on GPU/shader errors exactly as it did when Start rendered inline).
-        _renderThread = new Thread(RenderThreadBody)
+        _renderWorker = new WallpaperRenderWorker(PrepareFirstFrame, SafeRenderFrame,
+            () => _isShown && !_paused && !_failed ? Volatile.Read(ref _frameIntervalMs) : Timeout.Infinite,
+            ReleaseRenderResources);
+        try { _renderWorker.Start(TimeSpan.FromSeconds(15)); }
+        catch
         {
-            IsBackground = true,
-            Name = "HypnixWallpaperRender"
-        };
-        _renderThread.Start();
-        if (!_firstFrameReady.Wait(TimeSpan.FromSeconds(15)))
-            AppLog.Write("First wallpaper frame timed out; continuing without a prepared frame");
-        if (_initException is { } initFailure)
-            throw new InvalidOperationException("Wallpaper renderer failed to initialize.", initFailure);
+            _failed = true;
+            throw; // A timeout is a failed preparation; the controller retains the previous session.
+        }
 
         if (reveal) Show();
     }
@@ -256,27 +248,27 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         // Wake the render loop: it now free-runs at the frame cap and repaints the just-shown window.
-        _frameSignal.Set();
+        _renderWorker?.Signal();
     }
 
     public void Pause()
     {
         _paused = true;
         _clock.Stop();
-        _frameSignal.Set(); // let the loop observe the state change and park
+        _renderWorker?.Signal(); // let the loop observe the state change and park
     }
 
     public void Resume()
     {
         _paused = false;
         _clock.Start();
-        _frameSignal.Set(); // resume the loop and render immediately
+        _renderWorker?.Signal(); // resume the loop and render immediately
     }
 
     public void SetFrameCap(int framesPerSecond)
     {
         Volatile.Write(ref _frameIntervalMs, (int)(1000d / Math.Clamp(framesPerSecond, 1, 60)));
-        _frameSignal.Set();
+        _renderWorker?.Signal();
     }
 
     public void SubmitVideoFrame(byte[] frame, int width, int height)
@@ -318,7 +310,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
         _visualizerFreezeState.Update(incoming, now, GetAudioBands());
         AppLog.Write($"Native host monitor pause changed. Monitors={(incoming.Length == 0 ? "none" : string.Join(",", incoming))}");
-        _frameSignal.Set(); // render the new pause layout on the render thread
+        _renderWorker?.Signal(); // render the new pause layout on the render thread
     }
 
     private bool SamePausedMonitors(int[] incoming)
@@ -335,6 +327,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     public void SubmitAudioBands(float[] bands)
     {
         lock (_audioBandsLock) _audioBands = (float[])bands.Clone();
+        Interlocked.Exchange(ref _fireAudioReceived,Stopwatch.GetTimestamp());
     }
 
     public void UpdateVisualizerSettings(VisualizerSettings settings)
@@ -342,7 +335,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         _visualizerSettings = settings;
         AppLog.Write($"Visualizer settings updated. Intensity={settings.Intensity:F2}; " +
                      $"Sensitivity={settings.Sensitivity:F2}; Glow={settings.Glow:F2}");
-        _frameSignal.Set(); // render the updated settings on the render thread
+        _renderWorker?.Signal(); // render the updated settings on the render thread
     }
 
     private void RenderFrame()
@@ -358,11 +351,16 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         {
             return;
         }
+        if (_fireGpuRenderer is not null)
+        {
+            RenderFireGpuFrame(width,height);
+            return;
+        }
 
         // Direct3D owns the complete frame for both Aethelis modes. Rendering it
         // here avoids the old nested monitor loop (GDI monitor -> all GPU monitors),
         // which updated active effects on displays that were meant to stay frozen.
-        if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus) &&
+        if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire) &&
             _aethelisGpuRenderer is not null)
         {
             RenderAethelisGpuFrame(width, height);
@@ -479,6 +477,27 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         _aethelisGpuRenderer.EndFrame();
+    }
+
+    private void RenderFireGpuFrame(int width,int height)
+    {
+        var renderer=_fireGpuRenderer!;
+        long received=Interlocked.Read(ref _fireAudioReceived);
+        var bands=received!=0&&Stopwatch.GetElapsedTime(received).TotalSeconds<.5?GetAudioBands():new float[64];
+        renderer.BeginFrame();
+        if (_renderTargets is {Length:>0})
+        {
+            for (int index=0;index<_renderTargets.Length;index++)
+            {
+                var target=_renderTargets[index];
+                var sample=_visualizerFreezeState.Resolve(index,_clock.Elapsed.TotalSeconds,bands);
+                renderer.RenderViewport(target.X,target.Y,target.Width,target.Height,sample.TimeSeconds,
+                    AethelisAudioProfile.Analyze(sample.Bands,_visualizerSettings.Sensitivity),_visualizerSettings,sample.IsFrozen,sample.Bands);
+            }
+        }
+        else renderer.RenderViewport(0,0,width,height,_clock.Elapsed.TotalSeconds,
+            AethelisAudioProfile.Analyze(bands,_visualizerSettings.Sensitivity),_visualizerSettings,spectrum:bands);
+        renderer.EndFrame();
     }
 
     private void RenderAmbient(Graphics graphics, int width, int height, double time)
@@ -865,38 +884,48 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        if (Handle == IntPtr.Zero)
-        {
-            return;
-        }
-
-        // Stop the render thread first and wait for it, so nothing touches the GPU device, GDI
-        // buffers or the window handle while they are being released. Frames are short, so a join
-        // is quick; if a hung GPU driver blocks it we skip disposing render-owned resources (letting
-        // finalizers/OS reclaim them) rather than racing the still-running thread.
-        _stopRequested = true;
-        _frameSignal.Set();
-        var joined = _renderThread is null || _renderThread.Join(TimeSpan.FromSeconds(5));
-
+        if (_disposed) return;
+        _disposed = true;
+        var joined = _renderWorker is null || _renderWorker.Stop(TimeSpan.FromSeconds(5));
         var handle = Handle;
-        Handle = IntPtr.Zero;
-
-        if (joined)
-        {
-            _backBuffer?.Dispose();
-            _bufferContext.Dispose();
-            _visualizerBackground?.Dispose();
-            _aethelisGpuRenderer?.Dispose();
-            ReleaseVideoBitmaps();
-            ReleaseGdiCache();
-        }
+        if (_renderWorker is null) ReleaseRenderResources();
+        if (joined) DestroyHostWindow(handle);
         else
         {
-            AppLog.Write("Render thread did not stop in time; GPU/GDI resources left to finalizers.");
+            // Keep the HWND alive while native initialization/rendering can still access it.
+            // Resource cleanup belongs to the worker; HWND destruction belongs to the UI thread.
+            ShowWindow(handle, 0);
+            AppLog.Write("Render thread shutdown pending; cleanup deferred until the thread exits.");
+            _ = DestroyAfterRenderAsync(handle, _renderWorker!.Completion);
         }
+    }
 
-        _frameSignal.Dispose();
-        _firstFrameReady.Dispose();
+    private void ReleaseRenderResources()
+    {
+        _backBuffer?.Dispose();
+        _bufferContext.Dispose();
+        _visualizerBackground?.Dispose();
+        _aethelisGpuRenderer?.Dispose();
+        _fireGpuRenderer?.Dispose();
+        ReleaseVideoBitmaps();
+        ReleaseGdiCache();
+    }
+
+    private async Task DestroyAfterRenderAsync(IntPtr handle, Task completion)
+    {
+        try
+        {
+            await completion.ConfigureAwait(false);
+            if (!_ownerDispatcher.HasShutdownStarted)
+                await _ownerDispatcher.InvokeAsync(() => DestroyHostWindow(handle));
+        }
+        catch (Exception exception) { AppLog.WriteException("Deferred host destruction failed", exception); }
+    }
+
+    private void DestroyHostWindow(IntPtr handle)
+    {
+        Handle = IntPtr.Zero;
+        if (handle == IntPtr.Zero) return;
         var result = DestroyWindow(handle);
         AppLog.Write($"Native host destroyed. Handle=0x{handle.ToInt64():X}; result={result}; error={Marshal.GetLastPInvokeError()}");
     }

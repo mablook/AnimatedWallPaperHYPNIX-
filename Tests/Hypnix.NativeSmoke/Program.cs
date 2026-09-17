@@ -29,6 +29,16 @@ internal static class Program
                 "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
                 string.Concat(resourceXml.Nodes()) + "</ResourceDictionary>");
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if(args.Contains("--settings-only")){SettingsWindowChecks.Run(output);return 0;}
+            SettingsWindowChecks.Run(output);
+            if (args.Contains("--show-fire-gallery"))
+            {
+                var reviewSettings=new AppSettingsStore(Path.Combine(output,"gallery-review-settings.json"));
+                reviewSettings.Save(new AppSettings {SelectedWallpaperId="living-fire"});
+                var reviewWindow=new MainWindow(reviewSettings,Path.Combine(output,"gallery-review-library"));
+                app.Run(reviewWindow);
+                return 0;
+            }
             var parent = CreateWindowEx(0, "STATIC", "HYPNIX hidden test surface", 0x80000000,
                 0, 0, 640, 360, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
             if (parent == IntPtr.Zero) throw new InvalidOperationException("Hidden native test surface could not be created.");
@@ -45,6 +55,8 @@ internal static class Program
                     SpectralBloomRenderChecks.Run(parent, output);
                     return 0;
                 }
+                if (args.Contains("--fire-only")) {FireRenderChecks.Run(parent,output);return 0;}
+                FireRenderChecks.Run(parent,output);
                 NeonRibbonsRenderChecks.Run(parent, output);
                 NeonRibbonsRenderChecks.Run(parent, output, "LiquidOrbs.hlsl", "liquid-orbs");
                 NeonRibbonsRenderChecks.Run(parent, output, "FractalPyramid.hlsl", "fractal-pyramid");
@@ -56,7 +68,7 @@ internal static class Program
                     NativeRenderMode.AethelisVisualizer, NativeRenderMode.AethelisFlameBurst, NativeRenderMode.FlamethrowerRingV2,
                     NativeRenderMode.SpectralBloom, NativeRenderMode.NeonRibbons, NativeRenderMode.LiquidOrbs,
                     NativeRenderMode.EventHorizon, NativeRenderMode.FractalPyramid, NativeRenderMode.Kaleidoscope,
-                    NativeRenderMode.Lotus })
+                    NativeRenderMode.Lotus, NativeRenderMode.LivingFire })
                 {
                     using var host = new NativeWallpaperHost(mode, preview: new PreviewTarget(parent, 640, 360));
                     host.Start(30, reveal: false);
@@ -107,7 +119,7 @@ internal static class Program
             foreach (var kind in new[] { WallpaperKind.BuiltIn, WallpaperKind.VisualizerDemo,
                 WallpaperKind.AethelisVisualizer, WallpaperKind.AethelisFlameBurst, WallpaperKind.FlamethrowerRingV2,
                 WallpaperKind.SpectralBloom, WallpaperKind.NeonRibbons, WallpaperKind.LiquidOrbs, WallpaperKind.EventHorizon,
-                WallpaperKind.FractalPyramid, WallpaperKind.Kaleidoscope, WallpaperKind.Lotus })
+                WallpaperKind.FractalPyramid, WallpaperKind.Kaleidoscope, WallpaperKind.Lotus, WallpaperKind.LivingFire })
             {
                 if (!gallery.Items.OfType<WallpaperEntry>().Any(entry => entry.Kind == kind))
                     throw new InvalidOperationException($"Built-in wallpaper missing from the gallery: {kind}");
@@ -130,7 +142,19 @@ internal static class Program
             // The dedicated visualizer settings window: verify its XAML loads and the size/position
             // controls round-trip through the preferences (it is opened on demand in the real app).
             var settingsWindow = new VisualizerSettingsWindow();
-            settingsWindow.SetWallpaper("Fractal Pyramid");
+            settingsWindow.SetWallpaper(gallery.Items.OfType<WallpaperEntry>().Single(e => e.Kind == WallpaperKind.FractalPyramid));
+            var layoutControls = (FrameworkElement)settingsWindow.FindName("LayoutControls");
+            // Switch through both capability groups in one existing window, as gallery selection does.
+            foreach (var entry in gallery.Items.OfType<WallpaperEntry>().Where(e => e.IsVisualizer))
+            {
+                settingsWindow.SetWallpaper(entry);
+                var expected = entry.Kind is WallpaperKind.NeonRibbons or WallpaperKind.LiquidOrbs
+                    or WallpaperKind.EventHorizon or WallpaperKind.FractalPyramid or WallpaperKind.Kaleidoscope or WallpaperKind.Lotus or WallpaperKind.LivingFire;
+                if ((layoutControls.Visibility == Visibility.Visible) != expected)
+                    throw new InvalidOperationException($"Incorrect layout controls for {entry.Kind}.");
+                if (((FrameworkElement)settingsWindow.FindName("GlowSlider")).Visibility != Visibility.Visible)
+                    throw new InvalidOperationException($"Appearance controls hidden for {entry.Kind}.");
+            }
             settingsWindow.LoadValues(new VisualizerPreferences(3f, 4f, 1.2f, 2, 1.5f, 0.25f, -0.35f));
             var roundTrip = settingsWindow.ReadValues();
             if (Math.Abs(roundTrip.Scale - 1.5f) > 0.001f || Math.Abs(roundTrip.OffsetX - 0.25f) > 0.001f

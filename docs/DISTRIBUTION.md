@@ -35,7 +35,7 @@ Requires PowerShell 7 and a .NET SDK supporting the project's .NET 8 target:
 ```
 
 The script uses `win-x64-self-contained.pubxml`, creates a fresh timestamped output under `artifacts/distribution`,
-checks required runtime files and all nine wallpaper entries, compares tracked published assets with source,
+checks required runtime files and all thirteen wallpaper entries, compares tracked published assets with source,
 collects dependency notices, and produces a ZIP, a checksum and a file inventory. Existing packages and running
 application files are left in place. NuGet access may be needed to restore runtime packs. Each build records
 whether the source working tree was dirty; for a release candidate, commit the reviewed changes first.

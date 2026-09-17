@@ -29,6 +29,7 @@ internal static class WallpaperSessionFactory
         WallpaperKind.FractalPyramid => NativeRenderMode.FractalPyramid,
         WallpaperKind.Kaleidoscope => NativeRenderMode.Kaleidoscope,
         WallpaperKind.Lotus => NativeRenderMode.Lotus,
+        WallpaperKind.LivingFire => NativeRenderMode.LivingFire,
         WallpaperKind.VolumetricFire => NativeRenderMode.VolumetricFire,
         WallpaperKind.ExampleVideo => NativeRenderMode.Video,
         _ => NativeRenderMode.Ambient

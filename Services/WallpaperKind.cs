@@ -15,5 +15,6 @@ internal enum WallpaperKind
     EventHorizon,
     FractalPyramid,
     Kaleidoscope,
-    Lotus
+    Lotus,
+    LivingFire
 }

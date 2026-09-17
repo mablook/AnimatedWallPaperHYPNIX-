@@ -130,7 +130,7 @@ temporal smoothness on capable hardware, but does not turn the current CPU rende
 
 Run before releases and Store submissions:
 
-- Switch through all nine built-in wallpapers and a local MP4 without manually stopping first.
+- Switch through all thirteen built-in wallpapers and a local MP4 without manually stopping first.
 - Confirm every audio-reactive wallpaper reacts to real system audio on both displays.
 - Toggle Audio reactive in both the window and tray; verify desktop and preview return to calm animation,
   resume reacting when enabled, and retain the preference after restart.
@@ -175,14 +175,16 @@ and pause/resume check. Run it from the repository root on Windows with Direct3D
 The check uses hidden parent windows and does not attach to Explorer. Layout PNGs exclude HWND-hosted preview content.
 
 The default native smoke run retains lifecycle checks for ambient, classic visualizer, Aethelis, Fire Burst
-and Flamethrower Ring V2, and includes Spectral Bloom, Neon Ribbons, Liquid Orbs and Event Horizon.
-It asserts all nine entries are present in the built application's gallery. Additional GPU image checks cover:
+and Flamethrower Ring V2, and includes Spectral Bloom, Neon Ribbons, Liquid Orbs, Event Horizon,
+Fractal Pyramid, Kaleidoscope, Lotus and Living Fire.
+It asserts all thirteen entries are present in the built application's gallery. Additional GPU image checks cover:
 
 | Wallpaper | Checks |
 | --- | --- |
-| Neon Ribbons / Liquid Orbs | Animation in silence, quiet-audio response, intensity/glow range, black output at zero intensity and viewport origin. |
+| Neon Ribbons / Liquid Orbs / Fractal Pyramid / Kaleidoscope / Lotus | Animation in silence, quiet-audio response, intensity/glow range, black output at zero intensity, size/position controls and viewport origin. |
 | Spectral Bloom | Exposure at 15/30/60 FPS, audio response, individual FFT-band influence and pixel-exact independent viewport freeze. |
-| Event Horizon | Non-flat image, animation in silence, audio response, intensity/glow/color controls, return to silence and independent viewport freeze with saved time/audio inputs. |
+| Event Horizon | Non-flat image, animation in silence, audio response, intensity/glow/color/size/position controls, return to silence and independent viewport freeze with saved time/audio inputs. |
+| Living Fire | Shared fluid solver, controls and zero intensity, no settings-only time advancement, separate monitor state, frozen pixels, resume without catch-up, and D3D timestamp samples at 640 × 360 and 4K. The study harness separately checks material/particle invariants and source response to audio. |
 
 PNG artifacts are saved under the requested output directory. The `--spectral-only` option still runs the
 Spectral Bloom image checks alone. Its independent-freeze renderer is disposed before another swap chain is
@@ -261,3 +263,53 @@ Additional manual release checks:
 
 The native build is pinned and executable through `scripts/build-native.ps1`; `-UpdateRuntime` is an explicit opt-in
 because the existing committed runtime remains the default for ordinary .NET builds.
+
+## First-frame timeout and deferred render cleanup
+
+`WallpaperRenderWorkerTests` holds initialization behind a gate to reproduce both successful and
+failed completion after startup and shutdown timeouts. It requires that timed-out initialization
+never enters the ongoing render loop, cleanup runs exactly once on the render thread, and notifications
+are safe both before and after cleanup. A blocked-frame test also verifies deferred shutdown cleanup.
+A controller regression also verifies that a timed-out first frame preserves the previous wallpaper
+and its paused state, even after the delayed initializer finishes.
+
+A first frame must be ready within 15 seconds. Timeout fails preparation instead of revealing an
+empty host. Shutdown waits up to five seconds; if the thread is still inside native code, it retains
+its resources and hidden HWND until it exits. Resource cleanup then runs on the render thread and
+HWND destruction is dispatched to the owning UI thread. If the UI dispatcher has already shut down,
+Windows reclaims the HWND at process exit.
+
+The native smoke switches the same settings window across all visualizer entries and verifies that
+size and position appear only for the seven supported renderers. GPU comparisons separately require
+each of those three controls to change the image. Preference tests round-trip different transforms
+for separate wallpapers.
+
+The portable inventory regression compares the packaging script's renderer list with the visible
+manifest-driven gallery, so a newly added wallpaper cannot silently disappear from `build-info.json`.
+
+## Graphite settings, presets and Living Fire backgrounds
+
+`VisualizerCustomizationTests` exercises the reversible square/disk position mapping,
+out-of-range drags, old settings, persistence of background/sparks/presets and rejection
+of invalid preset records. The regression suite currently contains 144 passing cases.
+
+`SettingsWindowChecks` runs within the native smoke harness. It verifies that loading
+settings and switching View/Effects/More do not emit changes; geometry reset preserves
+appearance; reset undo restores the complete snapshot; presets save/apply/rename complete
+preferences and remain scoped to their wallpaper. It also checks background capabilities
+and captures each tab at normal and minimum window sizes.
+
+```powershell
+dotnet Tests/Hypnix.NativeSmoke/bin/Release/net8.0-windows/Hypnix.NativeSmoke.dll artifacts/settings-review --settings-only
+```
+
+The full smoke includes these checks plus all 13 wallpaper lifecycles. `--fire-only`
+also exercises solid/image composition, importing an image, missing-file fallback,
+background independence from the fire transform, zero intensity with a background,
+sparks visibility, frequency separation, full-width coverage and independent pauses.
+The shared FirePreview capture harness checks sustained physics, audio and particle state.
+
+Local results for the redesign are in `artifacts/settings-redesign/`. WPF render captures
+validate layout but do not prove native caption behavior, screen-reader usability or
+physical mixed-DPI operation. Keep those manual release checks, including inactive
+caption colors, maximize/restore, keyboard navigation, high contrast and display changes.

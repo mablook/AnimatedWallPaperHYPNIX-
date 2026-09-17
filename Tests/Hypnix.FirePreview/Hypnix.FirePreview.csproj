@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="NAudio" Version="2.3.0" />
+    <Compile Include="../../Services/AudioSpectrumService.cs" Link="Audio/AudioSpectrumService.cs" />
+    <Compile Include="../../Services/AethelisAudioProfile.cs" Link="Audio/AethelisAudioProfile.cs" />
+    <Compile Include="../../Services/RetryWorker.cs" Link="Audio/RetryWorker.cs" />
+    <Compile Include="../../Services/AppLog.cs" Link="Audio/AppLog.cs" />
+    <Compile Include="../../Services/FireSimulation.cs" Link="Fire/FireSimulation.cs" />
+    <Compile Include="../../Services/FireGpuRenderer.cs" Link="Fire/FireGpuRenderer.cs" />
+    <Compile Include="../../Services/FireBackground.cs" Link="Fire/FireBackground.cs" />
+    <Compile Include="../../Services/VisualizerCustomization.cs" Link="Fire/VisualizerCustomization.cs" />
+    <Compile Include="../../Services/FireFrameStepper.cs" Link="Fire/FireFrameStepper.cs" />
+    <Compile Include="../../Services/FireFrequencyBands.cs" Link="Fire/FireFrequencyBands.cs" />
+    <Compile Include="../../Services/FireEmitterLayout.cs" Link="Fire/FireEmitterLayout.cs" />
+    <Compile Include="../../Services/VisualizerSettings.cs" Link="Fire/VisualizerSettings.cs" />
+    <Compile Include="../../Services/AppSettingsStore.cs" Link="Fire/AppSettingsStore.cs" />
+    <Compile Include="../../Services/FrameRatePolicy.cs" Link="Fire/FrameRatePolicy.cs" />
+    <Content Include="../../Shaders/LivingFire.hlsl" Link="Shaders/LivingFire.hlsl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

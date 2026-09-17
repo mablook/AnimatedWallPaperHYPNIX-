@@ -7,6 +7,34 @@ public sealed class LifecycleTests
     private static WallpaperRequest Request(string id) => new(id, WallpaperKind.BuiltIn);
 
     [Fact]
+    public async Task FirstFrameTimeoutKeepsPreviousWallpaperEvenAfterLateCompletion()
+    {
+        using var release = new ManualResetEventSlim();
+        using var worker = new WallpaperRenderWorker(() => release.Wait(), () => { }, () => 1, () => { });
+        var previous = new FakeSession();
+        var candidate = new FakeSession();
+        using var controller = new WallpaperController((request, _) =>
+        {
+            if (request.Id == "old") return Task.FromResult<IWallpaperSession>(previous);
+            worker.Start(TimeSpan.FromMilliseconds(50));
+            return Task.FromResult<IWallpaperSession>(candidate);
+        });
+        try
+        {
+            await controller.StartAsync(Request("old"));
+            controller.Pause();
+            await Assert.ThrowsAsync<TimeoutException>(() => controller.StartAsync(Request("slow")));
+            Assert.False(previous.Disposed);
+            Assert.True(controller.IsPaused);
+        }
+        finally { release.Set(); }
+        await worker.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("old", controller.ActiveRequest!.Id);
+        Assert.False(previous.Disposed);
+        Assert.False(candidate.Shown);
+    }
+
+    [Fact]
     public async Task FailedPreparationKeepsCurrentWallpaperAndPauseState()
     {
         var current = new FakeSession();

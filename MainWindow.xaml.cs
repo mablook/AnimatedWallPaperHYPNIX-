@@ -128,7 +128,7 @@ public partial class MainWindow : Window
         {
             if (entry.IsVisualizer)
             {
-                _settingsWindow.SetWallpaper(entry.Title);
+                _settingsWindow.SetWallpaper(entry);
                 _settingsWindow.LoadValues(CurrentPreferencesFor(entry));
             }
             else
@@ -297,11 +297,12 @@ public partial class MainWindow : Window
         if (_settingsWindow is null)
         {
             _settingsWindow = new VisualizerSettingsWindow { Owner = this };
+            _settingsWindow.SetPresetLibrary(_settings.VisualizerPresets);
+            _settingsWindow.PresetsChanged += QueueSave;
             _settingsWindow.Changed += OnVisualizerWindowChanged;
-            _settingsWindow.ResetRequested += OnVisualizerWindowReset;
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         }
-        _settingsWindow.SetWallpaper(entry.Title);
+        _settingsWindow.SetWallpaper(entry);
         _settingsWindow.LoadValues(CurrentPreferencesFor(entry));
         _settingsWindow.Show();
         _settingsWindow.Activate();
@@ -311,14 +312,6 @@ public partial class MainWindow : Window
         => _settings.Visualizers.GetValueOrDefault(entry.Id) ?? entry.Defaults ?? new VisualizerPreferences();
 
     private void OnVisualizerWindowChanged(VisualizerPreferences preferences) => ApplyVisualizerPreferences(preferences);
-
-    private void OnVisualizerWindowReset()
-    {
-        if (Selected is not { IsVisualizer: true } entry) return;
-        var defaults = entry.Defaults ?? new VisualizerPreferences();
-        _settingsWindow?.LoadValues(defaults);
-        ApplyVisualizerPreferences(defaults);
-    }
 
     // Applies the selected wallpaper's stored preferences to the live session and preview
     // (used when a wallpaper starts). Live edits come through ApplyVisualizerPreferences.

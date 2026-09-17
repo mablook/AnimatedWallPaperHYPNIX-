@@ -1,121 +1,86 @@
 <Window x:Class="AnimatedWallPaper.VisualizerSettingsWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Visualizer settings" Width="420" Height="720" MinWidth="360" MinHeight="420"
-        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        Background="#0F141B" Foreground="{StaticResource TextPrimaryBrush}"
-        FontFamily="Segoe UI Variable, Segoe UI">
-    <Window.Resources>
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#111820"/>
-            <Setter Property="Foreground" Value="#F1F5FA"/>
-            <Setter Property="BorderBrush" Value="#48586B"/>
-            <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="HorizontalContentAlignment" Value="Right"/>
-        </Style>
-        <Style x:Key="GroupLabel" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,0,0,10"/>
-            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
-        </Style>
-        <Style x:Key="Hint" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
-            <Setter Property="Margin" Value="0,0,0,18"/>
-        </Style>
-    </Window.Resources>
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <StackPanel Grid.Row="0" Margin="0,0,0,14">
-            <TextBlock Text="Visualizer settings" FontSize="18" FontWeight="SemiBold"/>
-            <TextBlock x:Name="WallpaperNameText" Margin="0,2,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-        </StackPanel>
-
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
-            <StackPanel>
-                <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="16" Margin="0,0,0,14"
-                        BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1">
-                    <StackPanel>
-                        <TextBlock Text="APPEARANCE" Style="{StaticResource GroupLabel}"/>
-
-                        <TextBlock Text="Color theme" Margin="0,0,0,6"/>
-                        <ComboBox x:Name="ColorComboBox" SelectionChanged="OnComboChanged" AutomationProperties.Name="Color theme">
-                            <ComboBoxItem Content="Ice blue"/><ComboBoxItem Content="Neon sunset"/>
-                            <ComboBoxItem Content="Emerald"/><ComboBoxItem Content="Monochrome"/>
-                        </ComboBox>
-                        <TextBlock Text="Palette used for the wallpaper." Style="{StaticResource Hint}" Margin="0,6,0,18"/>
-
-                        <DockPanel>
-                            <TextBox Width="72" DockPanel.Dock="Right" Text="{Binding ElementName=SizeSlider, Path=Value, Mode=TwoWay, StringFormat=F2, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" AutomationProperties.Name="Size value"/>
-                            <TextBlock Text="Size · 0.3–3" VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <Slider x:Name="SizeSlider" Minimum="0.3" Maximum="3" Value="1" Margin="0,10,0,6" SmallChange="0.05" LargeChange="0.25"
-                                AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="2"
-                                ValueChanged="OnControlChanged" AutomationProperties.Name="Size"/>
-                        <TextBlock Text="Zoom the animation in or out." Style="{StaticResource Hint}"/>
-
-                        <DockPanel>
-                            <TextBox Width="72" DockPanel.Dock="Right" Text="{Binding ElementName=PositionXSlider, Path=Value, Mode=TwoWay, StringFormat=F2, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" AutomationProperties.Name="Horizontal position value"/>
-                            <TextBlock Text="Position X · -1–1" VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <Slider x:Name="PositionXSlider" Minimum="-1" Maximum="1" Value="0" Margin="0,10,0,6" SmallChange="0.02" LargeChange="0.1"
-                                AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="2"
-                                ValueChanged="OnControlChanged" AutomationProperties.Name="Horizontal position"/>
-                        <TextBlock Text="Move the animation left or right." Style="{StaticResource Hint}"/>
-
-                        <DockPanel>
-                            <TextBox Width="72" DockPanel.Dock="Right" Text="{Binding ElementName=PositionYSlider, Path=Value, Mode=TwoWay, StringFormat=F2, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" AutomationProperties.Name="Vertical position value"/>
-                            <TextBlock Text="Position Y · -1–1" VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <Slider x:Name="PositionYSlider" Minimum="-1" Maximum="1" Value="0" Margin="0,10,0,6" SmallChange="0.02" LargeChange="0.1"
-                                AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="2"
-                                ValueChanged="OnControlChanged" AutomationProperties.Name="Vertical position"/>
-                        <TextBlock Text="Move the animation up or down." Style="{StaticResource Hint}"/>
-
-                        <DockPanel>
-                            <TextBox Width="72" DockPanel.Dock="Right" Text="{Binding ElementName=GlowSlider, Path=Value, Mode=TwoWay, StringFormat=F2, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" AutomationProperties.Name="Glow value"/>
-                            <TextBlock Text="Glow · 0–3" VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <Slider x:Name="GlowSlider" Minimum="0" Maximum="3" Value="1.2" Margin="0,10,0,6" SmallChange="0.05" LargeChange="0.25"
-                                AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="2"
-                                ValueChanged="OnControlChanged" AutomationProperties.Name="Glow"/>
-                        <TextBlock Text="Light spread and glow strength." Style="{StaticResource Hint}"/>
-
-                        <DockPanel>
-                            <TextBox Width="72" DockPanel.Dock="Right" Text="{Binding ElementName=IntensitySlider, Path=Value, Mode=TwoWay, StringFormat=F2, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" AutomationProperties.Name="Intensity value"/>
-                            <TextBlock Text="Intensity · 0–8" VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <Slider x:Name="IntensitySlider" Minimum="0" Maximum="8" Value="3" Margin="0,10,0,6" SmallChange="0.05" LargeChange="0.5"
-                                AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="2"
-                                ValueChanged="OnControlChanged" AutomationProperties.Name="Intensity"/>
-                        <TextBlock Text="Overall visual strength (0 turns it off)." Style="{StaticResource Hint}" Margin="0,0,0,0"/>
-                    </StackPanel>
-                </Border>
-
-                <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="16"
-                        BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1">
-                    <StackPanel>
-                        <TextBlock Text="AUDIO" Style="{StaticResource GroupLabel}"/>
-                        <DockPanel>
-                            <TextBox Width="72" DockPanel.Dock="Right" Text="{Binding ElementName=SensitivitySlider, Path=Value, Mode=TwoWay, StringFormat=F2, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" AutomationProperties.Name="Audio sensitivity value"/>
-                            <TextBlock Text="Audio sensitivity · 0–12" VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <Slider x:Name="SensitivitySlider" Minimum="0" Maximum="12" Value="4" Margin="0,10,0,6" SmallChange="0.1" LargeChange="1"
-                                AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="2"
-                                ValueChanged="OnControlChanged" AutomationProperties.Name="Audio sensitivity"/>
-                        <TextBlock Text="More response to quiet music; 0 disables audio reaction." Style="{StaticResource Hint}" Margin="0,0,0,0"/>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
-
-        <Button Grid.Row="2" Content="Reset this wallpaper" Click="Reset_Click" Margin="0,16,0,0"/>
-    </Grid>
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework" xmlns:controls="clr-namespace:AnimatedWallPaper.Controls"
+ Title="Visualizer settings" Width="420" Height="760" MinWidth="360" MinHeight="420"
+ WindowStartupLocation="CenterOwner" ShowInTaskbar="False" WindowStyle="None" ResizeMode="CanResize"
+ Background="{DynamicResource SettingsWindowBackground}" Foreground="{DynamicResource SettingsTextPrimary}" FontFamily="Segoe UI Variable, Segoe UI">
+ <Window.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="Controls/SettingsTheme.xaml"/></ResourceDictionary.MergedDictionaries></ResourceDictionary></Window.Resources>
+ <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="42" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/></shell:WindowChrome.WindowChrome>
+ <Grid Margin="6" Background="{DynamicResource SettingsWindowBackground}">
+  <Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="40"/><ColumnDefinition Width="40"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+   <TextBlock Text="Visualizer settings" Margin="12,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource SettingsTextSecondary}"/>
+   <Button Grid.Column="1" Content="−" MinHeight="30" Padding="0" Background="Transparent" Click="Minimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimize" AutomationProperties.Name="Minimize"/>
+   <Button Grid.Column="2" Content="□" MinHeight="30" Padding="0" Background="Transparent" Click="Maximize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Maximize or restore" AutomationProperties.Name="Maximize or restore"/>
+   <Button Grid.Column="3" Content="×" FontSize="22" MinHeight="30" Padding="0" Background="Transparent" Click="Close_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Close settings" AutomationProperties.Name="Close settings"/>
+  </Grid>
+  <StackPanel Grid.Row="1" Margin="6,8,6,12">
+   <TextBlock x:Name="WallpaperNameText" FontSize="14" Margin="8,0,0,12" Foreground="{DynamicResource SettingsTextSecondary}"/>
+   <Border Background="{DynamicResource SettingsSurface}" CornerRadius="13" Padding="6"><UniformGrid Rows="1">
+    <RadioButton x:Name="ViewTab" Content="View" GroupName="Pages" Tag="View" Style="{StaticResource TabStyle}" Checked="Tab_Checked" IsChecked="True"/>
+    <RadioButton x:Name="EffectsTab" Content="Effects" GroupName="Pages" Tag="Effects" Style="{StaticResource TabStyle}" Checked="Tab_Checked"/>
+    <RadioButton x:Name="MoreTab" Content="More" GroupName="Pages" Tag="More" Style="{StaticResource TabStyle}" Checked="Tab_Checked"/>
+   </UniformGrid></Border>
+  </StackPanel>
+  <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="6,0" Padding="0,0,4,0">
+   <Grid>
+    <StackPanel x:Name="ViewPage">
+     <Border Style="{StaticResource Card}"><StackPanel>
+      <DockPanel><Button x:Name="ResetViewButton" DockPanel.Dock="Right" Content="↶" Width="40" Background="Transparent" FontSize="25" Click="ResetView_Click" ToolTip="Reset only position and zoom" AutomationProperties.Name="Reset position and zoom"/><TextBlock Text="View Adjustment" Style="{StaticResource Heading}" VerticalAlignment="Center"/></DockPanel>
+      <TextBlock x:Name="LayoutUnavailable" Text="This wallpaper has a fixed composition." Style="{StaticResource Hint}" Visibility="Collapsed"/>
+      <StackPanel x:Name="LayoutControls">
+       <Grid Margin="0,24,0,20"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="62"/></Grid.ColumnDefinitions>
+        <controls:PositionPad x:Name="PositionControl" HorizontalAlignment="Center" X="{Binding ElementName=PositionXSlider,Path=Value,Mode=TwoWay}" Y="{Binding ElementName=PositionYSlider,Path=Value,Mode=TwoWay}"/>
+        <Border Grid.Column="1" Background="{DynamicResource SettingsControlSurface}" CornerRadius="31" Margin="4,0,0,0"><Grid><Grid.RowDefinitions><RowDefinition Height="56"/><RowDefinition/><RowDefinition Height="56"/></Grid.RowDefinitions>
+         <RepeatButton Content="+" Style="{StaticResource PadArrowStyle}" Click="ZoomIn_Click" ToolTip="Zoom in" AutomationProperties.Name="Zoom in"/>
+         <StackPanel Grid.Row="1" VerticalAlignment="Center"><TextBox Text="{Binding ElementName=SizeSlider,Path=Value,Mode=TwoWay,StringFormat=F2,UpdateSourceTrigger=LostFocus,ValidatesOnExceptions=True}" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Center" FontSize="17" Padding="0" ToolTip="Zoom multiplier · 0.30 to 3.00" AutomationProperties.Name="Zoom multiplier"/><TextBlock Text="×" HorizontalAlignment="Center" Foreground="{DynamicResource SettingsTextSecondary}"/></StackPanel>
+         <RepeatButton Grid.Row="2" Content="−" Style="{StaticResource PadArrowStyle}" Click="ZoomOut_Click" ToolTip="Zoom out" AutomationProperties.Name="Zoom out"/>
+        </Grid></Border>
+       </Grid>
+       <Expander Header="Position values" Foreground="{DynamicResource SettingsTextSecondary}"><UniformGrid Rows="1" Margin="0,10,0,0"><StackPanel Margin="0,0,6,0"><TextBlock Text="X"/><TextBox Text="{Binding ElementName=PositionXSlider,Path=Value,Mode=TwoWay,StringFormat=F2,UpdateSourceTrigger=LostFocus,ValidatesOnExceptions=True}" AutomationProperties.Name="Horizontal position value"/></StackPanel><StackPanel Margin="6,0,0,0"><TextBlock Text="Y"/><TextBox Text="{Binding ElementName=PositionYSlider,Path=Value,Mode=TwoWay,StringFormat=F2,UpdateSourceTrigger=LostFocus,ValidatesOnExceptions=True}" AutomationProperties.Name="Vertical position value"/></StackPanel></UniformGrid></Expander>
+      </StackPanel>
+      <Border Height="1" Background="{DynamicResource SettingsStroke}" Margin="-20,20,-20,16"/>
+      <DockPanel><TextBlock Text="Presets" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/><Button Content="+" Width="44" Margin="12,0,0,0" HorizontalAlignment="Left" Click="NewPreset_Click" ToolTip="Save current settings as a preset" AutomationProperties.Name="New preset"/></DockPanel>
+      <ItemsControl x:Name="QuickPresets" Margin="0,12,0,0"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Button Content="{Binding Name}" Tag="{Binding}" Margin="0,0,6,6" MaxWidth="280" Click="ApplyPreset_Click" ToolTip="Apply preset"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+     </StackPanel></Border>
+     <Border x:Name="BackgroundCard" Style="{StaticResource Card}" Visibility="Collapsed"><StackPanel>
+      <TextBlock Text="Background" Style="{StaticResource Heading}"/>
+      <UniformGrid Rows="1" Margin="0,14,0,12"><RadioButton x:Name="OriginalBackground" Content="Original" GroupName="Background" Tag="original" Style="{StaticResource TabStyle}" FontSize="13" Checked="Background_Checked"/><RadioButton x:Name="SolidBackground" Content="Color" GroupName="Background" Tag="solid" Style="{StaticResource TabStyle}" FontSize="13" Checked="Background_Checked"/><RadioButton x:Name="ImageBackground" Content="Image" GroupName="Background" Tag="image" Style="{StaticResource TabStyle}" FontSize="13" Checked="Background_Checked"/></UniformGrid>
+      <StackPanel x:Name="SolidBackgroundControls" Visibility="Collapsed"><TextBlock Text="Background color · #RRGGBB" Style="{StaticResource Hint}"/><TextBox x:Name="BackgroundColorText" Text="#222222" MaxLength="7" LostFocus="BackgroundColor_LostFocus" AutomationProperties.Name="Background color"/></StackPanel>
+      <StackPanel x:Name="ImageBackgroundControls" Visibility="Collapsed"><Border CornerRadius="8" Height="90" Background="#222222" Margin="0,0,0,10" ClipToBounds="True"><Image x:Name="BackgroundPreview" Stretch="UniformToFill"/></Border><Button Content="Choose image…" Click="ChooseBackground_Click"/><TextBlock x:Name="BackgroundFileText" Style="{StaticResource Hint}"/></StackPanel>
+      <TextBlock Text="The background stays fixed when you move the fire." Style="{StaticResource Hint}"/>
+     </StackPanel></Border>
+    </StackPanel>
+    <StackPanel x:Name="EffectsPage" Visibility="Collapsed">
+     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Colors" Style="{StaticResource Heading}"/><UniformGrid Rows="2" Margin="0,16,0,0">
+      <RadioButton x:Name="Palette0" GroupName="Palette" Tag="0" AutomationProperties.Name="Ice blue" Style="{StaticResource TabStyle}" FontSize="13" Checked="Palette_Checked"><StackPanel><Rectangle Width="104" Height="24" RadiusX="5" RadiusY="5" Margin="0,0,0,6"><Rectangle.Fill><LinearGradientBrush><GradientStop Color="#58CDFF"/><GradientStop Color="#6850FF" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle><TextBlock Text="Ice blue" HorizontalAlignment="Center"/></StackPanel></RadioButton>
+<RadioButton x:Name="Palette1" GroupName="Palette" Tag="1" AutomationProperties.Name="Neon sunset" Style="{StaticResource TabStyle}" FontSize="13" Checked="Palette_Checked"><StackPanel><Rectangle Width="104" Height="24" RadiusX="5" RadiusY="5" Margin="0,0,0,6"><Rectangle.Fill><LinearGradientBrush><GradientStop Color="#FF5278"/><GradientStop Color="#FFB946" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle><TextBlock Text="Neon sunset" HorizontalAlignment="Center"/></StackPanel></RadioButton>
+<RadioButton x:Name="Palette2" GroupName="Palette" Tag="2" AutomationProperties.Name="Emerald" Style="{StaticResource TabStyle}" FontSize="13" Checked="Palette_Checked"><StackPanel><Rectangle Width="104" Height="24" RadiusX="5" RadiusY="5" Margin="0,0,0,6"><Rectangle.Fill><LinearGradientBrush><GradientStop Color="#46FFB9"/><GradientStop Color="#14A078" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle><TextBlock Text="Emerald" HorizontalAlignment="Center"/></StackPanel></RadioButton>
+<RadioButton x:Name="Palette3" GroupName="Palette" Tag="3" AutomationProperties.Name="Monochrome" Style="{StaticResource TabStyle}" FontSize="13" Checked="Palette_Checked"><StackPanel><Rectangle Width="104" Height="24" RadiusX="5" RadiusY="5" Margin="0,0,0,6"><Rectangle.Fill><LinearGradientBrush><GradientStop Color="#F5F5FA"/><GradientStop Color="#788296" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle><TextBlock Text="Monochrome" HorizontalAlignment="Center"/></StackPanel></RadioButton>
+     </UniformGrid></StackPanel></Border>
+     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Effects" Style="{StaticResource Heading}"/>
+      <DockPanel Margin="0,18,0,4"><TextBox Width="64" DockPanel.Dock="Right" Text="{Binding ElementName=IntensitySlider,Path=Value,Mode=TwoWay,StringFormat=F2,UpdateSourceTrigger=LostFocus,ValidatesOnExceptions=True}" AutomationProperties.Name="Intensity value"/><TextBlock Text="Intensity" VerticalAlignment="Center"/></DockPanel><Slider x:Name="IntensitySlider" Minimum="0" Maximum="8" Value="3" SmallChange="0.05" ValueChanged="OnControlChanged" AutomationProperties.Name="Intensity"/>
+      <DockPanel Margin="0,18,0,4"><TextBox Width="64" DockPanel.Dock="Right" Text="{Binding ElementName=GlowSlider,Path=Value,Mode=TwoWay,StringFormat=F2,UpdateSourceTrigger=LostFocus,ValidatesOnExceptions=True}" AutomationProperties.Name="Glow value"/><TextBlock Text="Glow" VerticalAlignment="Center"/></DockPanel><Slider x:Name="GlowSlider" Minimum="0" Maximum="3" Value="1.2" SmallChange="0.05" ValueChanged="OnControlChanged" AutomationProperties.Name="Glow"/>
+      <CheckBox x:Name="SparksCheckBox" Content="Sparks" Margin="0,18,0,0" Checked="Sparks_Changed" Unchecked="Sparks_Changed" Visibility="Collapsed"/>
+     </StackPanel></Border>
+     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Audio" Style="{StaticResource Heading}"/>
+      <DockPanel Margin="0,18,0,4"><TextBox Width="64" DockPanel.Dock="Right" Text="{Binding ElementName=SensitivitySlider,Path=Value,Mode=TwoWay,StringFormat=F2,UpdateSourceTrigger=LostFocus,ValidatesOnExceptions=True}" AutomationProperties.Name="Sensitivity value"/><TextBlock Text="Sensitivity" VerticalAlignment="Center"/></DockPanel><Slider x:Name="SensitivitySlider" Minimum="0" Maximum="12" Value="4" SmallChange="0.1" ValueChanged="OnControlChanged" AutomationProperties.Name="Sensitivity"/>
+      <TextBlock Text="0 disables audio reaction. Higher values respond to quieter music." Style="{StaticResource Hint}"/><TextBlock x:Name="FrequencyHint" Text="Treble on the left · Bass on the right" Style="{StaticResource Hint}" Visibility="Collapsed"/>
+     </StackPanel></Border>
+    </StackPanel>
+    <StackPanel x:Name="MorePage" Visibility="Collapsed">
+     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Presets" Style="{StaticResource Heading}"/><TextBlock Text="Save a complete look for this wallpaper." Style="{StaticResource Hint}"/>
+      <TextBox x:Name="PresetNameText" MaxLength="60" Margin="0,14,0,10" AutomationProperties.Name="Preset name" ToolTip="Preset name"/>
+      <Button Content="Save current look" Click="SavePreset_Click"/>
+      <ListBox x:Name="PresetList" Background="{DynamicResource SettingsControlSurface}" Foreground="{DynamicResource SettingsTextPrimary}" BorderThickness="0" MinHeight="60" MaxHeight="180" Margin="0,12,0,12" DisplayMemberPath="Name" SelectionChanged="Preset_SelectionChanged" AutomationProperties.Name="Saved presets"/>
+      <UniformGrid Rows="1"><Button Content="Apply" Click="ApplySelected_Click" Margin="0,0,4,0"/><Button Content="Rename" Click="RenamePreset_Click" Margin="4,0"/><Button Content="Delete" Click="DeletePreset_Click" Margin="4,0,0,0"/></UniformGrid>
+     </StackPanel></Border>
+     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Restore" Style="{StaticResource Heading}"/><TextBlock Text="Restore this wallpaper's defaults. Your saved presets stay available." Style="{StaticResource Hint}"/><Button Content="Reset this wallpaper" Click="Reset_Click" Margin="0,14,0,8"/><Button x:Name="UndoResetButton" Content="Undo reset" Click="UndoReset_Click" IsEnabled="False"/></StackPanel></Border>
+     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="About this wallpaper" Style="{StaticResource Heading}"/><TextBlock x:Name="CreditsText" Style="{StaticResource Hint}"/></StackPanel></Border>
+    </StackPanel>
+   </Grid>
+  </ScrollViewer>
+  <TextBlock x:Name="StatusText" Grid.Row="3" Margin="14,6" Foreground="{DynamicResource SettingsTextSecondary}" TextWrapping="Wrap" FontSize="12"/>
+  <StackPanel Visibility="Collapsed"><Slider x:Name="SizeSlider" Minimum="0.3" Maximum="3" Value="1" ValueChanged="OnControlChanged"/><Slider x:Name="PositionXSlider" Minimum="-1" Maximum="1" ValueChanged="OnControlChanged"/><Slider x:Name="PositionYSlider" Minimum="-1" Maximum="1" ValueChanged="OnControlChanged"/><ComboBox x:Name="ColorComboBox" SelectionChanged="OnComboChanged"><ComboBoxItem/><ComboBoxItem/><ComboBoxItem/><ComboBoxItem/></ComboBox></StackPanel>
+ </Grid>
 </Window>
