@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest for the Microsoft Store / sideload channel. This is SEPARATE from the Velopack
+  website installer. package-msix.ps1 substitutes {VERSION} (a 4-part x.y.z.0 value).
+
+  Identity Name/Publisher are placeholders:
+    - For the Store, replace them with the identity assigned in Partner Center (Product identity).
+    - For sideload testing, Publisher must match the signing certificate subject (CN=...).
+  EntryPoint Windows.FullTrustApplication + the runFullTrust capability give the app the Win32
+  full-trust it needs to host the wallpaper on the shell (SetParent to Progman/WorkerW). This is a
+  restricted capability and is reviewed during Store certification.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity Name="MarceloBossle.HYPNIX"
+            Publisher="CN=Marcelo Bossle"
+            Version="{VERSION}"
+            ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>HYPNIX</DisplayName>
+    <PublisherDisplayName>Marcelo Bossle</PublisherDisplayName>
+    <Logo>StoreAssets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="HYPNIX" Executable="HYPNIX.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="HYPNIX"
+        Description="Local animated and audio-reactive desktop wallpapers."
+        BackgroundColor="#0F0F0F"
+        Square150x150Logo="StoreAssets\Square150x150Logo.png"
+        Square44x44Logo="StoreAssets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="StoreAssets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
+

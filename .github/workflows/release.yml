@@ -1,7 +1,10 @@
-name: Release
+name: Release (website installer)
 
-# Builds the Velopack installer + update package and publishes it to GitHub Releases, which is the
-# feed the in-app updater reads. Run manually with a version, or push a v* tag.
+# Builds the Velopack installer + delta update package for the website distribution channel. The
+# GitHub repository is private, so this workflow does NOT publish to GitHub Releases (a private
+# repo's Releases are not a usable public feed). It uploads the packaged 'releases' folder as a
+# build artifact; publish it by copying those files to your public release host (the URL the app's
+# UpdateService points at). For the Microsoft Store channel see scripts/package-msix.ps1.
 on:
   push:
     tags: ['v*']
@@ -12,7 +15,7 @@ on:
         required: true
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -20,7 +23,7 @@ concurrency:
 
 jobs:
   release:
-    name: Build installer and publish update
+    name: Build website installer and update package
     runs-on: windows-2022
     timeout-minutes: 30
     defaults:
@@ -46,7 +49,6 @@ jobs:
           $v = if ('${{ github.event_name }}' -eq 'workflow_dispatch') { '${{ github.event.inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
           if ($v -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Invalid version: $v" }
           "version=$v" >> $env:GITHUB_OUTPUT
-          "tag=v$v" >> $env:GITHUB_OUTPUT
 
       - name: Install Velopack CLI (matches the Velopack package version)
         run: dotnet tool install -g vpk --version 1.2.0
@@ -54,15 +56,22 @@ jobs:
       - name: Publish self-contained win-x64
         run: dotnet publish AnimatedWallPaper.csproj -c Release -p:PublishProfile=win-x64-self-contained "-p:PublishDir=$env:GITHUB_WORKSPACE/publish/" "-p:Version=${{ steps.ver.outputs.version }}"
 
-      # Pull the previous release so vpk can build a small delta. Harmless (and skipped) on the first release.
-      - name: Download previous release for delta
+      # Optional: pull the current live release from the public feed so vpk can build a small delta.
+      # Set the RELEASE_FEED_URL repository variable to your host; skipped (full-only) if unset.
+      - name: Download live release for delta
+        if: ${{ vars.RELEASE_FEED_URL != '' }}
         continue-on-error: true
-        run: vpk download github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }} -o releases -c win
+        run: vpk download http --url ${{ vars.RELEASE_FEED_URL }} -o releases -c win
 
       # packId 'HypnixWallpaper' keeps the install (%LocalAppData%\HypnixWallpaper) separate from user
       # data (%LocalAppData%\HYPNIX); the friendly name/shortcuts stay "HYPNIX" via --packTitle.
       - name: Pack Velopack release
         run: vpk pack -u HypnixWallpaper -v ${{ steps.ver.outputs.version }} -p "$env:GITHUB_WORKSPACE/publish" -e HYPNIX.exe -o releases -c win --packTitle HYPNIX --packAuthors "Marcelo Bossle" -i Assets/Brand/hypnix-v2.ico
 
-      - name: Publish to GitHub Releases
-        run: vpk upload github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }} -o releases -c win --publish true --releaseName "HYPNIX ${{ steps.ver.outputs.version }}" --tag ${{ steps.ver.outputs.tag }} --targetCommitish ${{ github.sha }}
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hypnix-release-${{ steps.ver.outputs.version }}
+          path: releases/*
+          if-no-files-found: error
+          retention-days: 14

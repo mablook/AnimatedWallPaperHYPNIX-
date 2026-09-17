@@ -143,21 +143,31 @@ for the per-capture attestation checklist.
 
 ## Install and updates
 
-HYPNIX has a per-user installer and in-app auto-update built with [Velopack](https://velopack.io),
-publishing to GitHub Releases. `HypnixWallpaper-win-Setup.exe` installs without administrator rights and
-creates HYPNIX shortcuts; an installed build checks for updates on launch, downloads them (delta) in the
-background, and offers **Restart to update** in the tray. Install, update and uninstall keep user data in
-`%LocalAppData%\HYPNIX` untouched (the install lives in a separate `%LocalAppData%\HypnixWallpaper`).
+Two independent channels from one codebase (the GitHub repo is private, so it is not the end-user feed):
 
-```powershell
-dotnet tool install -g vpk --version 1.2.0
-./scripts/package-release.ps1 -Version 1.2.3
-```
+- **Website installer** — a per-user [Velopack](https://velopack.io) installer
+  (`HypnixWallpaper-win-Setup.exe`, no admin) with in-app auto-update served from a public release
+  website. An installed build checks on launch, downloads deltas in the background, and offers
+  **Restart to update** in the tray. Install/update/uninstall keep user data in `%LocalAppData%\HYPNIX`
+  untouched (the install lives in a separate `%LocalAppData%\HypnixWallpaper`). Point the app at your
+  host via `UpdateFeedUrl` in `Services/UpdateService.cs`.
 
-Publish with the [Release workflow](.github/workflows/release.yml) (manual version or a `v*` tag). The
-full flow, a local install→update test using `HYPNIX_UPDATE_FEED`, and code signing are in
-[install and updates](docs/INSTALL_AND_UPDATES.md). The installer/app are not yet code-signed, so
-SmartScreen warns until a certificate is configured.
+  ```powershell
+  dotnet tool install -g vpk --version 1.2.0
+  ./scripts/package-release.ps1 -Version 1.2.3     # -> artifacts/releases, upload to your host
+  ```
+
+- **Microsoft Store** — a separate MSIX package (`scripts/package-msix.ps1`, needs the Windows SDK)
+  with Store-managed updates. The in-app updater self-disables inside MSIX. The wallpaper hosting
+  needs the `runFullTrust` capability, reviewed at certification.
+
+  ```powershell
+  ./scripts/package-msix.ps1 -Version 1.2.3 -SelfSign   # sideload test; unsigned for Partner Center
+  ```
+
+Both are detailed in [install and updates](docs/INSTALL_AND_UPDATES.md) (feed hosting, local
+install→update test via `HYPNIX_UPDATE_FEED`, Store submission). Builds are not yet code-signed, so
+SmartScreen warns until a certificate is configured; the Store signs its own MSIX.
 
 ## Portable validation package
 

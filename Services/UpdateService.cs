@@ -4,19 +4,23 @@ using Velopack.Sources;
 namespace AnimatedWallPaper.Services;
 
 // Wraps Velopack's UpdateManager. It is only active when HYPNIX was installed via Velopack
-// (IsInstalled); running from a dev build or the portable ZIP is a safe no-op. The feed is the
-// GitHub Releases repository by default, but the HYPNIX_UPDATE_FEED environment variable can point
-// at a local folder to test the full install -> update cycle without publishing anything.
+// (IsInstalled); running from a dev build, the portable ZIP, or as a Store/MSIX package is a safe
+// no-op (the Store manages its own updates). The GitHub repository is private, so its Releases are
+// not usable as an end-user feed; updates are served from a public release website instead. Set
+// UpdateFeedUrl to that host (it must serve releases.win.json and the .nupkg files, e.g. a static
+// site, CDN, S3 or Azure Blob). The HYPNIX_UPDATE_FEED environment variable overrides it with a
+// local folder to test the full install -> update cycle without publishing anything.
 internal sealed class UpdateService
 {
-    private const string RepositoryUrl = "https://github.com/mablook/AnimatedWallPaperHYPNIX-";
+    // TODO: point this at your public release host before shipping the website installer.
+    private const string UpdateFeedUrl = "https://updates.example.com/hypnix/win";
     private readonly UpdateManager _manager;
 
     public UpdateService()
     {
         var feed = Environment.GetEnvironmentVariable("HYPNIX_UPDATE_FEED");
         _manager = string.IsNullOrWhiteSpace(feed)
-            ? new UpdateManager(new GithubSource(RepositoryUrl, null, false))
+            ? new UpdateManager(new SimpleWebSource(UpdateFeedUrl))
             : new UpdateManager(feed);
     }
 
