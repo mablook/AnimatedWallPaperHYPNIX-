@@ -433,10 +433,15 @@ public partial class MainWindow : Window
         _trayIcon = new System.Windows.Forms.NotifyIcon { Icon = _trayDrawingIcon, Text = "HYPNIX", ContextMenuStrip = menu, Visible = true };
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowMainWindow);
     }
-    private void ShowMainWindow()
+    // Also invoked by App when a second launch asks the running instance to surface from the tray.
+    internal void ShowMainWindow()
     {
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        // A brief topmost toggle reliably raises the window even when another app holds the
+        // foreground (e.g. the just-launched second instance), then restores normal Z-order.
+        Topmost = true;
+        Topmost = false;
         Activate();
     }
     protected override void OnClosing(CancelEventArgs e)

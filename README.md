@@ -44,6 +44,8 @@ Win32 desktop hosting, WASAPI and Direct3D 11.
 - Explorer/host failure detection, display-change recovery and resume handling recreate active sessions.
   Display identity, geometry and DPI snapshots are retained, including disconnected displays.
 - Closing the window hides it to the tray. Tray Stop stops desktop playback; Quit releases the application.
+- Single instance per user session: launching HYPNIX again surfaces the running window (restoring it from the
+  tray) and exits the new process, so copies never pile up in the notification area.
 - Diagnostics are kept under `%LocalAppData%\HYPNIX\logs`, with a 2 MB active log and three rotated files.
 
 ## Local videos
