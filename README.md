@@ -141,6 +141,24 @@ It switches wallpapers live, plays audio so the visualizers react, captures the 
 [testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md#desktop-end-to-end-smoke-test-scriptse2e-desktop-smokeps1)
 for the per-capture attestation checklist.
 
+## Install and updates
+
+HYPNIX has a per-user installer and in-app auto-update built with [Velopack](https://velopack.io),
+publishing to GitHub Releases. `HypnixWallpaper-win-Setup.exe` installs without administrator rights and
+creates HYPNIX shortcuts; an installed build checks for updates on launch, downloads them (delta) in the
+background, and offers **Restart to update** in the tray. Install, update and uninstall keep user data in
+`%LocalAppData%\HYPNIX` untouched (the install lives in a separate `%LocalAppData%\HypnixWallpaper`).
+
+```powershell
+dotnet tool install -g vpk --version 1.2.0
+./scripts/package-release.ps1 -Version 1.2.3
+```
+
+Publish with the [Release workflow](.github/workflows/release.yml) (manual version or a `v*` tag). The
+full flow, a local install→update test using `HYPNIX_UPDATE_FEED`, and code signing are in
+[install and updates](docs/INSTALL_AND_UPDATES.md). The installer/app are not yet code-signed, so
+SmartScreen warns until a certificate is configured.
+
 ## Portable validation package
 
 Run `./scripts/package-portable.ps1` in PowerShell 7 to create a Windows x64 ZIP with the .NET runtime,
@@ -159,7 +177,7 @@ for extraction, shared settings, integrity checks and the remaining release vali
 - [Standalone fire preview](Tests/Hypnix.FirePreview/README.md) exercises the shared Living Fire renderer with system-audio response, limited MacCormack transport, flow-driven embers and GPU state checks.
 - The approved FireRingV1 assets remain unchanged. The rejected volumetric prototype remains excluded from the gallery.
 - No microphone capture, stored raw audio, telemetry or administrator requirement in normal operation.
-- MSIX, Store certification, arbitrary per-display assignments and hardware-accelerated video decode remain future work.
+- Code signing (SmartScreen trust), MSIX/Store certification, arbitrary per-display assignments and hardware-accelerated video decode remain future work.
 - A [macOS port study](docs/MACOS_PORT_STUDY.md) documents a future, not-yet-started plan (NSWindow desktop hosting, Metal, ScreenCaptureKit audio, notarization). It is design-only and changes no Windows behavior.
 
 - [Living Fire integration](docs/LIVING_FIRE.md) documents the gallery effect, per-monitor simulation, controls and measured GPU cost.

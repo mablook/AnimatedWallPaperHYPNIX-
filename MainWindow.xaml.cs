@@ -26,7 +26,10 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _recoveryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private System.Windows.Forms.ToolStripMenuItem? _trayAudioItem;
+    private System.Windows.Forms.ToolStripMenuItem? _trayUpdateItem;
     private System.Drawing.Icon? _trayDrawingIcon;
+    private UpdateService? _updateService;
+    private Velopack.UpdateInfo? _pendingUpdate;
     private VisualizerSettingsWindow? _settingsWindow;
     private bool _isUiInitialized;
     private bool _isQuitting;
@@ -75,6 +78,7 @@ public partial class MainWindow : Window
         _foregroundMonitor.Start();
         RememberDisplays();
         UpdateStatus();
+        CheckForUpdates();
     }
 
     private void OnPackagesChanged(IReadOnlyList<WallpaperPackageRegistration> packages)
@@ -421,6 +425,10 @@ public partial class MainWindow : Window
         // Guarantee a disposable, owned icon so the tray is always visible and cleanup is safe.
         _trayDrawingIcon ??= (System.Drawing.Icon)System.Drawing.SystemIcons.Application.Clone();
         var menu = new System.Windows.Forms.ContextMenuStrip();
+        // Shown only once an update has been downloaded and is ready to apply on restart.
+        _trayUpdateItem = new System.Windows.Forms.ToolStripMenuItem("Restart to update HYPNIX") { Visible = false };
+        _trayUpdateItem.Click += (_, _) => Dispatcher.Invoke(ApplyUpdate);
+        menu.Items.Add(_trayUpdateItem);
         menu.Items.Add("Open HYPNIX", null, (_, _) => Dispatcher.Invoke(ShowMainWindow));
         menu.Items.Add("Stop wallpaper", null, (_, _) => Dispatcher.Invoke(StopWallpaper));
         _trayAudioItem = new System.Windows.Forms.ToolStripMenuItem("Audio reactive") { Checked = _settings.AudioReactive, CheckOnClick = true };
@@ -443,6 +451,38 @@ public partial class MainWindow : Window
         Topmost = true;
         Topmost = false;
         Activate();
+    }
+
+    // Background update check on startup. No-op unless installed via Velopack; a failed/unreachable
+    // check is logged and ignored so it never disrupts a running wallpaper. When an update is ready
+    // it is downloaded and surfaced in the tray, applied only when the user chooses to restart.
+    private async void CheckForUpdates()
+    {
+        try
+        {
+            _updateService = new UpdateService();
+            if (!_updateService.IsInstalled) return;
+            var update = await _updateService.CheckAndDownloadAsync();
+            if (update is null || _isQuitting || _trayUpdateItem is null) return;
+            _pendingUpdate = update;
+            _trayUpdateItem.Text = $"Restart to update HYPNIX to {update.TargetFullRelease.Version}";
+            _trayUpdateItem.Visible = true;
+            _trayIcon?.ShowBalloonTip(4000, "HYPNIX update ready",
+                "A new version was downloaded. Choose \u201CRestart to update HYPNIX\u201D in the tray menu.",
+                System.Windows.Forms.ToolTipIcon.Info);
+            AppLog.Write($"Update downloaded and ready: {update.TargetFullRelease.Version}");
+        }
+        catch (Exception exception) { AppLog.WriteException("Update check failed", exception); }
+    }
+
+    private void ApplyUpdate()
+    {
+        if (_pendingUpdate is null || _updateService is null) return;
+        AppLog.Write("Applying update and restarting.");
+        _isQuitting = true;
+        SavePreferences();
+        _settingsWindow?.Close();
+        _updateService.ApplyAndRestart(_pendingUpdate);
     }
     protected override void OnClosing(CancelEventArgs e)
     {

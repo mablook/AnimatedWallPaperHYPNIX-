@@ -10,6 +10,10 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>HYPNIX</AssemblyName>
+    <!-- SemVer for releases and update comparison. Velopack packs this version; bump it per release. -->
+    <Version>1.0.0</Version>
+    <!-- Velopack needs a custom Main (App.xaml becomes a Page below), so name the entry point. -->
+    <StartupObject>AnimatedWallPaper.App</StartupObject>
     <Authors>Marcelo Bossle</Authors>
     <Company>Marcelo Bossle</Company>
     <Copyright>Copyright (c) 2026 Marcelo Bossle. Todos os direitos reservados.</Copyright>
@@ -21,9 +25,17 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
   </PropertyGroup>
 
+  <!-- Velopack WPF bootstrap: App.xaml is a Page so the compiler does not generate Main; our
+       custom [STAThread] Main in App.xaml.cs runs VelopackApp.Build().Run() before the app starts. -->
+  <ItemGroup>
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
+
   <ItemGroup>
     <Compile Remove="Tests\**\*.cs" />
     <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
     <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
   </ItemGroup>
@@ -46,8 +58,7 @@
     <Content Include="Assets\Wallpapers\**\*-state.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Shaders\**\*.hlsl" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Effects\**\*" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="NativeBin\Hypnix.EffekseerBridge.dll"
-             Link="Hypnix.EffekseerBridge.dll" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="NativeBin\Hypnix.EffekseerBridge.dll" Link="Hypnix.EffekseerBridge.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

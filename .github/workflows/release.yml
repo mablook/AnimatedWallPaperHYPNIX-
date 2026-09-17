@@ -1,0 +1,68 @@
+name: Release
+
+# Builds the Velopack installer + update package and publishes it to GitHub Releases, which is the
+# feed the in-app updater reads. Run manually with a version, or push a v* tag.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'SemVer to release, without the leading v (e.g. 1.2.3)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build installer and publish update
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Resolve version
+        id: ver
+        run: |
+          $v = if ('${{ github.event_name }}' -eq 'workflow_dispatch') { '${{ github.event.inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
+          if ($v -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Invalid version: $v" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "tag=v$v" >> $env:GITHUB_OUTPUT
+
+      - name: Install Velopack CLI (matches the Velopack package version)
+        run: dotnet tool install -g vpk --version 1.2.0
+
+      - name: Publish self-contained win-x64
+        run: dotnet publish AnimatedWallPaper.csproj -c Release -p:PublishProfile=win-x64-self-contained "-p:PublishDir=$env:GITHUB_WORKSPACE/publish/" "-p:Version=${{ steps.ver.outputs.version }}"
+
+      # Pull the previous release so vpk can build a small delta. Harmless (and skipped) on the first release.
+      - name: Download previous release for delta
+        continue-on-error: true
+        run: vpk download github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }} -o releases -c win
+
+      # packId 'HypnixWallpaper' keeps the install (%LocalAppData%\HypnixWallpaper) separate from user
+      # data (%LocalAppData%\HYPNIX); the friendly name/shortcuts stay "HYPNIX" via --packTitle.
+      - name: Pack Velopack release
+        run: vpk pack -u HypnixWallpaper -v ${{ steps.ver.outputs.version }} -p "$env:GITHUB_WORKSPACE/publish" -e HYPNIX.exe -o releases -c win --packTitle HYPNIX --packAuthors "Marcelo Bossle" -i Assets/Brand/hypnix-v2.ico
+
+      - name: Publish to GitHub Releases
+        run: vpk upload github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }} -o releases -c win --publish true --releaseName "HYPNIX ${{ steps.ver.outputs.version }}" --tag ${{ steps.ver.outputs.tag }} --targetCommitish ${{ github.sha }}

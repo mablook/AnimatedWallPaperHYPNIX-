@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Velopack;
 
 namespace AnimatedWallPaper;
 
@@ -17,6 +18,17 @@ public partial class App : System.Windows.Application
     private Mutex? _instanceMutex;
     private EventWaitHandle? _activateSignal;
     private readonly EventWaitHandle _stopListener = new(false, EventResetMode.ManualReset);
+
+    // Custom entry point required by Velopack: its hooks (install/update/uninstall) run and exit
+    // here before the WPF app starts; a normal launch returns and continues to OnStartup.
+    [STAThread]
+    private static void Main(string[] args)
+    {
+        VelopackApp.Build().Run();
+        var app = new App();
+        app.InitializeComponent();
+        app.Run();
+    }
 
     public App()
     {
