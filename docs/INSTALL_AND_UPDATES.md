@@ -11,6 +11,9 @@ Releases require authentication). Both channels ship the same binary; the Velopa
 self-disables inside the Store/MSIX build (`UpdateManager.IsInstalled` is false there), so a Store
 build never tries to update itself.
 
+> Outstanding steps before a public release (code signing, the release host, Partner Center, etc.)
+> are tracked in [release pending items](RELEASE_PENDING.md).
+
 ---
 
 ## 1. Website installer (Velopack)

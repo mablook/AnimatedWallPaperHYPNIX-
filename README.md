@@ -178,6 +178,7 @@ for extraction, shared settings, integrity checks and the remaining release vali
 
 ## Engineering notes
 
+- [Release pending items](docs/RELEASE_PENDING.md) tracks what remains before a public release (code signing, feed host, Store/Partner Center) per channel.
 - Read [desktop integration findings](docs/DESKTOP_INTEGRATION_FINDINGS.md) before changing Win32 hosting.
 - [Testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md) covers automated and manual regression gates.
 - [Product direction](docs/PRODUCT_DIRECTION.md) and [UI architecture](docs/UI_ARCHITECTURE.md) distinguish future work.
