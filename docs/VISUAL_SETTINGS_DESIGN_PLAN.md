@@ -145,17 +145,22 @@ mantêm suas respectivas atribuições.
 
 ## 4. Linguagem visual e barra superior
 
-Paleta inicial proposta, aproximada visualmente das referências, a validar em mockup:
+Paleta unificada: base neutra preto/cinza compartilhada com a janela principal (`App.xaml`), com
+uma única cor de destaque azul usada apenas em botões principais e estados (hover, seleção, foco).
+O verde original foi descontinuado para eliminar as duas cores de destaque conflitantes. Vermelho é
+reservado para ações destrutivas/erro (hover do botão fechar, texto de erro).
 
-| Recurso semântico | Cor sugerida | Uso |
+| Recurso semântico | Cor | Uso |
 | --- | --- | --- |
-| SettingsWindowBackground | `#222222` | Fundo externo e barra de título |
-| SettingsSurface | `#2B2B2B` | Cartões e trilho das abas |
-| SettingsControlSurface | `#343434` | Aba selecionada, pad e cápsula de zoom |
-| SettingsStroke | `#454545` | Contornos e divisórias discretas |
+| SettingsWindowBackground | `#0F0F0F` | Fundo externo e barra de título |
+| SettingsSurface | `#1C1C1C` | Cartões e trilho das abas |
+| SettingsControlSurface | `#262626` | Aba selecionada, pad, cápsula de zoom, campos e botões |
+| SettingsStroke | `#3A3A3A` | Contornos, divisórias e trilhos |
+| HighlightBrush | `#333333` | Hover neutro (inclui minimizar/maximizar) |
 | SettingsTextPrimary | `#F2F2F2` | Títulos e valores |
-| SettingsTextSecondary | `#B8B8B8` | Rótulos auxiliares |
-| SettingsAccent | `#00D99A` | Seleção e ações de destaque |
+| SettingsTextSecondary | `#A6A6A6` | Rótulos auxiliares |
+| SettingsAccent | `#3CC2FF` | Seleção e ações de destaque (única cor cromática) |
+| DangerBrush | `#C42B1C` | Hover do botão fechar |
 
 Janela e barra de título devem usar o mesmo token de fundo, inclusive quando a janela
 perde foco. A navegação pode usar a superfície dos cartões, como na referência. Menus,

@@ -5,7 +5,7 @@
         Title="HYPNIX" Icon="pack://application:,,,/HYPNIX;component/Assets/Brand/hypnix-v2.ico"
         Width="1180" Height="760" MinWidth="800" MinHeight="600"
         WindowStartupLocation="Manual" Loaded="MainWindow_Loaded"
-        Background="#0B0E13" Foreground="{StaticResource TextPrimaryBrush}"
+        Background="{StaticResource WindowBackgroundBrush}" Foreground="{StaticResource TextPrimaryBrush}"
         FontFamily="Segoe UI Variable, Segoe UI">
     <Window.Resources>
         <Style x:Key="VisualizerButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
@@ -32,7 +32,7 @@
                             <Grid>
                                 <ContentPresenter/>
                                 <TextBlock x:Name="SelectedMark" Visibility="Collapsed" Text="✓" FontSize="20"
-                                           Background="#D0101925" Padding="5,0" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                           Background="#CC161616" Padding="5,0" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -81,7 +81,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Border BorderBrush="#35404D" BorderThickness="1" Background="#07090D">
+                <Border BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" Background="#0A0A0A">
                     <local:WallpaperPreviewControl x:Name="LivePreview"/>
                 </Border>
                 <StackPanel Grid.Row="1" Margin="0,12,0,14">
@@ -103,9 +103,9 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid Width="168" Height="104" Background="#161C26" ToolTip="{Binding Title}">
+                                <Grid Width="168" Height="104" Background="#1C1C1C" ToolTip="{Binding Title}">
                                     <Image Source="{Binding PreviewPath}" Stretch="UniformToFill"/>
-                                    <Border Background="#CF0B1018" VerticalAlignment="Bottom" Padding="8">
+                                    <Border Background="#CC141414" VerticalAlignment="Bottom" Padding="8">
                                         <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
                                     </Border>
                                 </Grid>
@@ -180,7 +180,7 @@
                 </ScrollViewer>
             </Border>
         </Grid>
-        <TextBlock x:Name="ErrorText" Grid.Row="3" Margin="0,12,0,0" TextWrapping="Wrap" Foreground="#FFB9A5"
+        <TextBlock x:Name="ErrorText" Grid.Row="3" Margin="0,12,0,0" TextWrapping="Wrap" Foreground="{StaticResource ErrorTextBrush}"
                    AutomationProperties.LiveSetting="Polite"/>
     </Grid>
 </Window>

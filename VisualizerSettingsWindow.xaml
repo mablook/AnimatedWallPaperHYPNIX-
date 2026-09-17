@@ -10,9 +10,9 @@
   <Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="40"/><ColumnDefinition Width="40"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
    <TextBlock Text="Visualizer settings" Margin="12,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource SettingsTextSecondary}"/>
-   <Button Grid.Column="1" Content="−" MinHeight="30" Padding="0" Background="Transparent" Click="Minimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimize" AutomationProperties.Name="Minimize"/>
-   <Button Grid.Column="2" Content="□" MinHeight="30" Padding="0" Background="Transparent" Click="Maximize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Maximize or restore" AutomationProperties.Name="Maximize or restore"/>
-   <Button Grid.Column="3" Content="×" FontSize="22" MinHeight="30" Padding="0" Background="Transparent" Click="Close_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Close settings" AutomationProperties.Name="Close settings"/>
+    <Button Grid.Column="1" Content="−" Style="{StaticResource CaptionButtonStyle}" Click="Minimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimize" AutomationProperties.Name="Minimize"/>
+    <Button Grid.Column="2" Content="□" Style="{StaticResource CaptionButtonStyle}" Click="Maximize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Maximize or restore" AutomationProperties.Name="Maximize or restore"/>
+    <Button Grid.Column="3" Content="×" FontSize="22" Style="{StaticResource CloseButtonStyle}" Click="Close_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Close settings" AutomationProperties.Name="Close settings"/>
   </Grid>
   <StackPanel Grid.Row="1" Margin="6,8,6,12">
    <TextBlock x:Name="WallpaperNameText" FontSize="14" Margin="8,0,0,12" Foreground="{DynamicResource SettingsTextSecondary}"/>
@@ -47,7 +47,7 @@
       <TextBlock Text="Background" Style="{StaticResource Heading}"/>
       <UniformGrid Rows="1" Margin="0,14,0,12"><RadioButton x:Name="OriginalBackground" Content="Original" GroupName="Background" Tag="original" Style="{StaticResource TabStyle}" FontSize="13" Checked="Background_Checked"/><RadioButton x:Name="SolidBackground" Content="Color" GroupName="Background" Tag="solid" Style="{StaticResource TabStyle}" FontSize="13" Checked="Background_Checked"/><RadioButton x:Name="ImageBackground" Content="Image" GroupName="Background" Tag="image" Style="{StaticResource TabStyle}" FontSize="13" Checked="Background_Checked"/></UniformGrid>
       <StackPanel x:Name="SolidBackgroundControls" Visibility="Collapsed"><TextBlock Text="Background color · #RRGGBB" Style="{StaticResource Hint}"/><TextBox x:Name="BackgroundColorText" Text="#222222" MaxLength="7" LostFocus="BackgroundColor_LostFocus" AutomationProperties.Name="Background color"/></StackPanel>
-      <StackPanel x:Name="ImageBackgroundControls" Visibility="Collapsed"><Border CornerRadius="8" Height="90" Background="#222222" Margin="0,0,0,10" ClipToBounds="True"><Image x:Name="BackgroundPreview" Stretch="UniformToFill"/></Border><Button Content="Choose image…" Click="ChooseBackground_Click"/><TextBlock x:Name="BackgroundFileText" Style="{StaticResource Hint}"/></StackPanel>
+      <StackPanel x:Name="ImageBackgroundControls" Visibility="Collapsed"><Border CornerRadius="8" Height="90" Background="#1C1C1C" Margin="0,0,0,10" ClipToBounds="True"><Image x:Name="BackgroundPreview" Stretch="UniformToFill"/></Border><Button Content="Choose image…" Click="ChooseBackground_Click"/><TextBlock x:Name="BackgroundFileText" Style="{StaticResource Hint}"/></StackPanel>
       <TextBlock Text="The background stays fixed when you move the fire." Style="{StaticResource Hint}"/>
      </StackPanel></Border>
     </StackPanel>

@@ -16,7 +16,10 @@ Win32 desktop hosting, WASAPI and Direct3D 11.
   every visualizer (the classic visualizer, Aethelis and all shader wallpapers), except the two
   Effekseer fire effects (Fire Burst, Flamethrower Ring V2) whose colors live in the authored effect
   and therefore hide the palette and size/position controls instead of showing ones that do nothing.
-- Graphite visualizer settings with **View / Effects / More** tabs and a matching custom title bar.
+- One neutral black/white theme across both windows, with a single blue accent used only on the
+  primary buttons and interactive states (hover, selection, focus). Title bars match the native
+  Windows caption: minimize/maximize hover gray and close hovers red.
+- Visualizer settings with **View / Effects / More** tabs and a matching custom title bar.
   View combines a circular position pad, numeric values and zoom; Effects groups palettes, glow,
   intensity and audio; More manages named presets, wallpaper defaults and undoing the last reset.
   Presets are independent per wallpaper and persist across restarts.
