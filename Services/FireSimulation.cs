@@ -15,6 +15,12 @@ internal sealed class FireSimulation : IDisposable
 {
     internal const int Width=1080, Height=640, X=288, Y=128, Z=40;
     internal const int SpeedMultiplier=4;
+    // Audio envelope smoothing rates, expressed per real-time second (the /(60*SpeedMultiplier)
+    // divisor makes them independent of the substep count, so attack tau = 1/rate). A quick attack
+    // gives beats an immediate "punch"; a gentler release lets the flame settle without flicker.
+    // Doubled-plus from the earlier 12/3 (tau 83/333 ms) to 28/7 (tau ~36/143 ms) so the flame
+    // visibly tracks the audio instead of lagging behind its 4x-faster motion. Ratio kept at 4:1.
+    const float AudioAttackRate=28f, AudioReleaseRate=7f;
     readonly List<IDisposable> owned=[];
     readonly ID3D11Device device;
     readonly ID3D11DeviceContext context;
@@ -155,7 +161,7 @@ internal sealed class FireSimulation : IDisposable
     }
     static float Smooth(float previous,float target) {
         target=float.IsFinite(target)?Math.Clamp(target,0,1):0;
-        return previous+(target-previous)*(1-MathF.Exp(-(target>previous?12f:3f)/(60f*SpeedMultiplier)));
+        return previous+(target-previous)*(1-MathF.Exp(-(target>previous?AudioAttackRate:AudioReleaseRate)/(60f*SpeedMultiplier)));
     }
     public void Render(int width,int height) {
         renderWidth=width;renderHeight=height;

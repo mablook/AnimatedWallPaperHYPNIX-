@@ -64,6 +64,8 @@ internal static class FireRenderChecks
         Pair(100+1d/30,false);if(r.GetSimulation(320,0,320,360).Time<=frozenTime)throw new Exception("Fire did not resume");
         SpectralBloomRenderChecks.Save(after,Path.Combine(output,"living-fire-monitor-freeze.png"));
         var spatialResponse=CheckFrequencySeparation(r,output);
+        CheckAudioResponsiveness(r);
+        CheckAudioLift(r,output);
         var gpu=Benchmark(r,()=>Frame(4),i=>Frame(4+(i+1)/30d));
         r.Dispose();
         var coverage=new List<object>();
@@ -91,6 +93,53 @@ internal static class FireRenderChecks
         var gpu4K=Benchmark(desktop,()=>Desktop(1),i=>Desktop(1+(i+1)/30d));
         File.WriteAllText(Path.Combine(output,"living-fire-checks.json"),JsonSerializer.Serialize(new{adapter=desktop.AdapterName,speedMultiplier=FireSimulation.SpeedMultiplier,coverage,spatialResponse,controls=true,zeroIntensity=true,independentMonitorPause=true,resumeWithoutCatchup=true,gpuMilliseconds=gpu,gpu4KMilliseconds=gpu4K,simulationGrid=new[]{FireSimulation.X,FireSimulation.Y,FireSimulation.Z}},new JsonSerializerOptions{WriteIndented=true}));
         Console.WriteLine($"PASS: Living Fire controls, zero intensity, two monitor states, resume; GPU median {gpu.Order().ElementAt(gpu.Length/2):F2} ms at 640x360, {gpu4K.Order().ElementAt(gpu4K.Length/2):F2} ms at 4K (30 FPS)");
+    }
+    // The flame must read as reacting to beats, not lagging behind them. Around 120 ms of playback
+    // (7 logical ticks = 28 physics substeps) should raise the envelope to most of the target and,
+    // once silent, let it fall well back. Thresholds are loose enough to allow tuning but tight
+    // enough to catch a regression to the old slow attack (~0.75 after 120 ms) or release.
+    static void CheckAudioResponsiveness(FireGpuRenderer renderer)
+    {
+        var sim=renderer.GetSimulation(0,0,640,360);
+        sim.Reset();
+        sim.AudioTarget=new System.Numerics.Vector3(1,1,1);
+        for(int i=0;i<7;i++)sim.Step();
+        float attack=sim.AudioEnvelope.X;
+        if(attack<.85f)throw new Exception($"Audio attack too slow to read as reactive: {attack:F2} after ~120 ms");
+        sim.AudioTarget=new System.Numerics.Vector3(0,0,0);
+        for(int i=0;i<7;i++)sim.Step();
+        float release=sim.AudioEnvelope.X;
+        if(release>.6f)throw new Exception($"Audio release lingers, blurring beats: {release:F2} after ~120 ms of silence");
+        sim.Reset();
+        Console.WriteLine($"PASS: audio envelope reacts quickly (attack {attack:F2}, release {release:F2} after ~120 ms)");
+    }
+    // Audio must be visible, not just measurable: a moderate music-like level (energy ~0.47 after
+    // gain) has to raise clearly more fire into the upper part of the screen than silence, so the
+    // flame reads as reacting to the beat rather than merely warming a little.
+    static void CheckAudioLift(FireGpuRenderer renderer,string output)
+    {
+        byte[] Sequence(Func<int,float> band)
+        {
+            var sim=renderer.GetSimulation(0,0,640,360);sim.Reset();
+            var spectrum=Enumerable.Range(0,64).Select(band).ToArray();
+            var profile=new AethelisAudioProfile(0,0,0,0,0);
+            var prefs=new VisualizerPreferences(Glow:0,ColorTheme:1).ToSettings();
+            for(int i=0;i<90;i++){renderer.BeginFrame();renderer.RenderViewport(0,0,640,360,i/30d,profile,prefs,spectrum:spectrum);}
+            renderer.RenderPreview(false);return renderer.Pixels();
+        }
+        // Count lit fire pixels in the upper 45% of the screen within [x0,x1); silence barely reaches it.
+        int Upper(byte[] px,int x0,int x1){int n=0;for(int y=0;y<162;y++)for(int x=x0;x<x1;x++)if(px[(y*640+x)*4+2]>40)n++;return n;}
+        // A bass-heavy spectrum (like a kick) must lift a tall column; silence stays low.
+        var quiet=Sequence(_=>0);var bass=Sequence(i=>i<20?.45f:.03f);
+        SpectralBloomRenderChecks.Save(bass,Path.Combine(output,"living-fire-audio-lift.png"));
+        int q=Upper(quiet,0,640),l=Upper(bass,0,640);
+        if(l<1500||l<q*3)throw new Exception($"Audio does not visibly raise the flame: quiet={q}, loud={l}");
+        // Separation must be visible, not a uniform wall: bass (routed right) lifts the right far more
+        // than the left. This guards the spectral-contrast emphasis added to FireFrequencyBands.
+        int right=Upper(bass,384,640),left=Upper(bass,0,256);
+        if(right<800||right<left*3)throw new Exception($"Bands do not separate visibly: left={left}, right={right}");
+        renderer.GetSimulation(0,0,640,360).Reset();
+        Console.WriteLine($"PASS: audio lifts the flame (upper {l}) and bands separate (right {right} >> left {left})");
     }
     static Dictionary<string,double[]> CheckFrequencySeparation(FireGpuRenderer renderer,string output)
     {

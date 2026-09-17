@@ -23,6 +23,14 @@ internal static class FireFrequencyBands
             }
             if(end>start)result[flame]=.62f*sum/(end-start)+.38f*peak;
         }
+        // Spectral contrast. Real music energizes every band at once and ApplyGain's soft-knee
+        // compression flattens the differences, so the flame would rise as one wall. Emphasize each
+        // band's deviation above the current average: loud frequencies form distinct columns (fire
+        // as an equalizer) while a smaller level term keeps overall responsiveness. A flat spectrum
+        // reacts gently and evenly; a peaky one visibly separates into bands.
+        float mean=0;for(int i=0;i<count;i++)mean+=result[i];mean/=count;
+        for(int i=0;i<count;i++)
+            result[i]=Math.Clamp(result[i]*.45f+Math.Max(0,result[i]-mean)*2.8f,0,1);
         return result;
     }
 }

@@ -33,10 +33,14 @@ float4 burner(int index) {
     float z=grid.z*.5+(hash(float3(seed,2,3))-.5)*8;
     return float4(x,z,sourceSpacing()*(.72+hash(float3(seed,7,2))*.18),.65+hash(float3(seed,4,1))*.5);
 }
-// Crop the unused volume boundary beyond the screen: the first/last sources are
-// centered on the display edges and their outer halves extend beyond the image.
-float pixelScale() { return (scene.x>.5?view.x/(grid.x-2*emitters.y):view.y*.0082)*layout.x; }
-float2 origin() { return float2(view.x*(.5+layout.y*.5),view.y*(.92-layout.z*.5)); }
+// Map the source bed to the screen with a small horizontal overscan (half a source spacing past
+// each border, so it scales with the source count for any aspect ratio). The visible edges are then
+// covered by sources with neighbors on both sides, giving a full-width bed instead of a lower
+// "arch" at the far left/right.
+float pixelScale() { return (scene.x>.5?view.x/(grid.x-2*emitters.y-sourceSpacing()):view.y*.0082)*layout.x; }
+// Base sits near the very bottom of the monitor by default so the flame roots at the edge;
+// position Y (layout.z) still moves it up/down from there.
+float2 origin() { return float2(view.x*(.5+layout.y*.5),view.y*(.99-layout.z*.5)); }
 float noise(float3 p) {
     float3 i=floor(p), f=frac(p); f=f*f*(3-2*f);
     return lerp(lerp(lerp(hash(i),hash(i+float3(1,0,0)),f.x),lerp(hash(i+float3(0,1,0)),hash(i+float3(1,1,0)),f.x),f.y),
@@ -90,9 +94,12 @@ float noise(float3 p) {
             float4 b=burner(i);
             float2 radial=(p.xz-b.xy)/float2(b.z,7);
             float rhythm=.82+.13*sin(view.z*(3.1+i*.17)+i*2.7)+.1*sin(view.z*7.3+p.x*.48+i);
+            // Audio drive must clearly beat the flame's own procedural flicker (rhythm ~+/-28%),
+            // so it is amplified well past the old +85% fuel / +30% lift. Lift dominates because a
+            // taller flame reads as "reacting" far more than a slightly brighter bed.
             float energy=flameBand(i);
-            float localSource=exp(-dot(radial,radial)*2.4)*b.w*rhythm*(1+energy*.85);
-            source+=localSource;sourceLift+=localSource*(1+energy*.3);
+            float localSource=exp(-dot(radial,radial)*2.4)*b.w*rhythm*(1+energy*1.7);
+            source+=localSource;sourceLift+=localSource*(1+energy*3.2);
         }
         source*=exp(-q.y*q.y*.22)*view.w;
         sourceLift*=exp(-q.y*q.y*.22)*view.w;

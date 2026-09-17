@@ -20,16 +20,22 @@ The fixed physics substep is 1/60 second. Each logical tick now executes four
 substeps, making flame and ember motion exactly 4x faster than the original
 (twice the preceding version). At 15/30/60 FPS, the frame scheduler advances
 the same 240 physics substeps per playback second.
-Audio smoothing keeps its original real-time attack/release rate. Monitor pause freezes both the cached image and
+Audio smoothing uses a fast attack and a gentler release (attack tau ~36 ms, release ~143 ms;
+rates are per real-time second and independent of the substep count), so beats visibly drive the
+flame instead of lagging behind its 4x-faster motion, while it still settles without flicker.
+Monitor pause freezes both the cached image and
 simulation; resuming discards the paused interval. Global pause stops the host clock.
 Large scheduling gaps do not cause unbounded catch-up. First-frame preparation
 warms the source for four simulated seconds before revealing the host.
 
 The source count is `clamp(ceil(width / height * 8), 6, 48)` per monitor. A 16:9
 monitor uses 15 sources, 3440 × 1440 uses 20, and 5120 × 1440 uses 29. Equal aspect
-ratios retain the same density regardless of resolution or preview size. The
-outer sources are centered at the screen edges at default size and position;
-the volume's unused boundary is cropped so fire covers the entire width.
+ratios retain the same density regardless of resolution or preview size. The bed is
+mapped with a small horizontal overscan (half a source spacing past each border, so it
+scales with the source count for any aspect ratio): the outermost sources sit just beyond
+the screen edges, so the visible left/right edges are covered by sources with neighbors on
+both sides — a full-width bed rather than a lower "arch" at the far edges. By default the
+base sits near the very bottom of the monitor (position Y still moves it up or down).
 
 Volume shading is capped at 1080 × 720 pixels per monitor, preserving aspect ratio.
 A 3840 × 2160 output renders the fire at 1080 × 608 before compositing into the
@@ -48,6 +54,13 @@ and recovery path for initialization, teardown and device errors.
   interval. Grouped bass/mids/highs no longer drive the whole fire bed together.
   Sensitivity uses the existing gain curve. Capture remains shared with the
   preview/desktop subscription.
+- Audio drives the flame strongly, especially its height (lift), so beats are unmistakable rather
+  than a faint warming of the bed. To keep the bands readable, `FireFrequencyBands` emphasizes each
+  group's deviation above the current spectral average: because real music energizes every band at
+  once (and the gain curve compresses the differences), a plain per-band level would raise the whole
+  flame as one wall. With the contrast emphasis the loud frequencies rise as distinct columns — fire
+  as an equalizer — while a flat spectrum reacts gently and evenly. A small level term preserves an
+  overall response to volume.
 - Without new audio data for 500 ms, the live target returns to silence.
 - Size and position transform both the fire and the embers within each monitor.
 - View offers original, solid-color and imported local-image backgrounds. Images use Cover
