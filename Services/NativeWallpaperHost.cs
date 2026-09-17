@@ -677,6 +677,10 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         bool clearBackground = true)
     {
         if (clearBackground) graphics.Clear(Color.FromArgb(3, 4, 10));
+        // User size/position. The background (when present) is drawn before this call and
+        // stays fixed; only the visualizer is transformed, matching the shader wallpapers.
+        var layoutState = graphics.Save();
+        ApplyLayoutTransform(graphics, width, height, settings);
         const int bandCount = 96;
         var scale = Math.Min(width, height);
         var centerX = width / 2f;
@@ -727,6 +731,22 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
         _visualizerCore ??= new SolidBrush(Color.FromArgb(225, 8, 12, 25));
         graphics.FillEllipse(_visualizerCore, centerX - innerRadius * 0.82f, centerY - innerRadius * 0.82f, innerRadius * 1.64f, innerRadius * 1.64f);
+        graphics.Restore(layoutState);
+    }
+
+    // Shared size/position transform for the GDI visualizer. Matches the shader convention:
+    // OffsetX+ moves right, OffsetY+ moves up (screen Y grows downward, so it is negated),
+    // both measured in half-heights so horizontal and vertical feel identical at any aspect.
+    private static void ApplyLayoutTransform(Graphics graphics, int width, int height, VisualizerSettings settings)
+    {
+        var scale = settings.Scale <= 0 ? 1f : settings.Scale;
+        var unit = height * 0.5f;
+        var centerX = width * 0.5f;
+        var centerY = height * 0.5f;
+        graphics.TranslateTransform(settings.OffsetX * unit, -settings.OffsetY * unit);
+        graphics.TranslateTransform(centerX, centerY);
+        graphics.ScaleTransform(scale, scale);
+        graphics.TranslateTransform(-centerX, -centerY);
     }
 
     private void RenderFlameVisualizer(

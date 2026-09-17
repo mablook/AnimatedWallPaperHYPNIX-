@@ -8,7 +8,12 @@ cbuffer FrameData : register(b0)
     float Intensity;
     float Glow;
     float2 Origin;
-    float2 Padding;
+    float PaddingX;
+    float OffsetY;      // user vertical position (shared constant-buffer slot)
+    float3 StartColor;  // palette color for the outer flame
+    float Scale;        // user size/zoom (shared constant-buffer slot)
+    float3 EndColor;    // palette color for the mid flame
+    float OffsetX;      // user horizontal position (shared constant-buffer slot)
 };
 
 struct VertexOutput
@@ -73,6 +78,9 @@ float4 PSMain(VertexOutput input) : SV_Target
     float2 viewportUV = (input.Position.xy - Origin) / max(Resolution, 1.0);
     float2 p = viewportUV * 2.0 - 1.0;
     p.x *= Resolution.x / max(Resolution.y, 1.0);
+    // User size/position. p.y grows downward here, so negate OffsetY to keep "up is positive"
+    // consistent with the other wallpapers. Identity at defaults (Scale 1, offsets 0).
+    p = (p - float2(OffsetX, -OffsetY)) / max(Scale, 0.05);
     float radius = length(p);
     float angle = atan2(p.y, p.x);
     float2 direction = radius > 0.0001 ? p / radius : float2(0, 1);
@@ -109,11 +117,12 @@ float4 PSMain(VertexOutput input) : SV_Target
     float emberEdge = exp(-max(outwardDistance, 0.0) * (20.0 - bassImpact * 6.0)) * step(0.0, radialDistance);
 
     float heat = saturate(outwardDistance / max(localFlameHeight, 0.001));
+    // Palette-tinted incandescence: the white-hot core stays neutral so the flame keeps its
+    // brightness, while the mid and outer heat take the user palette (EndColor -> StartColor).
+    // The warm theme (the Aethelis default) reproduces the approved orange look.
     float3 whiteHot = float3(1.00, 0.96, 0.66);
-    float3 orange = float3(1.00, 0.18, 0.008);
-    float3 deepRed = float3(0.52, 0.004, 0.001);
-    float3 fireColor = lerp(whiteHot, orange, smoothstep(0.02, 0.42, heat));
-    fireColor = lerp(fireColor, deepRed, smoothstep(0.42, 1.0, heat));
+    float3 fireColor = lerp(whiteHot, EndColor, smoothstep(0.02, 0.42, heat));
+    fireColor = lerp(fireColor, StartColor, smoothstep(0.42, 1.0, heat));
 
     float audioEnergy = 0.56 + bassImpact * 2.25 + Mids * 0.46 + Highs * 0.28;
     float fire = innerBody * 0.70 + flameEnvelope * (0.48 + tongues * 1.18) + emberEdge * (0.12 + bassImpact * 0.32);
@@ -122,8 +131,9 @@ float4 PSMain(VertexOutput input) : SV_Target
     color += whiteHot * hotCore * (0.42 + bassImpact * 1.85);
 
     // Restrained bloom belongs to the same single ring; it is not another ring.
+    // Tint it with the palette so the halo matches the flame instead of a fixed orange.
     float bloom = exp(-abs(radialDistance) * (20.0 - Glow * 6.0));
-    color += float3(0.50, 0.022, 0.001) * bloom * (0.12 + Glow * 0.30 + bassImpact * 0.68);
+    color += EndColor * 0.5 * bloom * (0.12 + Glow * 0.30 + bassImpact * 0.68);
 
     color = 1.0 - exp(-color * 1.12);
     return float4(saturate(color), 1.0);

@@ -64,6 +64,7 @@ internal static class Program
                 NeonRibbonsRenderChecks.Run(parent, output, "Lotus.hlsl", "lotus");
                 SpectralBloomRenderChecks.Run(parent, output);
                 EventHorizonRenderChecks.Run(parent, output);
+                AethelisRenderChecks.Run(parent, output);
                 foreach (var mode in new[] { NativeRenderMode.Ambient, NativeRenderMode.VisualizerDemo,
                     NativeRenderMode.AethelisVisualizer, NativeRenderMode.AethelisFlameBurst, NativeRenderMode.FlamethrowerRingV2,
                     NativeRenderMode.SpectralBloom, NativeRenderMode.NeonRibbons, NativeRenderMode.LiquidOrbs,
@@ -144,14 +145,17 @@ internal static class Program
             var settingsWindow = new VisualizerSettingsWindow();
             settingsWindow.SetWallpaper(gallery.Items.OfType<WallpaperEntry>().Single(e => e.Kind == WallpaperKind.FractalPyramid));
             var layoutControls = (FrameworkElement)settingsWindow.FindName("LayoutControls");
-            // Switch through both capability groups in one existing window, as gallery selection does.
+            var colorsCard = (FrameworkElement)settingsWindow.FindName("ColorsCard");
+            // Switch through every visualizer in one existing window, as gallery selection does.
+            // The window must advertise exactly the controls each renderer actually honors, so
+            // capabilities are the single source of truth (no control shown that does nothing).
             foreach (var entry in gallery.Items.OfType<WallpaperEntry>().Where(e => e.IsVisualizer))
             {
                 settingsWindow.SetWallpaper(entry);
-                var expected = entry.Kind is WallpaperKind.NeonRibbons or WallpaperKind.LiquidOrbs
-                    or WallpaperKind.EventHorizon or WallpaperKind.FractalPyramid or WallpaperKind.Kaleidoscope or WallpaperKind.Lotus or WallpaperKind.LivingFire;
-                if ((layoutControls.Visibility == Visibility.Visible) != expected)
+                if ((layoutControls.Visibility == Visibility.Visible) != entry.SupportsLayoutControls)
                     throw new InvalidOperationException($"Incorrect layout controls for {entry.Kind}.");
+                if ((colorsCard.Visibility == Visibility.Visible) != entry.SupportsColorTheme)
+                    throw new InvalidOperationException($"Incorrect color palette visibility for {entry.Kind}.");
                 if (((FrameworkElement)settingsWindow.FindName("GlowSlider")).Visibility != Visibility.Visible)
                     throw new InvalidOperationException($"Appearance controls hidden for {entry.Kind}.");
             }

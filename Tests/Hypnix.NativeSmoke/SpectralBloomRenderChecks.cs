@@ -34,6 +34,12 @@ internal static class SpectralBloomRenderChecks
         var forward = Render(window, 30, true);
         if (forward.SequenceEqual(reversed)) throw new Exception("Individual FFT bands do not affect the image.");
         Console.WriteLine("PASS: FFT distribution changes the image with identical grouped audio profile");
+
+        // Size/position acts on the emitted silk. Each Render starts feedback fresh, so a moved,
+        // zoomed pass must differ from the untransformed one.
+        var moved = Render(window, 30, true, settings: VisualizerSettings.Default with { OffsetX = 0.5f, Scale = 1.6f });
+        if (forward.SequenceEqual(moved)) throw new Exception("Spectral Bloom size/position has no visible effect.");
+        Console.WriteLine("PASS: Spectral Bloom size/position changes the image");
     }
 
     private static void CheckIndependentFreeze(IntPtr window, string output)
@@ -71,7 +77,7 @@ internal static class SpectralBloomRenderChecks
 
     }
 
-    private static byte[] Render(IntPtr window, int fps, bool audio, bool reverse = false)
+    private static byte[] Render(IntPtr window, int fps, bool audio, bool reverse = false, VisualizerSettings? settings = null)
     {
         using var renderer = new AethelisGpuRenderer(window, Width, Height, "SpectralBloom.hlsl");
         for (var n = 0; n <= fps * 4; n++)
@@ -82,7 +88,7 @@ internal static class SpectralBloomRenderChecks
             var profile = AethelisAudioProfile.Analyze(bands, 1);
             if (reverse) Array.Reverse(bands); // Same profile; only the detailed spectrum differs.
             renderer.BeginFrame();
-            renderer.RenderViewport(0, 0, Width, Height, time, profile, VisualizerSettings.Default, spectrum: bands);
+            renderer.RenderViewport(0, 0, Width, Height, time, profile, settings ?? VisualizerSettings.Default, spectrum: bands);
         }
         return ReadBack(renderer);
     }

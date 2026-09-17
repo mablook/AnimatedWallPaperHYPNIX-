@@ -12,6 +12,10 @@ Win32 desktop hosting, WASAPI and Direct3D 11.
 - **Audio reactive** in the window and tray toggles system-audio reaction for both desktop and preview;
   the preference persists across restarts. It does not mute other applications or stop animation.
 - Per-wallpaper intensity (0–8), audio sensitivity (0–12), glow (0–3) and four color themes.
+  Every control the settings window shows actually affects its wallpaper: the color themes recolor
+  every visualizer (the classic visualizer, Aethelis and all shader wallpapers), except the two
+  Effekseer fire effects (Fire Burst, Flamethrower Ring V2) whose colors live in the authored effect
+  and therefore hide the palette and size/position controls instead of showing ones that do nothing.
 - Graphite visualizer settings with **View / Effects / More** tabs and a matching custom title bar.
   View combines a circular position pad, numeric values and zoom; Effects groups palettes, glow,
   intensity and audio; More manages named presets, wallpaper defaults and undoing the last reset.
@@ -20,9 +24,11 @@ Win32 desktop hosting, WASAPI and Direct3D 11.
   monitor width according to aspect ratio, and routes treble left through mids to bass right.
   Its settings support an original, solid-color or local-image background and a sparks toggle.
   Imported backgrounds are copied into the local library; moving the fire leaves its background fixed.
-- A dedicated settings window exposes size (0.3–3) and position X/Y (-1–1) for Neon Ribbons,
-  Liquid Orbs, Event Horizon, Fractal Pyramid, Kaleidoscope, Lotus and Living Fire. These controls are hidden for
-  renderers without layout support; preferences remain independent and persist across restarts.
+- A dedicated settings window exposes size (0.3–3) and position X/Y (-1–1) for the classic visualizer,
+  Aethelis, Spectral Bloom, Neon Ribbons, Liquid Orbs, Event Horizon, Fractal Pyramid, Kaleidoscope,
+  Lotus and Living Fire. Size/position uses one convention everywhere (X+ right, Y+ up, measured in
+  half-heights so it feels identical at any aspect ratio). The controls are hidden for renderers
+  without layout support (the two Effekseer fire effects); preferences persist across restarts.
 - Preview stops when the window is hidden/minimized, the session is locked, or the battery pause option applies.
 - Safe replacement: prepare the next wallpaper and its first frame before showing it and disposing the previous one.
   Preparation failures, including a 15-second first-frame timeout, keep the current wallpaper.

@@ -51,8 +51,8 @@
       <TextBlock Text="The background stays fixed when you move the fire." Style="{StaticResource Hint}"/>
      </StackPanel></Border>
     </StackPanel>
-    <StackPanel x:Name="EffectsPage" Visibility="Collapsed">
-     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Colors" Style="{StaticResource Heading}"/><UniformGrid Rows="2" Margin="0,16,0,0">
+     <StackPanel x:Name="EffectsPage" Visibility="Collapsed">
+      <Border x:Name="ColorsCard" Style="{StaticResource Card}"><StackPanel><TextBlock Text="Colors" Style="{StaticResource Heading}"/><UniformGrid Rows="2" Margin="0,16,0,0">
       <RadioButton x:Name="Palette0" GroupName="Palette" Tag="0" AutomationProperties.Name="Ice blue" Style="{StaticResource TabStyle}" FontSize="13" Checked="Palette_Checked"><StackPanel><Rectangle Width="104" Height="24" RadiusX="5" RadiusY="5" Margin="0,0,0,6"><Rectangle.Fill><LinearGradientBrush><GradientStop Color="#58CDFF"/><GradientStop Color="#6850FF" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle><TextBlock Text="Ice blue" HorizontalAlignment="Center"/></StackPanel></RadioButton>
 <RadioButton x:Name="Palette1" GroupName="Palette" Tag="1" AutomationProperties.Name="Neon sunset" Style="{StaticResource TabStyle}" FontSize="13" Checked="Palette_Checked"><StackPanel><Rectangle Width="104" Height="24" RadiusX="5" RadiusY="5" Margin="0,0,0,6"><Rectangle.Fill><LinearGradientBrush><GradientStop Color="#FF5278"/><GradientStop Color="#FFB946" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle><TextBlock Text="Neon sunset" HorizontalAlignment="Center"/></StackPanel></RadioButton>
 <RadioButton x:Name="Palette2" GroupName="Palette" Tag="2" AutomationProperties.Name="Emerald" Style="{StaticResource TabStyle}" FontSize="13" Checked="Palette_Checked"><StackPanel><Rectangle Width="104" Height="24" RadiusX="5" RadiusY="5" Margin="0,0,0,6"><Rectangle.Fill><LinearGradientBrush><GradientStop Color="#46FFB9"/><GradientStop Color="#14A078" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle><TextBlock Text="Emerald" HorizontalAlignment="Center"/></StackPanel></RadioButton>

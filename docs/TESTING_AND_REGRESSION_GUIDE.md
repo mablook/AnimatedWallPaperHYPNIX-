@@ -182,7 +182,8 @@ It asserts all thirteen entries are present in the built application's gallery. 
 | Wallpaper | Checks |
 | --- | --- |
 | Neon Ribbons / Liquid Orbs / Fractal Pyramid / Kaleidoscope / Lotus | Animation in silence, quiet-audio response, intensity/glow range, black output at zero intensity, size/position controls and viewport origin. |
-| Spectral Bloom | Exposure at 15/30/60 FPS, audio response, individual FFT-band influence and pixel-exact independent viewport freeze. |
+| Aethelis | Animation in silence, plus the standardized size/position and color-theme controls each visibly change the output (warm default vs. ice-blue palette). |
+| Spectral Bloom | Exposure at 15/30/60 FPS, audio response, individual FFT-band influence, size/position effect on the emitted silk, and pixel-exact independent viewport freeze. |
 | Event Horizon | Non-flat image, animation in silence, audio response, intensity/glow/color/size/position controls, return to silence and independent viewport freeze with saved time/audio inputs. |
 | Living Fire | Shared fluid solver, controls and zero intensity, no settings-only time advancement, separate monitor state, frozen pixels, resume without catch-up, and D3D timestamp samples at 640 × 360 and 4K. The study harness separately checks material/particle invariants and source response to audio. |
 
@@ -280,9 +281,11 @@ HWND destruction is dispatched to the owning UI thread. If the UI dispatcher has
 Windows reclaims the HWND at process exit.
 
 The native smoke switches the same settings window across all visualizer entries and verifies that
-size and position appear only for the seven supported renderers. GPU comparisons separately require
-each of those three controls to change the image. Preference tests round-trip different transforms
-for separate wallpapers.
+size/position and the color palette appear exactly on the renderers that honor them (both hidden only
+for the two Effekseer fire effects), driven by the `SupportsLayoutControls`/`SupportsColorTheme`
+capabilities. GPU comparisons separately require size/position and color to change the image on
+Aethelis and Spectral Bloom in addition to the abstract shaders. Preference tests round-trip
+different transforms for separate wallpapers.
 
 The portable inventory regression compares the packaging script's renderer list with the visible
 manifest-driven gallery, so a newly added wallpaper cannot silently disappear from `build-info.json`.
@@ -291,7 +294,10 @@ manifest-driven gallery, so a newly added wallpaper cannot silently disappear fr
 
 `VisualizerCustomizationTests` exercises the reversible square/disk position mapping,
 out-of-range drags, old settings, persistence of background/sparks/presets and rejection
-of invalid preset records. The regression suite currently contains 144 passing cases.
+of invalid preset records. `VisualizerCapabilityTests` locks the standardized control contract:
+every visualizer's palette and size/position support matches its renderer, the two Effekseer effects
+hide both, the full-screen shaders consume Scale/OffsetX/OffsetY and the palette, and the GDI
+visualizer applies the shared transform. The regression suite currently contains 177 passing cases.
 
 `SettingsWindowChecks` runs within the native smoke harness. It verifies that loading
 settings and switching View/Effects/More do not emit changes; geometry reset preserves

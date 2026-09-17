@@ -177,7 +177,13 @@ sparks and audio; More groups preset management, defaults, reset undo and credit
 and changes apply live to the matching running wallpaper and preview.
 Size and position are carried to the GPU through previously unused constant-buffer slots (no layout change).
 
-Size and position are shown only for Neon Ribbons, Liquid Orbs, Event Horizon, Fractal Pyramid,
-Kaleidoscope, Lotus and Living Fire. Classic, Aethelis, Fire Burst, Flamethrower Ring V2 and Spectral Bloom
-retain their existing appearance/audio controls; no ineffective layout controls are presented.
-The same settings window updates its available controls when the selected wallpaper changes.
+Size and position are shown for the classic visualizer, Aethelis, Spectral Bloom, Neon Ribbons,
+Liquid Orbs, Event Horizon, Fractal Pyramid, Kaleidoscope, Lotus and Living Fire — every wallpaper
+whose renderer applies Scale/OffsetX/OffsetY. One convention holds everywhere: X+ right, Y+ up,
+measured in half-heights (so it feels identical at any aspect ratio). Color themes recolor every
+visualizer, including Aethelis (the flame is palette-tinted, warm by default) and the classic GDI
+visualizer. The two Effekseer fire effects (Fire Burst, Flamethrower Ring V2) author their color and
+motion in the effect, so they hide both the palette and size/position rather than showing controls
+that do nothing. The principle is that no control is shown unless it actually changes its wallpaper;
+capabilities (`SupportsColorTheme`, `SupportsLayoutControls`) are the single source of truth, and the
+same settings window updates its available controls when the selected wallpaper changes.

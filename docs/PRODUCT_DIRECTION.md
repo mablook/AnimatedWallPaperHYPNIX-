@@ -240,8 +240,16 @@ Rules:
 - Use bounded sliders and curated themes so invalid colors, extreme size/position, or extreme FFT amplification
   cannot destabilize rendering.
 - Size and position ride previously unused constant-buffer padding slots (Scale/OffsetX/OffsetY), so the shared
-  buffer layout is unchanged; shaders apply `uv = (uv - offset) / scale`.
-- Color themes should drive each visualizer's look (not just tint it), so switching theme visibly recolors it.
+  buffer layout is unchanged; shaders apply `uv = (uv - offset) / scale`. One convention holds everywhere
+  (X+ right, Y+ up, in half-heights); renderers whose screen Y grows downward negate OffsetY. The classic GDI
+  visualizer applies the same transform through the graphics matrix.
+- Every advertised control must actually change its wallpaper. Size/position and color are standardized across
+  all visualizers that can honor them; the two Effekseer fire effects (Fire Burst, Flamethrower Ring V2) author
+  color and motion in the effect, so they hide those controls (via `SupportsColorTheme`/`SupportsLayoutControls`)
+  rather than presenting inert ones, until the effect exposes a transform and recolor path.
+- Color themes drive each visualizer's look (not just tint it), so switching theme visibly recolors it. Aethelis
+  tints its flame from the palette with a white-hot core preserved, and defaults to the warm theme so the
+  approved orange look is unchanged out of the box.
 - Persistence lives in the visualizer wallpaper's own settings, not global performance settings.
 
 Manual UX validation completed on 2026-07-11:

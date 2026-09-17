@@ -10,8 +10,16 @@ internal sealed record WallpaperEntry(string Id, string Title, WallpaperKind Kin
     public bool IsVisualizer => Kind is not (WallpaperKind.BuiltIn or WallpaperKind.ExampleVideo);
     public bool SupportsBackground => Kind == WallpaperKind.LivingFire;
     public bool SupportsSparks => Kind == WallpaperKind.LivingFire;
+    // Size/position works on every visualizer whose renderer applies Scale/OffsetX/OffsetY.
+    // The Effekseer effects (Fire Burst, Flamethrower Ring V2) author their motion in the
+    // effect itself, so they intentionally opt out until the effect exposes a transform.
     public bool SupportsLayoutControls => Kind is WallpaperKind.NeonRibbons or WallpaperKind.LiquidOrbs
-        or WallpaperKind.EventHorizon or WallpaperKind.FractalPyramid or WallpaperKind.Kaleidoscope or WallpaperKind.Lotus or WallpaperKind.LivingFire;
+        or WallpaperKind.EventHorizon or WallpaperKind.FractalPyramid or WallpaperKind.Kaleidoscope or WallpaperKind.Lotus
+        or WallpaperKind.LivingFire or WallpaperKind.SpectralBloom or WallpaperKind.AethelisVisualizer or WallpaperKind.VisualizerDemo;
+    // Color palettes drive every visualizer except the two Effekseer fire effects, whose
+    // colors live in the authored particle effect and are not recolored from the palette.
+    public bool SupportsColorTheme => IsVisualizer
+        && Kind is not (WallpaperKind.AethelisFlameBurst or WallpaperKind.FlamethrowerRingV2);
     public string Description => Kind == WallpaperKind.ExampleVideo ? "Local video · muted · fit per display" :
         IsVisualizer ? "Audio reactive · system output" : "Native procedural wallpaper";
 }
@@ -40,7 +48,10 @@ internal static class WallpaperCatalog
                 entries.Add(new(json.GetProperty("id").GetString()!, json.GetProperty("title").GetString()!, kind,
                     Path.GetFullPath(Path.Combine(folder, json.GetProperty("preview").GetString()!)),
                     json.TryGetProperty("background", out var background) ? Path.Combine(folder, background.GetString()!) : null,
-                    Defaults: kind==WallpaperKind.LivingFire?new VisualizerPreferences(Glow:0,ColorTheme:1):null));
+                    // Fire wallpapers default to the warm palette so palette tinting keeps the
+                    // approved incandescent look; other themes recolor the flame from there.
+                    Defaults: kind==WallpaperKind.LivingFire?new VisualizerPreferences(Glow:0,ColorTheme:1)
+                        :kind==WallpaperKind.AethelisVisualizer?new VisualizerPreferences(ColorTheme:1):null));
             }
             catch (Exception exception) when (exception is IOException or JsonException or ArgumentException or InvalidOperationException)
             { AppLog.WriteException($"Built-in manifest skipped: {path}", exception); }

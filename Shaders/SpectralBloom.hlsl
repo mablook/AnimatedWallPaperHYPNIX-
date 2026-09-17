@@ -10,11 +10,11 @@ cbuffer FrameData : register(b0)
     float Glow;
     float2 Origin;
     float DeltaTime;
-    float Padding;
+    float OffsetY;   // user vertical position (shared constant-buffer slot)
     float3 StartColor;
-    float ColorPadA;
+    float Scale;     // user size/zoom (shared constant-buffer slot)
     float3 EndColor;
-    float ColorPadB;
+    float OffsetX;   // user horizontal position (shared constant-buffer slot)
     float4 Spectrum[16];
 };
 
@@ -88,8 +88,12 @@ float4 PSMain(VertexOutput input) : SV_Target
     float decayRate = 2.8 / (1 + max(Glow, 0) * 1.5);
     float3 history = History.SampleLevel(LinearClamp, oldUv, 0).rgb * exp(-decayRate * dt) * edge;
 
+    // User size/position: applied to the emitted silk only. The feedback advection above
+    // stays in screen space so the temporal history remains stable while panning/zooming.
+    // p.y grows downward here, so negate OffsetY to keep "up is positive" across wallpapers.
+    float2 pArt = (p - float2(OffsetX, -OffsetY)) / max(Scale, 0.05);
     // Five braided ribbons: large curves breathe slowly, fine folds follow FFT detail.
-    float2 silk = rotate(p, 0.22 * sin(Time * 0.12));
+    float2 silk = rotate(pArt, 0.22 * sin(Time * 0.12));
     float x = silk.x;
     float3 emission = 0;
     float pixel = 2 / max(Resolution.y, 1);
