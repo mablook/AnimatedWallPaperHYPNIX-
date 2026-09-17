@@ -48,6 +48,13 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
     private readonly bool _usesLotus;
     private readonly bool _usesLiquidOrbs;
     private readonly ID3D11SamplerState? _linearSampler;
+    // Optional custom background (solid color or cover image) composited behind the effect and
+    // then screen-blended over. Inactive by default ("original"), leaving rendering unchanged.
+    private readonly ID3D11VertexShader _backgroundVertexShader;
+    private readonly ID3D11PixelShader _backgroundPixelShader;
+    private readonly ID3D11Buffer _backgroundBuffer;
+    private readonly ID3D11BlendState _screenBlend;
+    private readonly FireBackground _background;
     private readonly string _effectPath;
     private readonly int _width;
     private readonly int _height;
@@ -107,22 +114,32 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
                 _bloomHorizontalShader = Own(_device.CreatePixelShader(Compiler.CompileFromFile(shaderPath, "PSBloomHorizontal", "ps_5_0").Span));
                 _bloomVerticalShader = Own(_device.CreatePixelShader(Compiler.CompileFromFile(shaderPath, "PSBloomVertical", "ps_5_0").Span));
                 _compositeShader = Own(_device.CreatePixelShader(Compiler.CompileFromFile(shaderPath, "PSComposite", "ps_5_0").Span));
-                var samplerDescription = new SamplerDescription
-                {
-                    Filter = Filter.MinMagMipLinear,
-                    AddressU = TextureAddressMode.Clamp,
-                    AddressV = TextureAddressMode.Clamp,
-                    AddressW = TextureAddressMode.Clamp,
-                    MipLODBias = 0,
-                    MaxAnisotropy = 1,
-                    ComparisonFunc = ComparisonFunction.Never,
-                    MinLOD = 0,
-                    MaxLOD = float.MaxValue
-                };
-                _linearSampler = Own(_device.CreateSamplerState(samplerDescription));
             }
+            // Always available: the feedback bloom and the background compositor both sample textures
+            // with linear clamp (cover / edge) behavior.
+            _linearSampler = Own(_device.CreateSamplerState(new SamplerDescription
+            {
+                Filter = Filter.MinMagMipLinear, AddressU = TextureAddressMode.Clamp,
+                AddressV = TextureAddressMode.Clamp, AddressW = TextureAddressMode.Clamp,
+                MipLODBias = 0, MaxAnisotropy = 1, ComparisonFunc = ComparisonFunction.Never,
+                MinLOD = 0, MaxLOD = float.MaxValue
+            }));
             _frameBuffer = Own(_device.CreateBuffer((uint)Marshal.SizeOf<FrameConstants>(), BindFlags.ConstantBuffer,
                 ResourceUsage.Dynamic, CpuAccessFlags.Write));
+            // Background compositor: a color/cover-image pass drawn behind the effect, with the effect
+            // screen-blended on top so its dark areas reveal the background.
+            var backgroundPath = Path.Combine(AppContext.BaseDirectory, "Shaders", "GpuBackground.hlsl");
+            _backgroundVertexShader = Own(_device.CreateVertexShader(Compiler.CompileFromFile(backgroundPath, "VSMain", "vs_5_0").Span));
+            _backgroundPixelShader = Own(_device.CreatePixelShader(Compiler.CompileFromFile(backgroundPath, "PSMain", "ps_5_0").Span));
+            _backgroundBuffer = Own(_device.CreateBuffer((uint)Marshal.SizeOf<BackgroundConstants>(), BindFlags.ConstantBuffer,
+                ResourceUsage.Dynamic, CpuAccessFlags.Write));
+            // Screen blend for color: result = src*(1-dst) + dst, so a black effect keeps the
+            // background and a bright effect adds over it without harshly saturating. Alpha uses
+            // valid alpha-only factors (color factors like InverseDestinationColor are illegal for
+            // the alpha channel and would fail device creation).
+            _screenBlend = Own(_device.CreateBlendState(new BlendDescription(
+                Blend.InverseDestinationColor, Blend.One, Blend.One, Blend.Zero)));
+            _background = Own(new FireBackground(_device));
             _usesFireRingEffect = string.Equals(shaderFileName, "AethelisFlameBurst.hlsl", StringComparison.OrdinalIgnoreCase) ||
                                   string.Equals(shaderFileName, "FlamethrowerRingV2.hlsl", StringComparison.OrdinalIgnoreCase);
             _effectPath = string.Equals(shaderFileName, "FlamethrowerRingV2.hlsl", StringComparison.OrdinalIgnoreCase)
@@ -236,15 +253,23 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
         *(FrameConstants*)mapped.DataPointer = frame;
         _context.Unmap(_frameBuffer, 0);
 
+        // Refresh the optional custom background; "original" (W=0) leaves the effect unchanged.
+        _background.Update(settings.Background);
+        var hasBackground = _background.Color.W > 0.5f;
+
         _context.OMSetRenderTargets(_renderTarget);
+        _context.RSSetViewport(new Viewport(x, y, width, height));
+        // Direct (non-feedback) effects draw the background here; feedback effects compose it just
+        // before their final composite pass instead.
+        if (hasBackground && !(_usesFeedback || _usesEventHorizon || _usesFluidSimulation))
+            ComposeBackground(x, y, width, height);
         _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
         _context.VSSetShader(_vertexShader);
         _context.PSSetShader(_pixelShader);
         _context.PSSetConstantBuffer(0, _frameBuffer);
-        _context.RSSetViewport(new Viewport(x, y, width, height));
         if (_usesFeedback || _usesEventHorizon)
         {
-            RenderFeedbackViewport(x, y, width, height, freezeEffect);
+            RenderFeedbackViewport(x, y, width, height, freezeEffect, hasBackground);
         }
         else if (_usesFluidSimulation && _computeShader is not null)
         {
@@ -264,7 +289,10 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
         }
         else
         {
+            // Screen-blend the effect over the background when one is set; otherwise draw opaque.
+            if (hasBackground) _context.OMSetBlendState(_screenBlend);
             _context.Draw(3, 0);
+            if (hasBackground) _context.OMSetBlendState(null);
         }
         if (_usesFireRingEffect)
         {
@@ -284,7 +312,7 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
     // Per-viewport HDR rendering and bloom. Spectral Bloom uses temporal feedback;
     // Event Horizon writes an independent frame without sampling previous emission.
     // When frozen the buffer is not advanced; the last frame is simply re-composited, so the monitor holds still.
-    private void RenderFeedbackViewport(int x, int y, int width, int height, bool freezeEffect)
+    private void RenderFeedbackViewport(int x, int y, int width, int height, bool freezeEffect, bool hasBackground = false)
     {
         var viewportKey = (x, y, width, height);
         if (!_feedbackByViewport.TryGetValue(viewportKey, out var feedback))
@@ -322,13 +350,47 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
 
         _context.OMSetRenderTargets(_renderTarget);
         _context.RSSetViewport(new Viewport(x, y, width, height));
+        // Draw the background first, then screen-blend the composited effect over it.
+        if (hasBackground) ComposeBackground(x, y, width, height);
+        _context.OMSetRenderTargets(_renderTarget);
+        _context.RSSetViewport(new Viewport(x, y, width, height));
+        _context.VSSetShader(_vertexShader);
         _context.PSSetShader(_compositeShader);
+        _context.PSSetConstantBuffer(0, _frameBuffer);
         _context.PSSetSampler(0, _linearSampler);
         _context.PSSetShaderResource(0, feedback.CurrentView);
         _context.PSSetShaderResource(1, feedback.BloomViews[1]);
+        if (hasBackground) _context.OMSetBlendState(_screenBlend);
         _context.Draw(3, 0);
+        if (hasBackground) _context.OMSetBlendState(null);
         _context.PSSetShaderResource(0, null!);
         _context.PSSetShaderResource(1, null!);
+    }
+
+    // Draws the custom background (solid color or cover image) into the viewport as an opaque pass.
+    // The caller then screen-blends the effect over it. Uses the shared linear-clamp sampler.
+    private unsafe void ComposeBackground(int x, int y, int width, int height)
+    {
+        var data = new BackgroundConstants
+        {
+            ColorR = _background.Color.X, ColorG = _background.Color.Y, ColorB = _background.Color.Z, Mode = _background.Color.W,
+            ImageW = _background.Size.X, ImageH = _background.Size.Y, ViewW = width, ViewH = height
+        };
+        var mapped = _context.Map(_backgroundBuffer, 0, MapMode.WriteDiscard);
+        *(BackgroundConstants*)mapped.DataPointer = data;
+        _context.Unmap(_backgroundBuffer, 0);
+        _context.OMSetBlendState(null);
+        _context.OMSetRenderTargets(_renderTarget);
+        _context.RSSetViewport(new Viewport(x, y, width, height));
+        _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
+        _context.VSSetShader(_backgroundVertexShader);
+        _context.PSSetShader(_backgroundPixelShader);
+        _context.PSSetConstantBuffer(0, _backgroundBuffer);
+        _context.PSSetSampler(0, _linearSampler);
+        // Null in solid-color mode simply clears the slot; the shader only samples in image mode.
+        _context.PSSetShaderResource(0, _background.Image!);
+        _context.Draw(3, 0);
+        _context.PSSetShaderResource(0, null!);
     }
 
     public void EndFrame()
@@ -415,6 +477,13 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
         // float4[16] in HLSL: scalar arrays would have a different cbuffer stride.
         public fixed float Spectrum[64];
         public fixed float Spheres[64];
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BackgroundConstants
+    {
+        public float ColorR, ColorG, ColorB, Mode;   // rgb + mode (1 solid, 2 image)
+        public float ImageW, ImageH, ViewW, ViewH;    // image pixels + viewport pixels
     }
 
     private sealed class FluidResources : IDisposable

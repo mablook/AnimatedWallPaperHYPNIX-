@@ -52,6 +52,26 @@ public sealed class VisualizerCapabilityTests
     public void LayoutSupportMatchesRendererCapability(int kind, bool supported)
         => Assert.Equal(supported, Entry((WallpaperKind)kind).SupportsLayoutControls);
 
+    [Theory]
+    // A custom background composites behind every shader visualizer and the classic GDI one...
+    [InlineData((int)WallpaperKind.VisualizerDemo, true)]
+    [InlineData((int)WallpaperKind.AethelisVisualizer, true)]
+    [InlineData((int)WallpaperKind.SpectralBloom, true)]
+    [InlineData((int)WallpaperKind.NeonRibbons, true)]
+    [InlineData((int)WallpaperKind.LiquidOrbs, true)]
+    [InlineData((int)WallpaperKind.EventHorizon, true)]
+    [InlineData((int)WallpaperKind.FractalPyramid, true)]
+    [InlineData((int)WallpaperKind.Kaleidoscope, true)]
+    [InlineData((int)WallpaperKind.Lotus, true)]
+    [InlineData((int)WallpaperKind.LivingFire, true)]
+    // ...but not the two Effekseer fire effects, nor video (which is itself the background).
+    [InlineData((int)WallpaperKind.AethelisFlameBurst, false)]
+    [InlineData((int)WallpaperKind.FlamethrowerRingV2, false)]
+    [InlineData((int)WallpaperKind.ExampleVideo, false)]
+    [InlineData((int)WallpaperKind.BuiltIn, false)]
+    public void BackgroundSupportMatchesRendererCapability(int kind, bool supported)
+        => Assert.Equal(supported, Entry((WallpaperKind)kind).SupportsBackground);
+
     [Fact]
     public void EffekseerEffectsHideBothPaletteAndLayout()
     {

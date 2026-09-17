@@ -8,7 +8,13 @@ internal sealed record WallpaperEntry(string Id, string Title, WallpaperKind Kin
     VisualizerPreferences? Defaults = null)
 {
     public bool IsVisualizer => Kind is not (WallpaperKind.BuiltIn or WallpaperKind.ExampleVideo);
-    public bool SupportsBackground => Kind == WallpaperKind.LivingFire;
+    // A solid-color/image background composites behind every visualizer that renders emission over
+    // black (the shader effects, screen-blended) and the classic GDI visualizer. The two Effekseer
+    // fire effects and video (which is itself the background) opt out.
+    public bool SupportsBackground => Kind is WallpaperKind.LivingFire
+        or WallpaperKind.NeonRibbons or WallpaperKind.LiquidOrbs or WallpaperKind.EventHorizon
+        or WallpaperKind.FractalPyramid or WallpaperKind.Kaleidoscope or WallpaperKind.Lotus
+        or WallpaperKind.SpectralBloom or WallpaperKind.AethelisVisualizer or WallpaperKind.VisualizerDemo;
     public bool SupportsSparks => Kind == WallpaperKind.LivingFire;
     // Size/position works on every visualizer whose renderer applies Scale/OffsetX/OffsetY.
     // The Effekseer effects (Fire Burst, Flamethrower Ring V2) author their motion in the

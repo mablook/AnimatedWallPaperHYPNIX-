@@ -48,7 +48,7 @@
       <UniformGrid Rows="1" Margin="0,14,0,12"><RadioButton x:Name="OriginalBackground" Content="Original" GroupName="Background" Tag="original" Style="{StaticResource TabStyle}" FontSize="13" Checked="Background_Checked"/><RadioButton x:Name="SolidBackground" Content="Color" GroupName="Background" Tag="solid" Style="{StaticResource TabStyle}" FontSize="13" Checked="Background_Checked"/><RadioButton x:Name="ImageBackground" Content="Image" GroupName="Background" Tag="image" Style="{StaticResource TabStyle}" FontSize="13" Checked="Background_Checked"/></UniformGrid>
       <StackPanel x:Name="SolidBackgroundControls" Visibility="Collapsed"><TextBlock Text="Background color · #RRGGBB" Style="{StaticResource Hint}"/><TextBox x:Name="BackgroundColorText" Text="#222222" MaxLength="7" LostFocus="BackgroundColor_LostFocus" AutomationProperties.Name="Background color"/></StackPanel>
       <StackPanel x:Name="ImageBackgroundControls" Visibility="Collapsed"><Border CornerRadius="8" Height="90" Background="#1C1C1C" Margin="0,0,0,10" ClipToBounds="True"><Image x:Name="BackgroundPreview" Stretch="UniformToFill"/></Border><Button Content="Choose image…" Click="ChooseBackground_Click"/><TextBlock x:Name="BackgroundFileText" Style="{StaticResource Hint}"/></StackPanel>
-      <TextBlock Text="The background stays fixed when you move the fire." Style="{StaticResource Hint}"/>
+      <TextBlock Text="The background stays fixed when you move or zoom the effect." Style="{StaticResource Hint}"/>
      </StackPanel></Border>
     </StackPanel>
      <StackPanel x:Name="EffectsPage" Visibility="Collapsed">

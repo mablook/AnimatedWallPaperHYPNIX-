@@ -23,6 +23,11 @@ Win32 desktop hosting, WASAPI and Direct3D 11.
   View combines a circular position pad, numeric values and zoom; Effects groups palettes, glow,
   intensity and audio; More manages named presets, wallpaper defaults and undoing the last reset.
   Presets are independent per wallpaper and persist across restarts.
+- A solid-color or local-image background can sit behind every shader visualizer (Neon Ribbons,
+  Liquid Orbs, Event Horizon, Fractal Pyramid, Kaleidoscope, Lotus, Spectral Bloom, Aethelis) and
+  the classic visualizer, composited (screen blend) so the effect's dark areas reveal it. The two
+  Effekseer fire effects and video (itself the background) opt out. Imported images are copied into
+  the local library and stay fixed when you move or zoom the effect.
 - Living Fire runs at four times its original simulation speed, distributes sources across the full
   monitor width according to aspect ratio, and routes treble left through mids to bass right.
   Its settings support an original, solid-color or local-image background and a sparks toggle.

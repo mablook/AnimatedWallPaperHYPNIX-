@@ -47,6 +47,15 @@ internal static class NeonRibbonsRenderChecks
             var i = (y * 640 + x) * 4 + c;
             if (Math.Abs(pair[i] - pair[i + 320 * 4]) > 1) throw new Exception("Neon Ribbons viewport origin mismatch.");
         }
-        Console.WriteLine($"PASS: {shader} animation, quiet audio (difference={difference:F1}), expanded controls and viewport origin");
+        // Custom background: a strong solid blue composites behind the effect (screen blend), so the
+        // mean blue channel rises well above the plain (background-less) frame.
+        var solidBackground = VisualizerSettings.Default with { Background = new VisualizerBackground("solid", "#3878E0") };
+        var backgroundFrame = Frame(8, silent, solidBackground);
+        Save(backgroundFrame, Path.Combine(output, $"{prefix}-background.png"));
+        long plainBlue = 0, withBackgroundBlue = 0;
+        for (var i = 0; i < baseline.Length; i += 4) { plainBlue += baseline[i]; withBackgroundBlue += backgroundFrame[i]; }
+        if (withBackgroundBlue <= plainBlue * 2)
+            throw new Exception($"{shader}: solid background not visible (plain blue={plainBlue}, with background={withBackgroundBlue}).");
+        Console.WriteLine($"PASS: {shader} animation, quiet audio (difference={difference:F1}), controls, viewport origin and custom background");
     }
 }

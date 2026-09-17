@@ -137,6 +137,15 @@ internal static class EventHorizonRenderChecks
             throw new Exception("Event Horizon active display stopped with the frozen display.");
         Save(after, Path.Combine(output, "event-horizon-independent-freeze.png"));
         Console.WriteLine($"PASS: Event Horizon animation, audio response (difference={difference:F2}), controls, silence reset and independent viewport freeze");
+
+        // Custom background composites behind the effect through the feedback composite pass.
+        var backgroundFrame = Frame(8, silence, VisualizerSettings.Default with { Background = new VisualizerBackground("solid", "#3878E0") });
+        Save(backgroundFrame, Path.Combine(output, "event-horizon-background.png"));
+        long baselineBlue = 0, backgroundBlue = 0;
+        for (var i = 0; i < baseline.Length; i += 4) { baselineBlue += baseline[i]; backgroundBlue += backgroundFrame[i]; }
+        if (backgroundBlue <= baselineBlue * 2)
+            throw new Exception($"Event Horizon: solid background not visible (baseline blue={baselineBlue}, background={backgroundBlue}).");
+        Console.WriteLine("PASS: Event Horizon custom background composites behind the effect");
     }
 
     public static void CaptureReviewFrames(IntPtr window, string output)

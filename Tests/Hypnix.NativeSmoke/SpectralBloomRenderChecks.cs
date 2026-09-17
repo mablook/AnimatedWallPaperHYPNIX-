@@ -40,6 +40,16 @@ internal static class SpectralBloomRenderChecks
         var moved = Render(window, 30, true, settings: VisualizerSettings.Default with { OffsetX = 0.5f, Scale = 1.6f });
         if (forward.SequenceEqual(moved)) throw new Exception("Spectral Bloom size/position has no visible effect.");
         Console.WriteLine("PASS: Spectral Bloom size/position changes the image");
+
+        // Custom background composites behind the effect via the feedback composite pass (screen
+        // blend): a strong solid blue lifts the mean blue channel well above the silent frame.
+        var background = Render(window, 30, false, settings: VisualizerSettings.Default with { Background = new VisualizerBackground("solid", "#3878E0") });
+        Save(background, Path.Combine(output, "spectral-background.png"));
+        long silenceBlue = 0, backgroundBlue = 0;
+        for (var i = 0; i < silence.Length; i += 4) { silenceBlue += silence[i]; backgroundBlue += background[i]; }
+        if (backgroundBlue <= silenceBlue * 2)
+            throw new Exception($"Spectral Bloom: solid background not visible (silence blue={silenceBlue}, background={backgroundBlue}).");
+        Console.WriteLine("PASS: Spectral Bloom custom background composites behind the effect");
     }
 
     private static void CheckIndependentFreeze(IntPtr window, string output)

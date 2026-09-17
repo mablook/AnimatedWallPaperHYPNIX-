@@ -40,9 +40,18 @@ internal static class AethelisRenderChecks
             throw new Exception("Aethelis color theme has no visible effect.");
         Save(Frame(8, iceBlue), Path.Combine(output, "aethelis-iceblue.png"));
 
+        // Custom background: a strong solid blue composites behind the flame (screen blend), so the
+        // mean blue channel rises well above the background-less frame.
+        var withBackground = Frame(8, warm with { Background = new VisualizerBackground("solid", "#3878E0") });
+        Save(withBackground, Path.Combine(output, "aethelis-background.png"));
+        long baseBlue = 0, backgroundBlue = 0;
+        for (var i = 0; i < baseline.Length; i += 4) { baseBlue += baseline[i]; backgroundBlue += withBackground[i]; }
+        if (backgroundBlue <= baseBlue * 1.5)
+            throw new Exception($"Aethelis: solid background not visible (base blue={baseBlue}, with background={backgroundBlue}).");
+
         // Intensity/Glow already worked before standardization and are intentionally not asserted
         // here: the Aethelis fire saturates under strong audio, so a fixed high-audio frame is not a
-        // reliable gain probe. This check focuses on the newly standardized size/position and palette.
-        Console.WriteLine("PASS: Aethelis animation, size/position and color theme");
+        // reliable gain probe. This check focuses on the standardized size/position, palette and background.
+        Console.WriteLine("PASS: Aethelis animation, size/position, color theme and custom background");
     }
 }

@@ -69,6 +69,10 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private readonly PerMonitorVisualizerFreezeState _visualizerFreezeState = new();
     private VisualizerSettings _visualizerSettings = VisualizerSettings.Default;
     private readonly Bitmap? _visualizerBackground;
+    // User-chosen background (solid color or imported image) for the GDI classic visualizer.
+    // Loaded lazily and reloaded when the path changes; released with the other GDI resources.
+    private Bitmap? _customBackground;
+    private string? _customBackgroundPath;
     private BufferedGraphics? _backBuffer;
     private readonly BufferedGraphicsContext _bufferContext = new();
     private Size _bufferSize;
@@ -434,15 +438,51 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
     private void RenderVisualizer(Graphics graphics, int width, int height, double time, float[] bands)
     {
-        if (_visualizerBackground is not null) DrawImageCover(graphics, _visualizerBackground, width, height);
-        else graphics.Clear(_renderMode == NativeRenderMode.FlameVisualizer
-            ? Color.FromArgb(8, 3, 2)
-            : Color.FromArgb(3, 4, 10));
+        // A user background (solid color or image) replaces the original; otherwise keep the
+        // wallpaper's own background image or the default clear.
+        if (!TryDrawCustomBackground(graphics, width, height))
+        {
+            if (_visualizerBackground is not null) DrawImageCover(graphics, _visualizerBackground, width, height);
+            else graphics.Clear(_renderMode == NativeRenderMode.FlameVisualizer
+                ? Color.FromArgb(8, 3, 2)
+                : Color.FromArgb(3, 4, 10));
+        }
 
         if (_renderMode == NativeRenderMode.FlameVisualizer)
             RenderFlameVisualizer(graphics, width, height, time, bands, _visualizerSettings);
         else
             RenderVisualizerDemo(graphics, width, height, time, bands, _visualizerSettings, clearBackground: false);
+    }
+
+    // Draws the user-selected solid color or cover image. Returns false for "original" (or on a
+    // missing/invalid image) so the caller falls back to the wallpaper's own background.
+    private bool TryDrawCustomBackground(Graphics graphics, int width, int height)
+    {
+        var background = _visualizerSettings.Background;
+        if (background is null) return false;
+        if (background.Mode == "solid")
+        {
+            try { graphics.Clear(ColorTranslator.FromHtml(background.Color)); return true; }
+            catch (Exception exception) when (exception is ArgumentException or FormatException) { return false; }
+        }
+        if (background.Mode == "image" && background.ImagePath is { } path && GetCustomBackground(path) is { } image)
+        {
+            DrawImageCover(graphics, image, width, height);
+            return true;
+        }
+        return false;
+    }
+
+    private Bitmap? GetCustomBackground(string path)
+    {
+        if (_customBackgroundPath == path) return _customBackground;
+        _customBackground?.Dispose();
+        _customBackground = null;
+        _customBackgroundPath = path;
+        try { if (System.IO.File.Exists(path)) _customBackground = new Bitmap(path); }
+        catch (Exception exception) when (exception is System.IO.IOException or ArgumentException or OutOfMemoryException)
+        { AppLog.WriteException("Custom background unavailable; using original", exception); }
+        return _customBackground;
     }
 
     private static void DrawImageCover(Graphics graphics, Image image, int width, int height)
@@ -646,6 +686,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         _flameGlowPen?.Dispose();
         _flameHotCorePen?.Dispose();
         _flamePath.Dispose();
+        _customBackground?.Dispose();
     }
 
     private static void DrawVideoCover(Graphics graphics, Bitmap bitmap, RectangleF target)
