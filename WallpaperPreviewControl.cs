@@ -79,7 +79,8 @@ public sealed class WallpaperPreviewControl : HwndHost
 
     protected override HandleRef BuildWindowCore(HandleRef hwndParent)
     {
-        _container = CreateWindowEx(0, "STATIC", "HYPNIX preview", 0x40000000 | 0x10000000 | 0x02000000,
+        // SS_BLACKRECT avoids a white native placeholder while a renderer starts or is suspended.
+        _container = CreateWindowEx(0, "STATIC", "HYPNIX preview", 0x40000000 | 0x10000000 | 0x02000000 | 0x00000004,
             0, 0, 2, 2, hwndParent.Handle, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
         if (_container == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         Schedule();

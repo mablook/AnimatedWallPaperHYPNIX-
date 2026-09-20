@@ -28,8 +28,9 @@ internal sealed class VideoWallpaperSession : IWallpaperSession
         try
         {
             session._host = new NativeWallpaperHost(NativeRenderMode.Video,
-                request.Preview is null ? DesktopWorker.GetMonitorTargets() : null, preview: request.Preview);
-            if (request.Preview is null) DesktopWorker.AttachWallpaperWindow(session._host.Handle);
+                request.Preview is null && request.Target is null ? DesktopWorker.GetMonitorTargets() : null,
+                preview: request.Preview, target: request.Target);
+            if (request.Preview is null) DesktopWorker.AttachWallpaperWindow(session._host.Handle, request.Target);
             session._decoder = new Process
             {
                 StartInfo = MediaTools.StartInfo(executable,

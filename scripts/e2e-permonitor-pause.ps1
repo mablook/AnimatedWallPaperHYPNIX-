@@ -11,7 +11,7 @@
     It also confirms that transparent/tool overlays (e.g. the NVIDIA GeForce overlay) do NOT pause a monitor.
 
     Proof is twofold: authoritative internal logs ("Foreground state changed ... Covered=[...]" and
-    "Native host monitor pause changed. Monitors=...") plus a frame-diff capture of clean monitors (covered
+    "Display wallpaper pause changed. Monitors=...") plus a frame-diff capture of clean monitors (covered
     monitors cannot be captured because the covering window is on top, so those are proven from the logs).
 
     The user's settings.json is backed up and always restored. MUST run in Windows PowerShell 5.1 (the
@@ -32,7 +32,7 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
 }
 
 $projectRoot = Split-Path $PSScriptRoot -Parent
-if (-not $Exe) { $Exe = Join-Path $projectRoot "bin\$Configuration\net8.0-windows\HYPNIX.exe" }
+if (-not $Exe) { $Exe = Join-Path $projectRoot "bin\$Configuration\net8.0-windows10.0.19041.0\HYPNIX.exe" }
 if (-not (Test-Path -LiteralPath $Exe)) { throw "HYPNIX.exe not found at '$Exe'. Build it first (dotnet build -c $Configuration)." }
 
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.Forms, System.Drawing
@@ -111,6 +111,7 @@ try {
     $cfg = Get-Content $settings -Raw | ConvertFrom-Json
     $cfg.AppPauseMode = 2; $cfg.PausePerMonitor = $true; $cfg.PauseOnBattery = $false
     $cfg.SelectedWallpaperId = 'built-in-ambient'
+    $cfg | Add-Member -NotePropertyName DisplayWallpapers -NotePropertyValue @{} -Force
     ($cfg | ConvertTo-Json -Depth 8) | Set-Content $settings -Encoding UTF8
     Write-Host "settings: AppPauseMode=2, PausePerMonitor=true, wallpaper=ambient (backup at $backup)"
 
@@ -121,7 +122,7 @@ try {
     for ($i = 0; $i -lt 20 -and -not $root; $i++) { $root = $Auto::RootElement.FindFirst($TS::Children, $cond); if (-not $root) { Start-Sleep -Milliseconds 300 } }
     if (-not $root) { throw 'HYPNIX window not found via UI Automation.' }
     Select-Item $root 0
-    Invoke-El (Find-ByAutoId $root 'StartButton')
+    Invoke-El (Find-ByAutoId $root 'ApplyAllButton')
     Write-Host 'clicked Start (ambient)'
     Pump 3000
     try { $root.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern).SetWindowVisualState('Minimized') } catch {}
@@ -143,7 +144,7 @@ try {
     Pump 3500
     $b = Log-Since $mark
     $covB = ($b | Select-String 'Foreground state changed' | Select-Object -Last 1).Line
-    $pauseB = ($b | Select-String 'Native host monitor pause changed' | Select-Object -Last 1).Line
+    $pauseB = ($b | Select-String 'Display wallpaper pause changed' | Select-Object -Last 1).Line
     Check 'B: detection reports Covered=[0]' ($covB -match 'Covered=\[0\];')
     Check 'B: host pauses Monitors=0 only' ($pauseB -match 'Monitors=0$')
     $fb1 = Animation-Fraction 1
@@ -156,7 +157,7 @@ try {
     Pump 3500
     $c = Log-Since $mark
     Check 'C: detection reports Covered=[0,1]' ([bool]($c | Select-String 'Covered=\[0,1\]' | Select-Object -Last 1))
-    Check 'C: host pauses Monitors=0,1 (all) [Rule 2]' ([bool]($c | Select-String 'Native host monitor pause changed\. Monitors=0,1$' | Select-Object -Last 1))
+    Check 'C: host pauses Monitors=0,1 (all) [Rule 2]' ([bool]($c | Select-String 'Display wallpaper pause changed\. Monitors=0,1$' | Select-Object -Last 1))
 
     # --- Phase D: minimize both -> both animate again (Rule 3) ---
     $mark = Log-Count
@@ -164,7 +165,7 @@ try {
     Pump 3500
     $d = Log-Since $mark
     Check 'D: detection reports Covered=[] (clean)' ([bool]($d | Select-String 'Covered=\[\];' | Select-Object -Last 1))
-    Check 'D: host resumes Monitors=none [Rule 3]' ([bool]($d | Select-String 'Native host monitor pause changed\. Monitors=none$' | Select-Object -Last 1))
+    Check 'D: host resumes Monitors=none [Rule 3]' ([bool]($d | Select-String 'Display wallpaper pause changed\. Monitors=none$' | Select-Object -Last 1))
     $fd0 = Animation-Fraction 0; $fd1 = Animation-Fraction 1
     Write-Host "PhaseD animation: mon0=$fd0 mon1=$fd1"
     Check 'D: monitor 0 animates again [Rule 3]' ($fd0 -gt 0.005)

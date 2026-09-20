@@ -1,10 +1,17 @@
 {
-  "preview": "../aethelis-audio-visualizer/preview.png",
+  "preview": "preview.png",
   "type": "native-audio-visualizer",
   "kind": "FlamethrowerRingV2",
   "title": "Flamethrower Ring V2",
   "id": "flamethrower-ring-v2",
-  "previewKind": "example",
+  "previewKind": "captured-preview",
   "author": "Marcelo Bossle",
-  "license": "LicenseRef-HYPNIX-Proprietary"
+  "license": "LicenseRef-HYPNIX-Proprietary",
+  "previewCapture": {
+    "width": 960,
+    "height": 540,
+    "timeSeconds": 3,
+    "audio": "quiet synthetic spectrum",
+    "source": "production preview renderer"
+  }
 }

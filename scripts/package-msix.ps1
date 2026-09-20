@@ -13,7 +13,7 @@
 param(
     [Parameter(Mandatory)][string]$Version,
     [switch]$SelfSign,
-    [string]$CertSubject = 'CN=Marcelo Bossle',
+    [string]$CertSubject,
     [string]$OutputDir = 'artifacts/msix'
 )
 $ErrorActionPreference = 'Stop'
@@ -21,8 +21,11 @@ $projectRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $projectRoot
 try {
     # MSIX versions are strictly 4-part numeric with a zero revision; no SemVer pre-release suffix.
-    if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Version must be x.y.z (no pre-release for MSIX): $Version" }
+    if ($Version -notmatch '^[1-9]\d*\.(0|[1-9]\d*)\.(0|[1-9]\d*)$' -or @($Version.Split('.') | Where-Object { [long]$_ -gt 65535 }).Count) { throw "MSIX version must be x.y.z, major > 0, each component <= 65535: $Version" }
     $msixVersion = "$Version.0"
+    [xml]$manifest = Get-Content -Raw (Join-Path $projectRoot 'packaging/msix/AppxManifest.xml')
+    if (-not $CertSubject) { $CertSubject = $manifest.Package.Identity.Publisher }
+    if ($SelfSign -and $CertSubject -ne $manifest.Package.Identity.Publisher) { throw 'Certificate subject must match the MSIX manifest Publisher.' }
 
     $sdkBin = Get-ChildItem 'C:/Program Files (x86)/Windows Kits/10/bin' -Directory |
         Where-Object { $_.Name -match '^10\.' } | Sort-Object Name -Descending |
@@ -32,11 +35,11 @@ try {
     $signtool = Join-Path $sdkBin 'signtool.exe'
 
     # Self-contained publish into a clean layout (MSIX ships the runtime; full-trust keeps real paths).
-    $staging = [IO.Path]::GetFullPath((Join-Path $OutputDir 'staging'), $projectRoot)
-    if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+    $staging = Join-Path $projectRoot ('artifacts/package-work/msix-' + [Guid]::NewGuid().ToString('N'))
     dotnet publish AnimatedWallPaper.csproj -c Release -p:PublishProfile=win-x64-self-contained `
         "-p:PublishDir=$staging/" "-p:Version=$Version"
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
+    & (Join-Path $PSScriptRoot 'copy-distribution-notices.ps1') -PublishedDirectory $staging | Out-Null
 
     # Lay out the manifest (with the version substituted) and the Store visual assets.
     (Get-Content -Raw packaging/msix/AppxManifest.xml).Replace('{VERSION}', $msixVersion) |
@@ -53,7 +56,7 @@ try {
 
     if ($SelfSign) {
         # Local sideload only. The cert subject must match the manifest Publisher.
-        $cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq $CertSubject -and $_.HasPrivateKey } | Select-Object -First 1
+        $cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq $CertSubject -and $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date) -and $_.NotBefore -le (Get-Date) -and $_.EnhancedKeyUsageList.ObjectId -contains '1.3.6.1.5.5.7.3.3' } | Sort-Object NotAfter -Descending | Select-Object -First 1
         if (-not $cert) {
             $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $CertSubject `
                 -KeyUsage DigitalSignature -CertStoreLocation Cert:\CurrentUser\My `
@@ -68,4 +71,5 @@ try {
     } else {
         Write-Output 'Unsigned package (Partner Center signs on Store submission). Use -SelfSign to sideload-test.'
     }
+    ((Get-FileHash -LiteralPath $msix).Hash + '  ' + [IO.Path]::GetFileName($msix)) | Set-Content "$msix.sha256" -Encoding ascii
 } finally { Pop-Location }

@@ -13,11 +13,21 @@ internal sealed class AppSettings
     public bool PausePerMonitor { get; set; }
     public bool PauseOnBattery { get; set; }
     public bool AudioReactive { get; set; } = true;
+    public bool PreviewPaneCollapsed { get; set; }
     public string? MediaToolsDirectory { get; set; }
     public Dictionary<string, VisualizerPreferences> Visualizers { get; set; } = [];
+    public Dictionary<string, DisplayWallpaperSettings> DisplayWallpapers { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
     public List<VisualizerPreset> VisualizerPresets { get; set; } = [];
     public List<LocalVideo> Videos { get; set; } = [];
     public List<SavedDisplay> Displays { get; set; } = [];
+}
+
+internal sealed class DisplayWallpaperSettings
+{
+    public string WallpaperId { get; set; } = "built-in-ambient";
+    public bool Enabled { get; set; }
+    public Dictionary<string, VisualizerPreferences> Visualizers { get; set; } = [];
 }
 
 internal sealed record LocalVideo(string Id, string Path, string Title);
@@ -67,9 +77,21 @@ internal sealed class AppSettingsStore(string? filePath = null)
             if (value is null || value.SchemaVersion != 1) return new();
             value.FramesPerSecond = FrameRatePolicy.Normalize(value.FramesPerSecond);
             value.AppPauseMode = Math.Clamp(value.AppPauseMode, 0, 2);
-            value.SelectedWallpaperId ??= "built-in-ambient";
-            value.Visualizers = (value.Visualizers ?? []).Where(item => item.Value is not null)
-                .ToDictionary(item => item.Key, item => item.Value.Normalize());
+            if (string.IsNullOrWhiteSpace(value.SelectedWallpaperId))
+                value.SelectedWallpaperId = "built-in-ambient";
+            value.Visualizers = NormalizeVisualizers(value.Visualizers);
+            var displayWallpapers = new Dictionary<string, DisplayWallpaperSettings>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (deviceId, displaySettings) in value.DisplayWallpapers ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(deviceId) || displaySettings is null) continue;
+                if (string.IsNullOrWhiteSpace(displaySettings.WallpaperId))
+                    displaySettings.WallpaperId = "built-in-ambient";
+                displaySettings.Visualizers = NormalizeVisualizers(displaySettings.Visualizers);
+                // Device IDs survive reconnects and may differ only in casing. Keep saved
+                // assignments even when that display is absent from the current desktop.
+                displayWallpapers[deviceId] = displaySettings;
+            }
+            value.DisplayWallpapers = displayWallpapers;
             value.VisualizerPresets = VisualizerPresetLibrary.Normalize(value.VisualizerPresets);
             if (value.VisualizerDefaultsVersion < 2)
             {
@@ -97,6 +119,11 @@ internal sealed class AppSettingsStore(string? filePath = null)
             return new();
         }
     }
+
+    private static Dictionary<string, VisualizerPreferences> NormalizeVisualizers(
+        Dictionary<string, VisualizerPreferences>? visualizers) => (visualizers ?? [])
+        .Where(item => !string.IsNullOrWhiteSpace(item.Key) && item.Value is not null)
+        .ToDictionary(item => item.Key, item => item.Value.Normalize(), StringComparer.Ordinal);
 
     public bool Save(AppSettings settings)
     {

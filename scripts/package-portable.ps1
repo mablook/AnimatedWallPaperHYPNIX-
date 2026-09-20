@@ -62,32 +62,8 @@ try {
         if (@($catalog | Where-Object kind -eq $kind).Count -ne 1) { throw "Missing or duplicate built-in: $kind" }
     }
 
-    Copy-Item -LiteralPath LICENSE -Destination (Join-Path $staging 'HYPNIX-LICENSE.txt')
     Copy-Item -LiteralPath docs/DISTRIBUTION.md -Destination (Join-Path $staging 'START-HERE.md')
-    Copy-Item -LiteralPath docs/licenses -Destination (Join-Path $staging 'licenses') -Recurse
-
-    # Preserve the license/notice files provided by the resolved NuGet runtime packs and libraries.
-    $assets = Get-Content -Raw obj/project.assets.json | ConvertFrom-Json
-    $packageRoots = @($assets.packageFolders.PSObject.Properties.Name)
-    $dependencies = foreach ($library in $deps.libraries.PSObject.Properties) {
-        if ($library.Name.StartsWith('HYPNIX/')) { continue }
-        $packageKey = $library.Name -replace '^runtimepack\.', ''
-        $packageFolder = $null
-        foreach ($root in $packageRoots) {
-            $candidate = Join-Path $root $packageKey.ToLowerInvariant()
-            if (Test-Path -LiteralPath $candidate) { $packageFolder = $candidate; break }
-        }
-        if (!$packageFolder) { throw "Cannot locate dependency notices: $packageKey" }
-        $noticeFolder = Join-Path $staging "licenses/packages/$($packageKey.Replace('/', '-'))"
-        New-Item -ItemType Directory -Path $noticeFolder -Force | Out-Null
-        $nuspec = Get-ChildItem -LiteralPath $packageFolder -Filter '*.nuspec' | Select-Object -First 1
-        [xml]$metadata = Get-Content -LiteralPath $nuspec.FullName
-        Copy-Item -LiteralPath $nuspec.FullName -Destination $noticeFolder
-        Get-ChildItem -LiteralPath $packageFolder -File | Where-Object Name -Match '^(LICENSE|THIRD-PARTY-NOTICES)(\..+)?$' |
-            Copy-Item -Destination $noticeFolder
-        [ordered]@{ package = $packageKey; license = $metadata.package.metadata.license.InnerText;
-            copyright = $metadata.package.metadata.copyright; repository = $metadata.package.metadata.repository.url }
-    }
+    $dependencies = @(& (Join-Path $PSScriptRoot 'copy-distribution-notices.ps1') -PublishedDirectory $staging)
     $manifest = [ordered]@{
         formatVersion = 1; package = $packageName; sourceCommit = $revision; sourceWorkingTreeDirty = $sourceDirty
         createdUtc = [DateTime]::UtcNow.ToString('o'); runtime = 'win-x64'; selfContained = $true

@@ -10,6 +10,19 @@ public sealed class AssetContractTests
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     [Fact]
+    public void VisibleWallpapersHaveDistinctFullSizePreviewCaptures()
+    {
+        var entries = WallpaperCatalog.LoadBuiltIns(Path.Combine(RepositoryRoot, "Assets", "Wallpapers"));
+        Assert.Equal(entries.Count, entries.Select(entry => entry.PreviewPath).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        foreach (var entry in entries)
+        {
+            using var bitmap = new Bitmap(entry.PreviewPath!);
+            Assert.Equal(960, bitmap.Width);
+            Assert.Equal(540, bitmap.Height);
+        }
+    }
+
+    [Fact]
     public void PortablePackageInventoryMatchesTheVisibleGallery()
     {
         var script = File.ReadAllText(Path.Combine(RepositoryRoot, "scripts", "package-portable.ps1"));

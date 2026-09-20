@@ -15,12 +15,12 @@ internal sealed class WallpaperSession : IWallpaperSession
         {
             var mode = WallpaperSessionFactory.RenderMode(request.Kind);
             _host = new NativeWallpaperHost(mode,
-                request.Preview is null ? DesktopWorker.GetMonitorTargets() : null,
-                mode == NativeRenderMode.VisualizerDemo ? request.BackgroundPath : null, request.Preview);
+                request.Preview is null && request.Target is null ? DesktopWorker.GetMonitorTargets() : null,
+                mode == NativeRenderMode.VisualizerDemo ? request.BackgroundPath : null, request.Preview, request.Target);
             _usesAudio = mode != NativeRenderMode.Ambient;
             if (_usesAudio) _audioSubscription = AudioSpectrumSource.Subscribe(_host.SubmitAudioBands);
             if (request.Preview is null)
-                DesktopWorker.AttachWallpaperWindow(_host.Handle,
+                DesktopWorker.AttachWallpaperWindow(_host.Handle, request.Target,
                     useLayeredWindow: mode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire));
             _host.UpdateVisualizerSettings(request.Settings??VisualizerSettings.Default);
             _host.Start(request.FramesPerSecond, reveal: false);

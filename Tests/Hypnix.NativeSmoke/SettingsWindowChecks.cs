@@ -43,7 +43,7 @@ internal static class SettingsWindowChecks
         w.SetWallpaper(catalog.Single(e=>e.Kind==WallpaperKind.LivingFire));w.LoadValues(new(Glow:0,ColorTheme:1));
         foreach(string tab in new[]{"View","Effects","More"}) {
             ((RadioButton)w.FindName(tab+"Tab")).IsChecked=true;
-            foreach(var size in new[]{new Size(408,748),new Size(348,408)}) {
+            foreach(var size in new[]{new Size(1028,768),new Size(688,668),new Size(348,468)}) {
                 var root=(FrameworkElement)w.Content;root.Measure(size);root.Arrange(new Rect(size));root.UpdateLayout();
                 var bitmap=new RenderTargetBitmap((int)size.Width,(int)size.Height,96,96,PixelFormats.Pbgra32);bitmap.Render(root);
                 var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));

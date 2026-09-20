@@ -19,6 +19,7 @@ public partial class VisualizerSettingsWindow : Window
     private VisualizerPreferences _values = new();
     private VisualizerPreferences? _beforeReset;
     private List<VisualizerPreset> _presets = [];
+    private bool _previewSuspended;
     internal event Action<VisualizerPreferences>? Changed;
     internal event Action? PresetsChanged;
 
@@ -29,14 +30,49 @@ public partial class VisualizerSettingsWindow : Window
         LoadValues(new());
         ApplyAccessibilityTheme();
         SystemParameters.StaticPropertyChanged += SystemThemeChanged;
-        Closed += (_, _) => SystemParameters.StaticPropertyChanged -= SystemThemeChanged;
+        Closed += (_, _) => { SystemParameters.StaticPropertyChanged -= SystemThemeChanged; EditorLivePreview.Dispose(); };
+        StateChanged += (_, _) => UpdatePreviewState();
+        EditorLivePreview.StatusChanged += status => EditorPreviewStatus.Text = status;
         Loaded += (_, _) => {
-            var work=SystemParameters.WorkArea;
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            var bounds = System.Windows.Forms.Screen.FromHandle(handle).WorkingArea;
+            var source = System.Windows.Interop.HwndSource.FromHwnd(handle);
+            var transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+            var work = Rect.Transform(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), transform);
             Height=Math.Min(Height,work.Height-24);
             Width=Math.Min(Width,work.Width-24);
             Top=Math.Clamp(Top,work.Top,Math.Max(work.Top,work.Bottom-Height));
             Left=Math.Clamp(Left,work.Left,Math.Max(work.Left,work.Right-Width));
         };
+    }
+    internal void SetPreview(WallpaperRequest request, double aspect, string display, bool audioEnabled)
+    {
+        SetPreviewDisplay(aspect, display);
+        EditorLivePreview.SetAudioEnabled(audioEnabled);
+        EditorLivePreview.Select(request);
+        UpdatePreviewState();
+    }
+    internal void SetPreviewDisplay(double aspect, string display)
+    {
+        EditorPreviewAspect.AspectRatio = aspect;
+        EditorDisplayText.Text = display;
+    }
+    internal void SetAudioEnabled(bool enabled) => EditorLivePreview.SetAudioEnabled(enabled);
+    internal void SetFrameCap(int fps) => EditorLivePreview.SetFrameCap(fps);
+    internal void SetPreviewSuspended(bool suspended) { _previewSuspended = suspended; UpdatePreviewState(); }
+    private void UpdatePreviewState() => EditorLivePreview.SetSuspended(_previewSuspended || WindowState == WindowState.Minimized);
+    private void EditorBody_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var wide = EditorBody.ActualWidth >= 800;
+        EditorPreviewStatus.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
+        EditorGap.Width = new GridLength(wide ? 16 : 0);
+        EditorControlsColumn.Width = new GridLength(wide ? 420 : 0);
+        EditorPreviewRow.Height = wide ? new GridLength(1, GridUnitType.Star) : new GridLength(Math.Clamp(EditorBody.ActualHeight * .32, 120, 220));
+        EditorControlsRow.Height = wide ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        Grid.SetColumn(EditorControlsPanel, wide ? 2 : 0);
+        Grid.SetRow(EditorControlsPanel, wide ? 0 : 1);
+        Grid.SetColumnSpan(EditorControlsPanel, wide ? 1 : 3);
+        EditorPreviewPanel.Margin = wide ? new Thickness(12, 8, 0, 12) : new Thickness(6, 8, 6, 6);
     }
     internal void SetPresetLibrary(List<VisualizerPreset> presets) { _presets=presets; RefreshPresets(); }
     internal void SetWallpaper(WallpaperEntry entry)
@@ -76,6 +112,7 @@ public partial class VisualizerSettingsWindow : Window
             ImageBackground.IsChecked=bg.Mode=="image";
             RefreshBackground();
         } finally {_suppress=previous;}
+        EditorLivePreview.UpdateSettings(_values.ToSettings());
     }
     internal VisualizerPreferences ReadValues() => _values with {
         Intensity=(float)IntensitySlider.Value,Sensitivity=(float)SensitivitySlider.Value,
@@ -83,7 +120,7 @@ public partial class VisualizerSettingsWindow : Window
         Scale=(float)SizeSlider.Value,OffsetX=(float)PositionXSlider.Value,OffsetY=(float)PositionYSlider.Value,
         Sparks=SparksCheckBox.IsChecked==true
     };
-    private void Emit() { if(_suppress)return; _values=ReadValues().Normalize();Changed?.Invoke(_values); }
+    private void Emit() { if(_suppress)return; _values=ReadValues().Normalize();EditorLivePreview.UpdateSettings(_values.ToSettings());Changed?.Invoke(_values); }
     private void OnControlChanged(object sender,RoutedPropertyChangedEventArgs<double> e)=>Emit();
     private void OnComboChanged(object sender,SelectionChangedEventArgs e)=>Emit();
     private void Sparks_Changed(object sender,RoutedEventArgs e)=>Emit();

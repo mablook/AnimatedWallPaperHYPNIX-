@@ -6,6 +6,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using System.Windows.Media;
+using Brush = System.Windows.Media.Brush;
 using AnimatedWallPaper.Services;
 
 namespace AnimatedWallPaper;
@@ -16,7 +18,20 @@ namespace AnimatedWallPaper;
     Justification = "Owned services are disposed in OnClosed, the WPF window teardown path.")]
 public partial class MainWindow : Window
 {
-    private readonly WallpaperController _wallpaperController = new();
+    public static readonly DependencyProperty ActiveWallpaperIdProperty = DependencyProperty.Register(
+        nameof(ActiveWallpaperId), typeof(string), typeof(MainWindow), new PropertyMetadata(null));
+    public string? ActiveWallpaperId { get => (string?)GetValue(ActiveWallpaperIdProperty); private set => SetValue(ActiveWallpaperIdProperty, value); }
+    private bool _previewRequested;
+    private bool _appSettingsOpen;
+    private sealed record PreviewDisplay(DesktopWorker.WallpaperTarget Target, int Number)
+    {
+        public string Label => $"Display {Number} · {Target.Width} × {Target.Height}";
+        public double Aspect => (double)Target.Width / Math.Max(1, Target.Height);
+    }
+    private PreviewDisplay? SelectedDisplay => TargetDisplayCombo.SelectedItem as PreviewDisplay;
+    private readonly DisplayWallpaperController _wallpaperController;
+    private readonly Func<DesktopWorker.WallpaperTarget[]> _getMonitorTargets;
+    private bool _syncingDisplaySelection;
     private readonly ForegroundAppMonitor _foregroundMonitor = new();
     private readonly WallpaperLibraryService _wallpaperLibrary;
     private readonly DesktopEnvironmentMonitor _environment = new();
@@ -43,8 +58,12 @@ public partial class MainWindow : Window
 
     public MainWindow() : this(new AppSettingsStore(), null) { }
 
-    internal MainWindow(AppSettingsStore settingsStore, string? libraryRoot)
+    internal MainWindow(AppSettingsStore settingsStore, string? libraryRoot, DisplayWallpaperController? controller = null, AppLicenseService? license = null,
+        Func<DesktopWorker.WallpaperTarget[]>? getMonitorTargets = null)
     {
+        _license = license ?? new AppLicenseService(new MicrosoftStoreLicenseProvider());
+        _wallpaperController = controller ?? new();
+        _getMonitorTargets = getMonitorTargets ?? DesktopWorker.GetMonitorTargets;
         _settingsStore = settingsStore;
         _wallpaperLibrary = new WallpaperLibraryService(libraryRoot);
         _settings = _settingsStore.Load();
@@ -67,7 +86,7 @@ public partial class MainWindow : Window
         _foregroundMonitor.StateChanged += (_, _) => ApplyPlaybackPolicy();
         _wallpaperController.StateChanged += () => ApplyPlaybackPolicy();
         _environment.PolicyChanged += ApplyPlaybackPolicy;
-        _environment.LayoutChanged += () => { RememberDisplays(); _recoveryAttempts = 0; ScheduleRecovery(); };
+        _environment.LayoutChanged += () => { _layoutRecoveryPending = true; RememberDisplays(); _recoveryAttempts = 0; ScheduleRecovery(); };
         _environment.HealthCheck += () =>
         {
             if (_wallpaperController.IsRunning && !_wallpaperController.IsHealthy) ScheduleRecovery();
@@ -77,6 +96,10 @@ public partial class MainWindow : Window
         StateChanged += (_, _) => UpdatePreviewSuspension();
         _foregroundMonitor.Start();
         RememberDisplays();
+        _license.Changed += UpdateLicenseUi;
+        _license.RefreshRequested += OnStoreLicenseChanged;
+        Activated += RefreshLicenseOnActivate;
+        UpdateLicenseUi();
         UpdateStatus();
         CheckForUpdates();
     }
@@ -108,17 +131,17 @@ public partial class MainWindow : Window
             WallpaperKind.ExampleVideo, null, VideoPath: video.Path)));
         WallpaperGallery.ItemsSource = entries;
         WallpaperGallery.SelectedItem = entries.FirstOrDefault(entry => entry.Id == selectedId) ?? entries.FirstOrDefault();
-        LibraryStatusText.Text = $"{entries.Count} wallpapers · {invalid} unavailable packages";
+        LibraryStatusText.Text = invalid == 0 ? $"{entries.Count} wallpapers" : $"{entries.Count} wallpapers · {invalid} unavailable packages";
         _isUiInitialized = initialized;
         if (initialized) UpdateSelection();
     }
 
-    private async void WallpaperGallery_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void WallpaperGallery_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isUiInitialized) return;
         UpdateSelection();
         QueueSave();
-        if (_playRequested) await StartSelectedAsync();
+        UpdateStatus();
     }
 
     private void UpdateSelection()
@@ -133,6 +156,8 @@ public partial class MainWindow : Window
             if (entry.IsVisualizer)
             {
                 _settingsWindow.SetWallpaper(entry);
+                _editorEntry = entry;
+                _editorDisplayId = SelectedDisplay?.Target.DeviceId;
                 _settingsWindow.LoadValues(CurrentPreferencesFor(entry));
             }
             else
@@ -140,83 +165,75 @@ public partial class MainWindow : Window
                 _settingsWindow.Close();
             }
         }
-        try { LivePreview.Select(WallpaperCatalog.Request(entry, _settings)); }
+        try {
+            var request = RequestForDisplay(entry, SelectedDisplay?.Target.DeviceId);
+            LivePreview.Select(request);
+            _settingsWindow?.SetPreview(request, SelectedDisplay?.Aspect ?? 16d / 9, SelectedDisplay?.Label ?? "Preview", _settings.AudioReactive);
+        }
         catch (Exception exception) { LivePreview.Select(null); ReportError("Preview", exception); }
         UpdatePreviewSuspension();
     }
 
     private async void StartButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!_license.CanPlay) { UpdateLicenseUi(); return; }
         _playRequested = true;
         await StartSelectedAsync();
     }
 
     private async Task StartSelectedAsync()
     {
-        if (Selected is not { } entry) return;
-        var revision = ++_selectionRevision;
-        _changingWallpaper = true;
-        _recoveryAttempts = 0;
-        _recoveryTimer.Stop();
-        StartButton.IsEnabled = false;
-        ErrorText.Text = "";
-        StatusText.Text = "Preparing wallpaper…";
-        try
-        {
-            await _wallpaperController.StartAsync(WallpaperCatalog.Request(entry, _settings));
-            _wallpaperController.SetFrameCap(GetSelectedFps());
-            ApplyVisualizerSettings();
-            _foregroundMonitor.ExcludedProcessId = _wallpaperController.ActiveProcessId;
-            _foregroundMonitor.RefreshNow();
-            ApplyPlaybackPolicy();
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception exception)
-        {
-            if (revision == _selectionRevision)
-            {
-                _playRequested = _wallpaperController.IsRunning;
-                ReportError("Wallpaper could not be started", exception);
-            }
-        }
-        finally
-        {
-            if (revision == _selectionRevision)
-            {
-                _changingWallpaper = false;
-                StartButton.IsEnabled = true;
-                UpdateStatus();
-            }
-        }
+        if (SelectedDisplay is { } display) await ApplyToDisplaysAsync([display.Target]);
     }
 
     private void StopButton_Click(object sender, RoutedEventArgs e) => StopWallpaper();
-    private void StopWallpaper()
+    private void StopWallpaper() => StopWallpapers(persist: true);
+    private void StopWallpapers(bool persist)
     {
         _playRequested = false;
         _selectionRevision++;
         _changingWallpaper = false;
         _recoveryTimer.Stop();
         _wallpaperController.Stop();
-        _foregroundMonitor.ExcludedProcessId = null;
+        if (persist)
+        {
+            foreach (var assignment in _settings.DisplayWallpapers.Values) assignment.Enabled = false;
+            QueueSave();
+        }
         StartButton.IsEnabled = true;
         UpdateStatus();
     }
 
     private void ScheduleRecovery()
     {
-        if (_isQuitting || !_playRequested || _changingWallpaper || _recovering || _recoveryTimer.IsEnabled) return;
+        if (_isQuitting || !_license.CanPlay || !_playRequested || _changingWallpaper || _recovering || _recoveryTimer.IsEnabled || _recoveryAttempts >= 3) return;
         _recoveryTimer.Start();
     }
 
     private async Task RecoverAsync()
     {
-        if (_isQuitting || !_playRequested || _changingWallpaper || _recovering || _wallpaperController.ActiveRequest is not { } request) return;
+        if (_isQuitting || !_license.CanPlay || !_playRequested || _changingWallpaper || _recovering || _recoveryAttempts >= 3) return;
         _recovering = true;
+        _layoutRecoveryPending = false;
+        var revision = _selectionRevision;
+        var retry = false;
         try
         {
             AppLog.Write("Rebuilding wallpaper after desktop/display/decoder change");
-            await _wallpaperController.StartAsync(request);
+            var failures = new List<Exception>();
+            try { await _wallpaperController.ReconcileAsync(_getMonitorTargets()); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception exception) { failures.Add(exception); }
+            if (revision != _selectionRevision || !_playRequested || _isQuitting) return;
+            if (!_license.CanPlay) { StopWallpapers(persist: false); return; }
+            // A failed existing session must not prevent an independently saved display,
+            // absent at startup, from receiving its own wallpaper when it reconnects.
+            try { await RestoreMissingDisplaysAsync(); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception exception) { failures.Add(exception); }
+            if (revision != _selectionRevision || !_playRequested || _isQuitting) return;
+            if (!_license.CanPlay) { StopWallpapers(persist: false); return; }
+            if (failures.Count > 0) throw new AggregateException("Some displays could not be restored.", failures);
             _recoveryAttempts = 0;
             _foregroundMonitor.RefreshNow();
             ApplyPlaybackPolicy();
@@ -225,13 +242,13 @@ public partial class MainWindow : Window
         catch (Exception exception)
         {
             ReportError("Desktop recovery", exception);
+            retry = true;
             if (++_recoveryAttempts >= 3)
             {
-                StopWallpaper();
-                ErrorText.Text += " Playback stopped after three failed attempts. Use Start to retry.";
+                ErrorText.Text += " Use Apply to retry the affected display. Other displays keep their wallpapers.";
             }
         }
-        finally { _recovering = false; }
+        finally { _recovering = false; UpdateStatus(); if (_layoutRecoveryPending || retry && _recoveryAttempts < 3) ScheduleRecovery(); }
     }
 
     private void AudioReactiveChanged(object sender, RoutedEventArgs e)
@@ -241,6 +258,7 @@ public partial class MainWindow : Window
         _settings.AudioReactive = enabled;
         _wallpaperController.SetAudioEnabled(enabled);
         LivePreview.SetAudioEnabled(enabled);
+        _settingsWindow?.SetAudioEnabled(enabled);
         if (_trayAudioItem is not null && _trayAudioItem.Checked != enabled) _trayAudioItem.Checked = enabled;
         QueueSave();
     }
@@ -253,6 +271,7 @@ public partial class MainWindow : Window
         _settings.FramesPerSecond = GetSelectedFps();
         _wallpaperController.SetFrameCap(_settings.FramesPerSecond);
         LivePreview.SetFrameCap(_settings.FramesPerSecond);
+        _settingsWindow?.SetFrameCap(_settings.FramesPerSecond);
         QueueSave();
     }
     private int GetSelectedFps() => FpsComboBox.SelectedItem is ComboBoxItem item &&
@@ -271,51 +290,91 @@ public partial class MainWindow : Window
             if (decision.PauseAll)
             {
                 _wallpaperController.Pause();
-                _wallpaperController.SetPausedMonitors(Array.Empty<int>());
+                _wallpaperController.SetPausedDisplays(Array.Empty<string>());
             }
             else
             {
-                _wallpaperController.SetPausedMonitors(decision.PausedMonitors);
+                var displays = TargetDisplayCombo.Items.Cast<PreviewDisplay>().ToArray();
+                _wallpaperController.SetPausedDisplays(decision.PausedMonitors.Where(index => index >= 0 && index < displays.Length)
+                    .Select(index => displays[index].Target.DeviceId).ToArray());
                 _wallpaperController.Resume();
             }
         }
         catch (Exception exception) { ReportError("Playback policy", exception); ScheduleRecovery(); }
+        var pausedDisplays = TargetDisplayCombo.Items.Cast<PreviewDisplay>().Select((display, index) =>
+            (display, index)).Where(value => _wallpaperController.IsDisplayPaused(value.display.Target.DeviceId))
+            .Select(value => value.index).ToArray();
+        var pauseReport = pausedDisplays.Length == 0 ? "none" : string.Join(",", pausedDisplays);
+        if (_lastDisplayPauseReport != pauseReport)
+        {
+            _lastDisplayPauseReport = pauseReport;
+            AppLog.Write($"Display wallpaper pause changed. Monitors={pauseReport}");
+        }
         UpdatePreviewSuspension();
         UpdateStatus();
     }
-    private void UpdatePreviewSuspension() => LivePreview.SetSuspended(!IsVisible ||
-        WindowState == WindowState.Minimized || _environment.SessionLocked ||
-        PauseBatteryCheckBox.IsChecked == true && _foregroundMonitor.IsOnBattery);
+    private void UpdatePreviewSuspension()
+    {
+        var suspended = !_license.CanPlay || !IsVisible || WindowState == WindowState.Minimized || _environment.SessionLocked ||
+            PauseBatteryCheckBox.IsChecked == true && _foregroundMonitor.IsOnBattery;
+        var editorVisible = _settingsWindow is { IsVisible: true, WindowState: not WindowState.Minimized };
+        LivePreview.SetSuspended(suspended || _appSettingsOpen || PreviewPanel.Visibility != Visibility.Visible || editorVisible);
+        if (editorVisible) PreviewStatusText.Text = "Preview open in Customize";
+        _settingsWindow?.SetPreviewSuspended(suspended);
+    }
     private void UpdateStatus()
     {
         var state = _wallpaperController.IsRunning ? _wallpaperController.IsPaused ? "Paused" : "Running" : "Stopped";
-        StatusText.Text = _wallpaperController.IsRunning ? $"{state} · {Decision.Reason}" : state;
-        StatusText.ToolTip = _wallpaperController.ActiveRequest?.Id;
+        var active = SelectedDisplay is { } display ? _wallpaperController.ActiveRequests.GetValueOrDefault(display.Target.DeviceId) : null;
+        ActiveWallpaperId = active?.Id;
+        var title = WallpaperGallery.Items.Cast<WallpaperEntry>().FirstOrDefault(entry => entry.Id == ActiveWallpaperId)?.Title;
+        var count = _wallpaperController.ActiveRequests.Count;
+        StatusText.Text = _changingWallpaper ? "Preparing wallpaper…" : count == 0 ? state : $"{state} · {count} {(count == 1 ? "display" : "displays")}";
+        DisplayWallpaperText.Text = title is null ? "No wallpaper on this display" : $"{(_wallpaperController.IsDisplayPaused(SelectedDisplay!.Target.DeviceId) ? "Paused" : "Playing")} · {title}";
+        StatusText.ToolTip = Decision.Reason;
+        StopButton.IsEnabled = _wallpaperController.IsRunning || _changingWallpaper || _restoringDisplays || _recovering || _playRequested;
+        StartButton.IsEnabled = _license.CanPlay && Selected is not null && SelectedDisplay is not null && !_changingWallpaper && !_recovering && !_restoringDisplays;
+        ApplyAllButton.IsEnabled = StartButton.IsEnabled;
+        ApplyAllButton.Visibility = TargetDisplayCombo.Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        StopDisplayButton.IsEnabled = active is not null && !_changingWallpaper && !_recovering && !_restoringDisplays;
+        StartButton.Content = SelectedDisplay is { } selectedDisplay ? $"Apply to display {selectedDisplay.Number}" : "Apply wallpaper";
+        ApplyTargetText.Text = SelectedDisplay is { } target ? $"Only display {target.Number} will change" : "Connect a display to apply";
     }
 
     private void VisualizerSettingsButton_Click(object sender, RoutedEventArgs e) => OpenVisualizerSettingsWindow();
 
     private void OpenVisualizerSettingsWindow()
     {
-        if (Selected is not { IsVisualizer: true } entry) return;
+        if (!_license.CanPlay || Selected is not { IsVisualizer: true } entry) return;
         if (_settingsWindow is null)
         {
             _settingsWindow = new VisualizerSettingsWindow { Owner = this };
             _settingsWindow.SetPresetLibrary(_settings.VisualizerPresets);
             _settingsWindow.PresetsChanged += QueueSave;
             _settingsWindow.Changed += OnVisualizerWindowChanged;
-            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsWindow.StateChanged += (_, _) => UpdatePreviewSuspension();
+            _settingsWindow.IsVisibleChanged += (_, _) => UpdatePreviewSuspension();
+            _settingsWindow.Closed += (_, _) => { _settingsWindow = null; _editorDisplayId = null; _editorEntry = null; UpdatePreviewSuspension(); };
         }
         _settingsWindow.SetWallpaper(entry);
+        _editorDisplayId = SelectedDisplay?.Target.DeviceId;
+        _editorEntry = entry;
         _settingsWindow.LoadValues(CurrentPreferencesFor(entry));
+        _settingsWindow.SetPreview(RequestForDisplay(entry, SelectedDisplay?.Target.DeviceId), SelectedDisplay?.Aspect ?? 16d / 9,
+            SelectedDisplay?.Label ?? "Preview", _settings.AudioReactive);
+        UpdatePreviewSuspension();
         _settingsWindow.Show();
         _settingsWindow.Activate();
     }
 
     private VisualizerPreferences CurrentPreferencesFor(WallpaperEntry entry)
-        => _settings.Visualizers.GetValueOrDefault(entry.Id) ?? entry.Defaults ?? new VisualizerPreferences();
+        => PreferencesForDisplay(entry, SelectedDisplay?.Target.DeviceId);
 
-    private void OnVisualizerWindowChanged(VisualizerPreferences preferences) => ApplyVisualizerPreferences(preferences);
+    private void OnVisualizerWindowChanged(VisualizerPreferences preferences)
+    {
+        if (_editorEntry is { } entry && _editorDisplayId is { } deviceId)
+            ApplyPreferencesForDisplay(entry, deviceId, preferences);
+    }
 
     // Applies the selected wallpaper's stored preferences to the live session and preview
     // (used when a wallpaper starts). Live edits come through ApplyVisualizerPreferences.
@@ -328,11 +387,16 @@ public partial class MainWindow : Window
     private void ApplyVisualizerPreferences(VisualizerPreferences preferences)
     {
         if (Selected is not { IsVisualizer: true } entry) return;
+        if (SelectedDisplay is { } display) ApplyPreferencesForDisplay(entry, display.Target.DeviceId, preferences);
+    }
+    private void ApplyPreferencesForDisplay(WallpaperEntry entry, string deviceId, VisualizerPreferences preferences)
+    {
         var normalized = preferences.Normalize();
-        _settings.Visualizers[entry.Id] = normalized;
+        DisplayPreferences(deviceId).Visualizers[entry.Id] = normalized;
         var settings = normalized.ToSettings();
-        if (_wallpaperController.ActiveRequest?.Id == entry.Id) _wallpaperController.UpdateVisualizerSettings(settings);
-        LivePreview.UpdateSettings(settings);
+        if (_wallpaperController.ActiveRequests.GetValueOrDefault(deviceId)?.Id == entry.Id)
+            _wallpaperController.UpdateVisualizerSettings(deviceId, settings);
+        if (SelectedDisplay?.Target.DeviceId == deviceId && Selected?.Id == entry.Id) LivePreview.UpdateSettings(settings);
         QueueSave();
     }
 
@@ -396,7 +460,16 @@ public partial class MainWindow : Window
 
     private void RememberDisplays()
     {
-        var snapshots = DesktopWorker.GetMonitorTargets().Select(display => new SavedDisplay(
+        var targets = _getMonitorTargets();
+        var selectedDevice = SelectedDisplay?.Target.DeviceId;
+        var displays = targets.Select((display, index) => new PreviewDisplay(display, index + 1)).ToList();
+        _syncingDisplaySelection = true;
+        TargetDisplayCombo.ItemsSource = PreviewDisplayCombo.ItemsSource = displays;
+        TargetDisplayCombo.SelectedItem = PreviewDisplayCombo.SelectedItem = displays.FirstOrDefault(display =>
+            string.Equals(display.Target.DeviceId, selectedDevice, StringComparison.OrdinalIgnoreCase)) ?? displays.FirstOrDefault();
+        _syncingDisplaySelection = false;
+        UpdateDisplaySelection();
+        var snapshots = targets.Select(display => new SavedDisplay(
             display.DeviceId, display.DeviceName, display.X, display.Y, display.Width, display.Height,
             display.DpiX, display.DpiY));
         // Disconnected displays retain their snapshot; indices are never persisted as identity.
@@ -430,7 +503,7 @@ public partial class MainWindow : Window
         _trayUpdateItem.Click += (_, _) => Dispatcher.Invoke(ApplyUpdate);
         menu.Items.Add(_trayUpdateItem);
         menu.Items.Add("Open HYPNIX", null, (_, _) => Dispatcher.Invoke(ShowMainWindow));
-        menu.Items.Add("Stop wallpaper", null, (_, _) => Dispatcher.Invoke(StopWallpaper));
+        menu.Items.Add("Stop all wallpapers", null, (_, _) => Dispatcher.Invoke(StopWallpaper));
         _trayAudioItem = new System.Windows.Forms.ToolStripMenuItem("Audio reactive") { Checked = _settings.AudioReactive, CheckOnClick = true };
         _trayAudioItem.CheckedChanged += (_, _) => Dispatcher.Invoke(() =>
         {
@@ -480,6 +553,10 @@ public partial class MainWindow : Window
         if (_pendingUpdate is null || _updateService is null) return;
         AppLog.Write("Applying update and restarting.");
         _isQuitting = true;
+        _licenseTimer.Stop();
+        _license.Changed -= UpdateLicenseUi;
+        _license.RefreshRequested -= OnStoreLicenseChanged;
+        _license.Dispose();
         SavePreferences();
         _settingsWindow?.Close();
         _updateService.ApplyAndRestart(_pendingUpdate);
@@ -504,6 +581,10 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _isQuitting = true;
+        _licenseTimer.Stop();
+        _license.Changed -= UpdateLicenseUi;
+        _license.RefreshRequested -= OnStoreLicenseChanged;
+        _license.Dispose();
         SavePreferences();
         _settingsWindow?.Close();
         _recoveryTimer.Stop();
@@ -517,7 +598,7 @@ public partial class MainWindow : Window
         _trayDrawingIcon?.Dispose();
         base.OnClosed(e);
     }
-    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         var enabled = 1;
         // DWMWA_USE_IMMERSIVE_DARK_MODE (20). Best-effort: unsupported on older Windows builds,
@@ -527,11 +608,87 @@ public partial class MainWindow : Window
         var work = SystemParameters.WorkArea;
         MinWidth = Math.Min(MinWidth, Math.Max(320, work.Width - 32));
         MinHeight = Math.Min(MinHeight, Math.Max(320, work.Height - 32));
-        Width = Math.Min(1180, work.Width - 32);
-        Height = Math.Min(760, work.Height - 32);
+        Width = Math.Min(1280, work.Width - 32);
+        Height = Math.Min(820, work.Height - 32);
         Left = work.Left + (work.Width - Width) / 2;
         Top = work.Top + (work.Height - Height) / 2;
         UpdateSelection();
+        if (Selected is { } selected) WallpaperGallery.ScrollIntoView(selected);
+        await InitializeLicenseAsync();
+        if (_license.CanPlay)
+        {
+            try { await RestoreMissingDisplaysAsync(); }
+            catch (Exception exception) { ReportError("Restore wallpapers", exception); ScheduleRecovery(); }
+        }
+    }
+
+    private void ShellRoot_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateLayoutMode();
+    private void UpdateLayoutMode()
+    {
+        if (!_isUiInitialized) return;
+        var mode = LibraryLayout.Resolve(ShellRoot.ActualWidth, ShellRoot.ActualHeight, _previewRequested, _settings.PreviewPaneCollapsed);
+        LibraryWorkspace.Visibility = _appSettingsOpen || LicenseGateVisible ? Visibility.Collapsed : Visibility.Visible;
+        AppSettingsPage.Visibility = _appSettingsOpen && !LicenseGateVisible ? Visibility.Visible : Visibility.Collapsed;
+        LicenseGatePage.Visibility = LicenseGateVisible ? Visibility.Visible : Visibility.Collapsed;
+        LibraryPanel.Visibility = mode == LibraryPreviewMode.Preview ? Visibility.Collapsed : Visibility.Visible;
+        PreviewPanel.Visibility = mode == LibraryPreviewMode.Library ? Visibility.Collapsed : Visibility.Visible;
+        Grid.SetColumn(PreviewPanel, mode == LibraryPreviewMode.Docked ? 2 : 0);
+        Grid.SetColumnSpan(PreviewPanel, mode == LibraryPreviewMode.Docked ? 1 : 3);
+        PreviewColumn.Width = mode == LibraryPreviewMode.Docked ? new GridLength(Math.Min(420, ShellRoot.ActualWidth * .35)) : new GridLength(0);
+        PreviewGap.Width = new GridLength(mode == LibraryPreviewMode.Docked ? 24 : 0);
+        PreviewPanel.Padding = mode == LibraryPreviewMode.Docked ? new Thickness(24, 0, 0, 0) : new Thickness(0);
+        PreviewPanel.BorderThickness = mode == LibraryPreviewMode.Docked ? new Thickness(1, 0, 0, 0) : new Thickness(0);
+        ClosePreviewButton.Content = mode == LibraryPreviewMode.Preview ? "Back to library" : "Hide preview";
+        PreviewButton.Visibility = mode == LibraryPreviewMode.Library ? Visibility.Visible : Visibility.Collapsed;
+        UpdatePreviewSuspension();
+    }
+    private void Preview_Click(object sender, RoutedEventArgs e)
+    {
+        _previewRequested = true; _settings.PreviewPaneCollapsed = false; QueueSave(); UpdateLayoutMode();
+    }
+    private void ClosePreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (LibraryLayout.Resolve(ShellRoot.ActualWidth, ShellRoot.ActualHeight, _previewRequested, _settings.PreviewPaneCollapsed) == LibraryPreviewMode.Docked)
+            _settings.PreviewPaneCollapsed = true;
+        _previewRequested = false; QueueSave(); UpdateLayoutMode();
+    }
+    private void AppSettings_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = true; UpdateLayoutMode(); }
+    private void BackToLibrary_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = false; _previewRequested = false; UpdateLayoutMode(); }
+    private void PreviewDisplay_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isUiInitialized || _syncingDisplaySelection) return;
+        _syncingDisplaySelection = true;
+        if (ReferenceEquals(sender, PreviewDisplayCombo)) TargetDisplayCombo.SelectedItem = PreviewDisplayCombo.SelectedItem;
+        else PreviewDisplayCombo.SelectedItem = TargetDisplayCombo.SelectedItem;
+        _syncingDisplaySelection = false;
+        UpdateDisplaySelection();
+    }
+    private void MonitorMap_SizeChanged(object sender, SizeChangedEventArgs e) => DrawMonitorMap();
+    private void DrawMonitorMap()
+    {
+        if (MonitorMap is null) return;
+        MonitorMap.Children.Clear();
+        var displays = PreviewDisplayCombo.Items.Cast<PreviewDisplay>().ToArray();
+        if (displays.Length == 0 || MonitorMap.ActualWidth <= 0) return;
+        var left = displays.Min(d => d.Target.X); var top = displays.Min(d => d.Target.Y);
+        var width = displays.Max(d => d.Target.X + d.Target.Width) - left;
+        var height = displays.Max(d => d.Target.Y + d.Target.Height) - top;
+        var scale = Math.Min((MonitorMap.ActualWidth - 12) / Math.Max(1, width), 60d / Math.Max(1, height));
+        foreach (var display in displays)
+        {
+            var button = new System.Windows.Controls.Button {
+                Content = display.Number.ToString(System.Globalization.CultureInfo.InvariantCulture), ToolTip = display.Label,
+                Width = Math.Max(1, display.Target.Width * scale - 4), Height = Math.Max(1, display.Target.Height * scale - 4),
+                MinWidth = 0, MinHeight = 0, Padding = new Thickness(0), Margin = new Thickness(0),
+                BorderBrush = (Brush)FindResource(Equals(display, SelectedDisplay) ? "AccentBrush" : "InputBorderBrush"),
+                BorderThickness = new Thickness(Equals(display, SelectedDisplay) ? 2 : 1)
+            };
+            System.Windows.Automation.AutomationProperties.SetName(button, $"Preview {display.Label}");
+            button.Click += (_, _) => TargetDisplayCombo.SelectedItem = display;
+            Canvas.SetLeft(button, (MonitorMap.ActualWidth - width * scale) / 2 + (display.Target.X - left) * scale);
+            Canvas.SetTop(button, 6 + (display.Target.Y - top) * scale);
+            MonitorMap.Children.Add(button);
+        }
     }
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);

@@ -29,7 +29,21 @@ internal static class Program
                 "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
                 string.Concat(resourceXml.Nodes()) + "</ResourceDictionary>");
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (args.Contains("--license-only")) { LicenseWindowChecks.Run(output); return 0; }
+            if (args.Contains("--show-license-demo")) { LicenseWindowChecks.ShowDemo(app, output); return 0; }
+            if (args.Contains("--displays-ui")) { DisplayWindowChecks.Run(output); return 0; }
+            if (args.Contains("--displays-desktop")) { DisplayDesktopChecks.Run(output, args.ElementAtOrDefault(2), args.ElementAtOrDefault(3)); return 0; }
+            if (args.Contains("--capture-thumbnails"))
+            {
+                var surface = CreateWindowEx(0, "STATIC", "HYPNIX thumbnail surface", 0x80000000,
+                    0, 0, 960, 540, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+                if (surface == IntPtr.Zero) throw new InvalidOperationException("Thumbnail render surface could not be created.");
+                try { ThumbnailCapture.Run(surface, output); }
+                finally { DestroyWindow(surface); }
+                return 0;
+            }
             if(args.Contains("--settings-only")){SettingsWindowChecks.Run(output);return 0;}
+            if(args.Contains("--layout-only")){SettingsWindowChecks.Run(output);LibraryLayoutChecks.Run(output);return 0;}
             SettingsWindowChecks.Run(output);
             if (args.Contains("--show-fire-gallery"))
             {

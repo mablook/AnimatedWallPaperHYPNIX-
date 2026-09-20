@@ -45,28 +45,46 @@ jobs:
 
       - name: Resolve version
         id: ver
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          $v = if ('${{ github.event_name }}' -eq 'workflow_dispatch') { '${{ github.event.inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
-          if ($v -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Invalid version: $v" }
+          $v = if ($env:EVENT_NAME -eq 'workflow_dispatch') { $env:INPUT_VERSION } else { $env:REF_NAME.TrimStart('v') }
+          if ($v -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') { throw "Invalid stable version: $v" }
           "version=$v" >> $env:GITHUB_OUTPUT
 
       - name: Install Velopack CLI (matches the Velopack package version)
         run: dotnet tool install -g vpk --version 1.2.0
 
-      - name: Publish self-contained win-x64
-        run: dotnet publish AnimatedWallPaper.csproj -c Release -p:PublishProfile=win-x64-self-contained "-p:PublishDir=$env:GITHUB_WORKSPACE/publish/" "-p:Version=${{ steps.ver.outputs.version }}"
+      - name: Run regression tests before packaging
+        run: dotnet test Tests/Hypnix.Tests/Hypnix.Tests.csproj -c Release --logger "trx;LogFileName=regression.trx" --results-directory artifacts/test-results
 
-      # Optional: pull the current live release from the public feed so vpk can build a small delta.
-      # Set the RELEASE_FEED_URL repository variable to your host; skipped (full-only) if unset.
       - name: Download live release for delta
         if: ${{ vars.RELEASE_FEED_URL != '' }}
-        continue-on-error: true
-        run: vpk download http --url ${{ vars.RELEASE_FEED_URL }} -o releases -c win
+        env:
+          FEED_URL: ${{ vars.RELEASE_FEED_URL }}
+        run: vpk download http --url "$env:FEED_URL" -o releases -c win
 
-      # packId 'HypnixWallpaper' keeps the install (%LocalAppData%\HypnixWallpaper) separate from user
-      # data (%LocalAppData%\HYPNIX); the friendly name/shortcuts stay "HYPNIX" via --packTitle.
-      - name: Pack Velopack release
-        run: vpk pack -u HypnixWallpaper -v ${{ steps.ver.outputs.version }} -p "$env:GITHUB_WORKSPACE/publish" -e HYPNIX.exe -o releases -c win --packTitle HYPNIX --packAuthors "Marcelo Bossle" -i Assets/Brand/hypnix-v2.ico
+      # Use the same script locally and in CI. It corrects and validates the MSI BEFORE delivery.
+      - name: Build and validate EXE and MSI
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
+        run: ./scripts/package-release.ps1 -Version $env:RELEASE_VERSION -OutputDir releases
+
+      - name: Test real EXE and MSI installation, repair and uninstall
+        run: ./scripts/test-distribution-install.ps1 -ReleaseDirectory releases -OutputDirectory artifacts/install-validation
+
+      - name: Upload validation evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: hypnix-release-validation
+          path: |
+            artifacts/test-results/*.trx
+            artifacts/install-validation/*.log
+            artifacts/install-validation/results.json
+          if-no-files-found: warn
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4

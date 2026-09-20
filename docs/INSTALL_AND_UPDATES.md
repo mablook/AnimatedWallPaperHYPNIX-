@@ -2,7 +2,7 @@
 
 HYPNIX has two independent distribution channels from one codebase:
 
-1. **Website installer** — a per-user [Velopack](https://velopack.io) installer with in-app
+1. **Website installers (EXE and MSI)** — per-user [Velopack](https://velopack.io) installers with in-app
    auto-update, hosted on a public release website.
 2. **Microsoft Store** — an MSIX package with Store-managed updates.
 
@@ -21,6 +21,8 @@ build never tries to update itself.
 ### What the user gets
 - **`HypnixWallpaper-win-Setup.exe`** — per-user installer (no admin). Installs to
   `%LocalAppData%\HypnixWallpaper`, creates Desktop/Start-Menu shortcuts named **HYPNIX**, runs the app.
+- **`HypnixWallpaper-win.msi`** — classic Windows Installer package, also per-user. Supports
+  silent installation, repair, upgrade and uninstall using `msiexec`. This is separate from MSIX.
 - **Automatic updates** — on launch an installed build checks the release website in the background,
   downloads deltas silently, shows a tray balloon and a **"Restart to update HYPNIX to <version>"**
   tray item, and applies the update on the user's restart. A failed/offline check is logged and
@@ -47,7 +49,15 @@ dotnet tool install -g vpk --version 1.2.0
 ./scripts/package-release.ps1 -Version 1.2.3
 ```
 
-Output in `artifacts/releases`: `HypnixWallpaper-win-Setup.exe`, the full and delta `.nupkg`, a
+Use stable `x.y.z` versions (MSI limits: major/minor <= 255, patch <= 65535). Pre-release suffixes
+are rejected because Windows Installer cannot distinguish them for upgrades. Only the `win` update
+channel is currently supported by the application.
+
+The script builds into a unique staging folder, corrects and validates the MSI, then copies the outputs
+to the delivery folder. It emits `SHA256SUMS.txt` and `build-info.json`. These unsigned packages are
+validation candidates; build metadata does not assert public-release readiness.
+
+Output in `artifacts/releases`: `HypnixWallpaper-win-Setup.exe`, `HypnixWallpaper-win.msi`, the full and delta `.nupkg`, a
 portable ZIP, and `releases.win.json` (the feed). Copy those files to your release host to publish.
 To build a delta, first place the current live `.nupkg` + feed in that folder (or `vpk download http
 --url <host> -o artifacts/releases`), then pack the newer version into it.
@@ -66,8 +76,46 @@ The updater honors `HYPNIX_UPDATE_FEED` (a local folder) instead of the website:
 3. `./scripts/package-release.ps1 -Version 1.0.1` into the same `artifacts/releases`.
 4. Launch the installed app with `HYPNIX_UPDATE_FEED` set to that folder. The log records
    `Update downloaded and ready: 1.0.1`; the tray offers the restart.
-5. Uninstall: `%LocalAppData%\HypnixWallpaper\current\Update.exe --uninstall --silent`. User data in
+5. Uninstall an EXE installation: `%LocalAppData%\HypnixWallpaper\Update.exe --silent uninstall`. User data in
    `%LocalAppData%\HYPNIX` remains.
+
+### Classic MSI
+
+```powershell
+msiexec /i artifacts/releases/HypnixWallpaper-win.msi /qn /norestart /L*v install.log
+msiexec /fa artifacts/releases/HypnixWallpaper-win.msi /qn /norestart /L*v repair.log
+msiexec /x artifacts/releases/HypnixWallpaper-win.msi /qn /norestart /L*v uninstall.log
+```
+
+Use Windows Installer to remove an MSI installation; do not use `Update.exe uninstall` for it.
+EXE and MSI are alternative installers for the same application and folder. Switching installer
+types over an existing installation has not been validated; uninstall the previous type first.
+The delivered MSI is per-user, not a system-wide corporate deployment package.
+
+**Required Velopack 1.2.0 corrections:** `scripts/fix-msi-package.ps1` runs after packing in both
+the local script and CI. The original MSI defaults to `C:\HYPNIX` during `/qn`, and its
+`RustAppId=HYPNIX` causes uninstall to delete the user-data directory. The correction assigns
+`INSTALLFOLDER` to `LocalAppDataFolder\HypnixWallpaper` and `RustAppId` to `HypnixWallpaper`.
+Do not distribute an MSI produced by a bare `vpk pack` command. Apply the correction **before
+signing**; the script refuses to change a signed package. Review the workaround when upgrading
+Velopack. The existing `VELOPACK_INSTALLDIR` override is retained.
+
+All channels now include `HYPNIX-LICENSE.txt`, the checked-in third-party notices and the resolved
+dependency metadata/notices through `scripts/copy-distribution-notices.ps1`.
+See [the distribution test report](DISTRIBUTION_TEST_REPORT.md) for the actual validation results.
+
+### Repeat the installer regression tests
+
+```powershell
+./scripts/test-msi-package.ps1 -Path artifacts/releases/HypnixWallpaper-win.msi
+./scripts/test-distribution-install.ps1 -ReleaseDirectory artifacts/releases -OutputDirectory artifacts/install-validation-new
+# Optional: add -UpgradeDirectory <folder containing a newer EXE/MSI release>.
+```
+
+Use a fresh output folder and quit HYPNIX first. The lifecycle script refuses existing installations,
+backs up and hashes all user-data files, then checks preservation at every installer boundary. It tests
+repair by removing and restoring the installed application DLL. It uninstalls only its own test installation
+and retains logs/backups. The release workflow runs this script on its disposable Windows runner.
 
 ---
 
@@ -115,10 +163,11 @@ handles updates for installed users.
 
 ## Code signing (both channels)
 
-The Velopack installer/app are **not code-signed**, so Windows SmartScreen warns on first
+The Velopack EXE/MSI/app are **not code-signed**, so Windows SmartScreen may warn on first
 run/install until a code-signing certificate is configured (`vpk pack --signTemplate ...`, or
-`--azureTrustedSignFile` for Azure Trusted Signing). The Store signs its MSIX itself. Signing does
-not change functionality, only first-run trust.
+`--azureTrustedSignFile` for Azure Trusted Signing). When wiring signing, ensure MSI signing runs
+after `fix-msi-package.ps1`; signing it inside `vpk pack` first is incompatible with that correction.
+The Store signs its MSIX itself.
 
 ## Portable ZIP
 

@@ -1,5 +1,68 @@
 # UI architecture and layout direction
 
+## Visual refinement — 20 September 2026
+
+Use a maximum 3 DIP corner radius for cards, buttons, inputs and purchase surfaces.
+The neutral charcoal palette shares a restrained blue accent across the library,
+license screens and wallpaper editor. Outer spacing is 24 DIPs; control gaps use
+8/12 DIPs, and sections use 16/24 DIPs. Button templates must honor Padding and
+retain distinct hover, pressed, disabled and keyboard-focus states.
+
+Library headings align with card edges. A thin divider separates the live preview,
+and the selected wallpaper shares a compact action row with Preview, Customize and
+Apply. App settings cards stretch consistently instead of sizing to their text.
+Visual captures and passing layout/license smoke checks: `artifacts/design-refinement`.
+
+## Implemented adaptive library — 20 September 2026
+
+The library now uses a vertical card grid, with separate selected and on-desktop
+states. Selecting a card updates the preview; **Apply wallpaper** explicitly starts
+that wallpaper. **Stop** and the running/paused/stopped status remain global.
+
+Preview layout uses available WPF device-independent units, so monitor resolution
+and Windows scaling are not confused with usable window space. At 1100 × 480 DIPs
+of shell content or above, a collapsible right preview leaves room for three or
+more gallery columns. Otherwise, Preview opens a dedicated page inside the same
+window. Returning retains selection and scroll position. The wide-pane preference
+is saved; the compact back action does not change it.
+
+A diagram and selector show the connected displays. Their arrangement follows
+physical monitor bounds; the live render surface preserves the selected display's
+aspect ratio, including portrait and ultrawide. The always-visible display selector
+and preview diagram select the display to preview, customize and apply to. Apply
+changes only that display; a separate Apply to all copies the selected wallpaper
+and current customization to each connected display. Subsequent edits stay independent.
+Display refresh preserves selection by device identity or falls back to an available
+display when the selected one is disconnected.
+
+`DisplayWallpaperController` owns one production session per stable DeviceId. Each
+host attaches to that physical monitor rectangle and renders into a local (0,0)
+viewport. Audio capture is shared, while GPU resources and video decoders belong to
+individual sessions. Global FPS/audio/stop apply to all sessions; covered-display
+pause maps current monitor indices to stable IDs and pauses only the matching session.
+
+`DisplayWallpapers` saves wallpaper, enabled state and per-wallpaper preferences for
+each display, using the old global preferences as fallback. Startup restores enabled
+assignments after license verification. Unplugging retains assignments and reconnecting
+restores them with the new geometry/DPI. Failed replacement preserves the old session;
+recovery failures on one display do not stop the others. See [per-monitor validation](PER_MONITOR_VALIDATION.md).
+
+**App settings** contains pause, battery, FPS, global audio, library and media tools.
+**Customize** contains supported wallpaper controls, presets and reset/undo. Its
+live preview docks beside the controls in a wide window and stays above them in a
+compact one. Only the visible preview renders; hidden/minimized previews stop,
+and playback resumes when returning to them. Native placeholders are black.
+
+All 13 visible built-ins now have their own 960 × 540 capture of the production
+preview renderer. The gallery preserves the entire image. Fire Burst and
+Flamethrower no longer reuse the Aethelis image. These static captures never replace
+the animated preview. See [layout validation](LAYOUT_VALIDATION.md).
+
+The historical proposals below remain design background; their horizontal filmstrip
+and fixed panel suggestions are superseded by this implementation. No additional
+UI framework dependency was introduced for this change.
+
+
 ## Visual settings implementation — 17 September 2026
 
 The requested View / Effects / More controls, graphite styling, matching title-bar

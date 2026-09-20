@@ -111,10 +111,11 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private static bool _windowClassRegistered;
 
     public NativeWallpaperHost(NativeRenderMode renderMode, DesktopWorker.WallpaperTarget[]? renderTargets = null,
-        string? customBackground = null, PreviewTarget? preview = null)
+        string? customBackground = null, PreviewTarget? preview = null, DesktopWorker.WallpaperTarget? target = null)
     {
         _renderMode = renderMode;
-        _renderTargets = renderTargets;
+        var geometry = WallpaperRenderGeometry.Resolve(renderTargets, preview, target);
+        _renderTargets = geometry.RenderTargets;
         var backgroundPath = customBackground ?? (renderMode switch
         {
             NativeRenderMode.VisualizerDemo => System.IO.Path.Combine(
@@ -139,8 +140,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             preview is null ? WsPopup : 0x40000000u,
             0,
             0,
-            preview?.Width ?? 1,
-            preview?.Height ?? 1,
+            geometry.Width,
+            geometry.Height,
             preview?.Parent ?? IntPtr.Zero,
             IntPtr.Zero,
             ModuleHandle,

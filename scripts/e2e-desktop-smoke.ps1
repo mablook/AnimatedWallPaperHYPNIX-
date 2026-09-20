@@ -40,7 +40,7 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
 }
 
 $projectRoot = Split-Path $PSScriptRoot -Parent
-if (-not $Exe)    { $Exe    = Join-Path $projectRoot "bin\$Configuration\net8.0-windows\HYPNIX.exe" }
+if (-not $Exe)    { $Exe    = Join-Path $projectRoot "bin\$Configuration\net8.0-windows10.0.19041.0\HYPNIX.exe" }
 if (-not $OutDir) { $OutDir = Join-Path $projectRoot 'artifacts\e2e-desktop' }
 if (-not (Test-Path -LiteralPath $Exe)) { throw "HYPNIX.exe not found at '$Exe'. Build it first (dotnet build -c $Configuration)." }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -125,6 +125,7 @@ try {
     $cfg = Get-Content $settings -Raw | ConvertFrom-Json
     $cfg.AppPauseMode = 0
     $cfg.SelectedWallpaperId = 'built-in-ambient'
+    $cfg | Add-Member -NotePropertyName DisplayWallpapers -NotePropertyValue @{} -Force
     $cfg.MediaToolsDirectory = $FfmpegDir
     $cfg.Videos = @([pscustomobject]@{ Id = 'video:e2e'; Path = $video; Title = 'E2E Test Clip' })
     ($cfg | ConvertTo-Json -Depth 8) | Set-Content $settings -Encoding UTF8
@@ -147,17 +148,17 @@ try {
     Start-Sleep -Seconds 3
     Capture '01-ambient.png'
 
-    Select-Item $root 1; Start-Sleep -Seconds 2; Audio-On; Start-Sleep -Seconds 3
+    Select-Item $root 1; Invoke-El (Find-ByAutoId $root 'StartButton'); Start-Sleep -Seconds 2; Audio-On; Start-Sleep -Seconds 3
     Capture '02-visualizer-audio.png'; Audio-Off
 
-    Select-Item $root 2; Start-Sleep -Seconds 2; Audio-On; Start-Sleep -Seconds 3
+    Select-Item $root 2; Invoke-El (Find-ByAutoId $root 'StartButton'); Start-Sleep -Seconds 2; Audio-On; Start-Sleep -Seconds 3
     Capture '03-aethelis-audio.png'; Audio-Off
 
-    Select-Item $root 3; Start-Sleep -Seconds 2; Audio-On; Start-Sleep -Seconds 3
+    Select-Item $root 3; Invoke-El (Find-ByAutoId $root 'StartButton'); Start-Sleep -Seconds 2; Audio-On; Start-Sleep -Seconds 3
     Capture '04-fireburst-audio.png'; Audio-Off
 
     if (-not $SkipVideo -and $count -ge 6) {
-        Select-Item $root 5; Start-Sleep -Seconds 5
+        Select-Item $root ($count - 1); Invoke-El (Find-ByAutoId $root 'StartButton'); Start-Sleep -Seconds 5
         Capture '05-video.png'
     }
 

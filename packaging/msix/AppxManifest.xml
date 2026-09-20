@@ -3,8 +3,8 @@
   MSIX manifest for the Microsoft Store / sideload channel. This is SEPARATE from the Velopack
   website installer. package-msix.ps1 substitutes {VERSION} (a 4-part x.y.z.0 value).
 
-  Identity Name/Publisher are placeholders:
-    - For the Store, replace them with the identity assigned in Partner Center (Product identity).
+  Official Partner Center identity for HYPNIX (Store ID 9MTRP976K91M):
+    - Keep Name, Publisher and PublisherDisplayName aligned with Product identity.
     - For sideload testing, Publisher must match the signing certificate subject (CN=...).
   EntryPoint Windows.FullTrustApplication + the runFullTrust capability give the app the Win32
   full-trust it needs to host the wallpaper on the shell (SetParent to Progman/WorkerW). This is a
@@ -16,14 +16,14 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap rescap">
 
-  <Identity Name="MarceloBossle.HYPNIX"
-            Publisher="CN=Marcelo Bossle"
+  <Identity Name="Mablook.HYPNIX"
+            Publisher="CN=AE07AC42-52EF-4F23-BDC1-56F970CD3F72"
             Version="{VERSION}"
             ProcessorArchitecture="x64" />
 
   <Properties>
     <DisplayName>HYPNIX</DisplayName>
-    <PublisherDisplayName>Marcelo Bossle</PublisherDisplayName>
+    <PublisherDisplayName>Mablook</PublisherDisplayName>
     <Logo>StoreAssets\StoreLogo.png</Logo>
   </Properties>
 

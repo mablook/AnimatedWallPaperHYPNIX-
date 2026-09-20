@@ -5,10 +5,17 @@
   "renderer": "classic-bars",
   "background": "background.png",
   "preview": "preview.png",
-  "previewKind": "generated-example",
+  "previewKind": "captured-preview",
   "audio": "wasapi-loopback",
   "multiMonitor": "independent-cover",
   "kind": "VisualizerDemo",
   "author": "Marcelo Bossle",
-  "license": "LicenseRef-HYPNIX-Proprietary"
+  "license": "LicenseRef-HYPNIX-Proprietary",
+  "previewCapture": {
+    "width": 960,
+    "height": 540,
+    "timeSeconds": 6,
+    "audio": "quiet synthetic spectrum",
+    "source": "production preview renderer"
+  }
 }

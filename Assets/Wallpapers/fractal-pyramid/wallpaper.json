@@ -4,10 +4,17 @@
   "type": "native-audio-visualizer",
   "renderer": "fractal-pyramid-hlsl-v1",
   "preview": "preview.png",
-  "previewKind": "rendered-shader",
+  "previewKind": "captured-preview",
   "audio": "wasapi-loopback",
   "multiMonitor": "independent-cover",
   "kind": "FractalPyramid",
   "author": "Marcelo Bossle",
-  "license": "LicenseRef-HYPNIX-Proprietary"
+  "license": "LicenseRef-HYPNIX-Proprietary",
+  "previewCapture": {
+    "width": 960,
+    "height": 540,
+    "timeSeconds": 6,
+    "audio": "quiet synthetic spectrum",
+    "source": "production preview renderer"
+  }
 }
