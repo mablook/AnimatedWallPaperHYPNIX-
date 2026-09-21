@@ -61,13 +61,14 @@ public partial class MainWindow : Window
     internal MainWindow(AppSettingsStore settingsStore, string? libraryRoot, DisplayWallpaperController? controller = null, AppLicenseService? license = null,
         Func<DesktopWorker.WallpaperTarget[]>? getMonitorTargets = null)
     {
-        _license = license ?? new AppLicenseService(new MicrosoftStoreLicenseProvider());
+        _license = license ?? new AppLicenseService(LemonSqueezyLicenseProvider.Create());
         _wallpaperController = controller ?? new();
         _getMonitorTargets = getMonitorTargets ?? DesktopWorker.GetMonitorTargets;
         _settingsStore = settingsStore;
         _wallpaperLibrary = new WallpaperLibraryService(libraryRoot);
         _settings = _settingsStore.Load();
         InitializeComponent();
+        InitializeMonitorPreviews();
         InitializeTrayIcon();
         AppPauseModeComboBox.SelectedIndex = _settings.AppPauseMode;
         PausePerMonitorToggle.IsChecked = _settings.PausePerMonitor;
@@ -139,6 +140,8 @@ public partial class MainWindow : Window
     private void WallpaperGallery_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isUiInitialized) return;
+        if (IsMultiPreview && !IsPreviewSimulation && SelectedDisplay is { } display && Selected is { } entry)
+            _monitorPreviewDrafts[display.Target.DeviceId] = entry.Id;
         UpdateSelection();
         QueueSave();
         UpdateStatus();
@@ -171,11 +174,13 @@ public partial class MainWindow : Window
             _settingsWindow?.SetPreview(request, SelectedDisplay?.Aspect ?? 16d / 9, SelectedDisplay?.Label ?? "Preview", _settings.AudioReactive);
         }
         catch (Exception exception) { LivePreview.Select(null); ReportError("Preview", exception); }
+        UpdateMonitorPreviews();
         UpdatePreviewSuspension();
     }
 
     private async void StartButton_Click(object sender, RoutedEventArgs e)
     {
+        if (IsPreviewSimulation) return;
         if (!_license.CanPlay) { UpdateLicenseUi(); return; }
         _playRequested = true;
         await StartSelectedAsync();
@@ -258,6 +263,7 @@ public partial class MainWindow : Window
         _settings.AudioReactive = enabled;
         _wallpaperController.SetAudioEnabled(enabled);
         LivePreview.SetAudioEnabled(enabled);
+        MultiPreview.SetAudioEnabled(enabled);
         _settingsWindow?.SetAudioEnabled(enabled);
         if (_trayAudioItem is not null && _trayAudioItem.Checked != enabled) _trayAudioItem.Checked = enabled;
         QueueSave();
@@ -271,6 +277,7 @@ public partial class MainWindow : Window
         _settings.FramesPerSecond = GetSelectedFps();
         _wallpaperController.SetFrameCap(_settings.FramesPerSecond);
         LivePreview.SetFrameCap(_settings.FramesPerSecond);
+        MultiPreview.SetFrameCap(_settings.FramesPerSecond);
         _settingsWindow?.SetFrameCap(_settings.FramesPerSecond);
         QueueSave();
     }
@@ -318,7 +325,9 @@ public partial class MainWindow : Window
         var suspended = !_license.CanPlay || !IsVisible || WindowState == WindowState.Minimized || _environment.SessionLocked ||
             PauseBatteryCheckBox.IsChecked == true && _foregroundMonitor.IsOnBattery;
         var editorVisible = _settingsWindow is { IsVisible: true, WindowState: not WindowState.Minimized };
-        LivePreview.SetSuspended(suspended || _appSettingsOpen || PreviewPanel.Visibility != Visibility.Visible || editorVisible);
+        var previewSuspended = suspended || _appSettingsOpen || PreviewPanel.Visibility != Visibility.Visible || editorVisible;
+        LivePreview.SetSuspended(previewSuspended || IsMultiPreview);
+        MultiPreview.SetSuspended(previewSuspended || !IsMultiPreview);
         if (editorVisible) PreviewStatusText.Text = "Preview open in Customize";
         _settingsWindow?.SetPreviewSuspended(suspended);
     }
@@ -339,13 +348,15 @@ public partial class MainWindow : Window
         StopDisplayButton.IsEnabled = active is not null && !_changingWallpaper && !_recovering && !_restoringDisplays;
         StartButton.Content = SelectedDisplay is { } selectedDisplay ? $"Apply to display {selectedDisplay.Number}" : "Apply wallpaper";
         ApplyTargetText.Text = SelectedDisplay is { } target ? $"Only display {target.Number} will change" : "Connect a display to apply";
+        UpdatePreviewActions();
+        UpdateMonitorPreviews();
     }
 
     private void VisualizerSettingsButton_Click(object sender, RoutedEventArgs e) => OpenVisualizerSettingsWindow();
 
     private void OpenVisualizerSettingsWindow()
     {
-        if (!_license.CanPlay || Selected is not { IsVisualizer: true } entry) return;
+        if (IsPreviewSimulation || !_license.CanPlay || Selected is not { IsVisualizer: true } entry) return;
         if (_settingsWindow is null)
         {
             _settingsWindow = new VisualizerSettingsWindow { Owner = this };
@@ -397,6 +408,7 @@ public partial class MainWindow : Window
         if (_wallpaperController.ActiveRequests.GetValueOrDefault(deviceId)?.Id == entry.Id)
             _wallpaperController.UpdateVisualizerSettings(deviceId, settings);
         if (SelectedDisplay?.Target.DeviceId == deviceId && Selected?.Id == entry.Id) LivePreview.UpdateSettings(settings);
+        UpdateMonitorPreviews();
         QueueSave();
     }
 
@@ -591,6 +603,7 @@ public partial class MainWindow : Window
         _wallpaperLibrary.PackagesChanged -= OnPackagesChanged;
         _environment.Dispose();
         LivePreview.Dispose();
+        MultiPreview.Dispose();
         _foregroundMonitor.Dispose();
         _wallpaperLibrary.Dispose();
         _wallpaperController.Dispose();
@@ -627,6 +640,9 @@ public partial class MainWindow : Window
     {
         if (!_isUiInitialized) return;
         var mode = LibraryLayout.Resolve(ShellRoot.ActualWidth, ShellRoot.ActualHeight, _previewRequested, _settings.PreviewPaneCollapsed);
+        LicenseBanner.Visibility = !_appSettingsOpen && _license.Snapshot.Kind is AppLicenseKind.Trial or AppLicenseKind.Checking
+            ? Visibility.Visible : Visibility.Collapsed;
+        if (IsMultiPreview && _previewRequested) mode = LibraryPreviewMode.Preview;
         LibraryWorkspace.Visibility = _appSettingsOpen || LicenseGateVisible ? Visibility.Collapsed : Visibility.Visible;
         AppSettingsPage.Visibility = _appSettingsOpen && !LicenseGateVisible ? Visibility.Visible : Visibility.Collapsed;
         LicenseGatePage.Visibility = LicenseGateVisible ? Visibility.Visible : Visibility.Collapsed;
@@ -648,12 +664,13 @@ public partial class MainWindow : Window
     }
     private void ClosePreview_Click(object sender, RoutedEventArgs e)
     {
+        if (IsMultiPreview) PreviewModeCombo.SelectedIndex = 0;
         if (LibraryLayout.Resolve(ShellRoot.ActualWidth, ShellRoot.ActualHeight, _previewRequested, _settings.PreviewPaneCollapsed) == LibraryPreviewMode.Docked)
             _settings.PreviewPaneCollapsed = true;
         _previewRequested = false; QueueSave(); UpdateLayoutMode();
     }
     private void AppSettings_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = true; UpdateLayoutMode(); }
-    private void BackToLibrary_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = false; _previewRequested = false; UpdateLayoutMode(); }
+    private void BackToLibrary_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = false; if (IsMultiPreview) PreviewModeCombo.SelectedIndex = 0; _previewRequested = false; UpdateLayoutMode(); }
     private void PreviewDisplay_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isUiInitialized || _syncingDisplaySelection) return;

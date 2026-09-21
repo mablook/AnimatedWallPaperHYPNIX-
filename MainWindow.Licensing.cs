@@ -19,7 +19,7 @@ public partial class MainWindow
         if (_licenseInitialized || _isQuitting) return;
         _licenseInitialized = true;
         _license.Initialize(new WindowInteropHelper(this).Handle);
-        if (!_license.IsStoreManaged) return;
+        if (!_license.IsManaged) return;
         _licenseTimer.Tick += LicenseTimer_Tick;
         _licenseTimer.Start();
         _lastLicenseCheck = DateTimeOffset.UtcNow;
@@ -79,19 +79,46 @@ public partial class MainWindow
             AppLicenseKind.Unavailable => "Connect to the internet and sign in to Microsoft Store, then check your license again. Your settings are safe.",
             _ => "Connecting to Microsoft Store. Your settings are safe."
         };
+        if (_license.UsesLicenseKey)
+        {
+            detail = kind switch {
+                AppLicenseKind.Trial => "15 days free · No card required · One-time purchase through Lemon Squeezy",
+                AppLicenseKind.Owned => "Full version · One-time purchase · Activated on this PC",
+                AppLicenseKind.Expired => "Your free trial has ended. Buy a license or enter your existing key to continue. Your wallpapers, presets and settings are saved.",
+                AppLicenseKind.NotOwned => "This activation is no longer valid. Check your license, enter a valid key, or contact hello@mablook.com.",
+                AppLicenseKind.Unavailable => "Connect to the internet and check your license again. Your settings are safe. Support: hello@mablook.com",
+                _ => "Checking your HYPNIX license. Your settings are safe."
+            };
+            if (!_license.CanPurchase) detail += "\nPurchases are not available in this development build.";
+        }
         var canOfferPurchase = kind is AppLicenseKind.Trial or AppLicenseKind.Expired or AppLicenseKind.NotOwned;
-        var buyLabel = _license.IsPurchasing ? "Opening Store…" : _license.FormattedPrice is { } price ? $"Buy HYPNIX · {price}" : "Buy HYPNIX";
+        var busy = _license.IsPurchasing || _license.IsRefreshing || _license.IsManagingKey;
+        var buyLabel = _license.IsPurchasing ? "Opening checkout…" : _license.UsesLicenseKey ? "Buy via Lemon Squeezy"
+            : _license.FormattedPrice is { } price ? $"Buy HYPNIX · {price}" : "Buy HYPNIX";
         foreach (var button in new[] { LicenseBuyButton, LicenseSettingsBuyButton, LicenseGateBuyButton })
         {
             button.Content = buyLabel;
             button.Visibility = canOfferPurchase ? Visibility.Visible : Visibility.Collapsed;
-            button.IsEnabled = !_license.IsPurchasing && !_license.IsRefreshing;
+            button.IsEnabled = !busy && _license.CanPurchase;
         }
         foreach (var button in new[] { LicenseCheckButton, LicenseGateCheckButton })
         {
             button.Content = _license.IsRefreshing ? "Checking…" : "Check license";
-            button.IsEnabled = !_license.IsPurchasing && !_license.IsRefreshing;
+            button.IsEnabled = !busy;
         }
+        LicenseEnterKeyButton.Visibility = _license.UsesLicenseKey ? Visibility.Visible : Visibility.Collapsed;
+        LicenseKeyPanel.Visibility = LicenseGateKeyPanel.Visibility = _license.UsesLicenseKey ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var button in new[] { LicenseActivateButton, LicenseGateActivateButton })
+        {
+            button.IsEnabled = !busy;
+            button.Content = _license.IsManagingKey ? "Please wait…" : "Activate license";
+        }
+        foreach (var button in new[] { LicenseDeactivateButton, LicenseGateDeactivateButton })
+        {
+            button.Visibility = _license.HasActivation ? Visibility.Visible : Visibility.Collapsed;
+            button.IsEnabled = !busy;
+        }
+        LicenseKeyInput.IsEnabled = LicenseGateKeyInput.IsEnabled = !busy;
         LicenseBanner.Visibility = kind is AppLicenseKind.Trial or AppLicenseKind.Checking ? Visibility.Visible : Visibility.Collapsed;
         LicenseBannerTitle.Text = LicenseSettingsTitle.Text = LicenseGateTitle.Text = title;
         LicenseBannerDetail.Text = LicenseSettingsDetail.Text = LicenseGateDetail.Text = detail;
@@ -100,7 +127,7 @@ public partial class MainWindow
             LicenseSettingsDetail.Text += $"\nTrial ends {expiry.ToLocalTime():d}.";
         LicenseNoticeText.Text = LicenseGateNotice.Text = _license.Notice ?? "";
         LicenseGateBenefits.Visibility = canOfferPurchase ? Visibility.Visible : Visibility.Collapsed;
-        LicenseSettingsCard.Visibility = _license.IsStoreManaged ? Visibility.Visible : Visibility.Collapsed;
+        LicenseSettingsCard.Visibility = _license.IsManaged ? Visibility.Visible : Visibility.Collapsed;
         if (previous != kind && kind == AppLicenseKind.Owned && previous is AppLicenseKind.Trial or AppLicenseKind.Expired or AppLicenseKind.NotOwned)
             _appSettingsOpen = true;
         UpdateLayoutMode(); UpdateStatus();
@@ -108,6 +135,23 @@ public partial class MainWindow
     private async void BuyLicense_Click(object sender, RoutedEventArgs e)
     {
         await _license.PurchaseAsync();
+    }
+    private void ShowLicenseSettings_Click(object sender, RoutedEventArgs e)
+    {
+        _appSettingsOpen = true;
+        UpdateLayoutMode();
+        LicenseKeyInput.Focus();
+    }
+    private async void ActivateLicense_Click(object sender, RoutedEventArgs e)
+    {
+        var input = ReferenceEquals(sender, LicenseGateActivateButton) ? LicenseGateKeyInput : LicenseKeyInput;
+        var key = input.Password;
+        input.Clear();
+        await _license.ActivateAsync(key);
+    }
+    private async void DeactivateLicense_Click(object sender, RoutedEventArgs e)
+    {
+        await _license.DeactivateAsync();
     }
     private async void CheckLicense_Click(object sender, RoutedEventArgs e)
     {

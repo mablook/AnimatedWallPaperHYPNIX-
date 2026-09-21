@@ -1,5 +1,7 @@
 # HYPNIX portable Windows package
 
+For HYPNIX support, contact [hello@mablook.com](mailto:hello@mablook.com).
+
 ## Run the validation build
 
 1. Extract the complete ZIP into a new folder. Keep all DLLs, `Assets`, `Shaders` and notices beside `HYPNIX.exe`.

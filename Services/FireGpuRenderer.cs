@@ -71,6 +71,7 @@ internal sealed class FireGpuRenderer : IDisposable
     public void RenderViewport(int x,int y,int w,int h,double time,AethelisAudioProfile audio,VisualizerSettings settings,bool frozen=false,float[]? spectrum=null) {
         bool created=!surfaces.ContainsKey((x,y,w,h));var surface=Get(x,y,w,h);var sim=surface.Simulation;
         if(!frozen||created) {
+            sim.SetFlameCount(FireEmitterLayout.CountForViewport(w,h,settings.Scale));
             surface.Background.Update(settings.Background);
             sim.BackgroundColor=surface.Background.Color;sim.BackgroundSize=surface.Background.Size;
             sim.SparksVisible=settings.Sparks;

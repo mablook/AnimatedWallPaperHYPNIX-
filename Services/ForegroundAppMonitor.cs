@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Windows.Threading;
 
 namespace AnimatedWallPaper.Services;
 
@@ -7,17 +8,20 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
 {
     // Periodic detection runs on a background timer so the heavy EnumWindows sweep (many P/Invokes
     // per top-level window, once a second) no longer stalls the UI thread. The resulting state is
-    // applied back on the UI thread via the captured SynchronizationContext, so the properties and
-    // StateChanged stay single-threaded for subscribers. RefreshNow() stays synchronous for callers
+    // applied back on the owner Dispatcher, so properties and StateChanged stay single-threaded
+    // for subscribers. RefreshNow() stays synchronous for callers
     // that read the state immediately after (wallpaper start/recovery).
     private readonly System.Threading.Timer _timer;
-    private readonly SynchronizationContext _uiContext;
+    private readonly Dispatcher _dispatcher;
     private int _ticking;
     private volatile bool _disposed;
 
     public ForegroundAppMonitor()
     {
-        _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
+        // MainWindow can construct this service before Application.Run installs WPF's
+        // synchronization context. A default SynchronizationContext posts to the thread
+        // pool, so capture the actual dispatcher independently of the ambient context.
+        _dispatcher = Dispatcher.CurrentDispatcher;
         _timer = new System.Threading.Timer(_ => BackgroundTick(), null, Timeout.Infinite, Timeout.Infinite);
     }
 
@@ -58,12 +62,14 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
     // still running (e.g. a very busy desktop), so ticks never pile up.
     private void BackgroundTick()
     {
-        if (_disposed || Interlocked.Exchange(ref _ticking, 1) == 1) return;
+        if (_disposed || _dispatcher.HasShutdownStarted || _dispatcher.HasShutdownFinished ||
+            Interlocked.Exchange(ref _ticking, 1) == 1) return;
         try
         {
             var (fullscreen, covered) = DetectCoveredMonitors();
             var onBattery = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Offline;
-            _uiContext.Post(_ => Apply(fullscreen, covered, onBattery), null);
+            _dispatcher.BeginInvoke(DispatcherPriority.Background,
+                new Action(() => Apply(fullscreen, covered, onBattery)));
         }
         catch (Exception exception)
         {
@@ -78,6 +84,8 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
     // Synchronous detection + apply on the calling (UI) thread; used at startup and on demand.
     private void Refresh()
     {
+        if (_disposed) return;
+        _dispatcher.VerifyAccess();
         var (fullscreen, covered) = DetectCoveredMonitors();
         var onBattery = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Offline;
         Apply(fullscreen, covered, onBattery);
@@ -88,6 +96,7 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
     private void Apply(IReadOnlyList<int> fullscreen, IReadOnlyList<int> covered, bool onBattery)
     {
         if (_disposed) return;
+        _dispatcher.VerifyAccess();
         if (onBattery == IsOnBattery && SameSet(fullscreen, FullscreenMonitors) && SameSet(covered, CoveredMonitors))
         {
             return;

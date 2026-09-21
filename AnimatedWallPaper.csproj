@@ -1,4 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="packaging/Commerce.props" />
+
+  <ItemGroup>
+    <AssemblyMetadata Include="LemonSqueezyStoreId" Value="$(LemonSqueezyStoreId)" />
+    <AssemblyMetadata Include="LemonSqueezyProductId" Value="$(LemonSqueezyProductId)" />
+    <AssemblyMetadata Include="LemonSqueezyVariantId" Value="$(LemonSqueezyVariantId)" />
+    <AssemblyMetadata Include="LemonSqueezyCheckoutUrl" Value="$(LemonSqueezyCheckoutUrl)" />
+  </ItemGroup>
+  <Target Name="RequireCommerceConfiguration" BeforeTargets="PrepareForPublish">
+    <Error Condition="'$(LemonSqueezyMode)' != 'Live'"
+           Text="HYPNIX publication blocked: Lemon Squeezy is in Test mode. Configure and verify Live product values before publishing. Normal builds and tests remain available." />
+    <Error Condition="'$(LemonSqueezyStoreId)' == '0' Or '$(LemonSqueezyProductId)' == '0' Or '$(LemonSqueezyVariantId)' == '0' Or '$(LemonSqueezyCheckoutUrl)' == ''"
+           Text="HYPNIX publication blocked: configure the live Lemon Squeezy product in packaging/Commerce.props. Normal builds and tests remain available." />
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(LemonSqueezyStoreId)/$(LemonSqueezyProductId)/$(LemonSqueezyVariantId)', '^[1-9][0-9]*/[1-9][0-9]*/[1-9][0-9]*$'))"
+           Text="Lemon Squeezy store, product and variant IDs must be positive numbers." />
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(LemonSqueezyCheckoutUrl)', '\Ahttps://[a-zA-Z0-9-]+\.lemonsqueezy\.com/(checkout/)?buy/[a-zA-Z0-9-]+\z'))"
+           Text="Use the public HTTPS Lemon Squeezy /buy/ or /checkout/buy/ URL, without query parameters. Confirm live mode before publishing." />
+  </Target>
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>

@@ -34,7 +34,8 @@ public partial class MainWindow
         PreviewAspect.AspectRatio = SelectedDisplay?.Aspect ?? 16d / 9;
         if (SelectedDisplay is { } display)
         {
-            var id = _wallpaperController.ActiveRequests.GetValueOrDefault(display.Target.DeviceId)?.Id
+            var id = (IsMultiPreview ? _monitorPreviewDrafts.GetValueOrDefault(display.Target.DeviceId) : null)
+                ?? _wallpaperController.ActiveRequests.GetValueOrDefault(display.Target.DeviceId)?.Id
                 ?? _settings.DisplayWallpapers.GetValueOrDefault(display.Target.DeviceId)?.WallpaperId;
             if (id is not null && WallpaperGallery.Items.Cast<WallpaperEntry>().FirstOrDefault(entry => entry.Id == id) is { } entry)
                 WallpaperGallery.SelectedItem = entry;
@@ -47,7 +48,7 @@ public partial class MainWindow
 
     private async Task ApplyToDisplaysAsync(IReadOnlyList<DesktopWorker.WallpaperTarget> targets, bool copySelectedPreferences = false)
     {
-        if (!_license.CanPlay || _isQuitting || _changingWallpaper || _recovering || _restoringDisplays || Selected is not { } entry) return;
+        if (IsPreviewSimulation || !_license.CanPlay || _isQuitting || _changingWallpaper || _recovering || _restoringDisplays || Selected is not { } entry) return;
         var preferences = CurrentPreferencesFor(entry);
         var revision = ++_selectionRevision;
         _changingWallpaper = true;
@@ -72,6 +73,7 @@ public partial class MainWindow
                     var assignment = DisplayPreferences(target.DeviceId);
                     assignment.WallpaperId = entry.Id;
                     assignment.Enabled = true;
+                    _monitorPreviewDrafts[target.DeviceId] = entry.Id;
                     if (copySelectedPreferences) assignment.Visualizers[entry.Id] = preferences;
                     QueueSave();
                 }
@@ -102,7 +104,7 @@ public partial class MainWindow
 
     private void StopDisplay_Click(object sender, RoutedEventArgs e)
     {
-        if (_changingWallpaper || _recovering || SelectedDisplay is not { } display) return;
+        if (IsPreviewSimulation || _changingWallpaper || _recovering || SelectedDisplay is not { } display) return;
         _wallpaperController.Stop(display.Target.DeviceId);
         DisplayPreferences(display.Target.DeviceId).Enabled = false;
         _playRequested = _wallpaperController.DesiredRequests.Count > 0 || _settings.DisplayWallpapers.Values.Any(value => value.Enabled);

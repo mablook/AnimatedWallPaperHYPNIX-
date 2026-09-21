@@ -17,7 +17,7 @@ internal static class LibraryLayoutChecks
         var controller = new DisplayWallpaperController((_, _) => { starts++; return Task.FromResult<IWallpaperSession>(new Session()); });
         var store = new AppSettingsStore(Path.Combine(output, "layout-settings.json"));
         store.Save(new AppSettings());
-        var window = new MainWindow(store, Path.Combine(output, "layout-library"), controller);
+        var window = new MainWindow(store, Path.Combine(output, "layout-library"), controller, LicenseWindowChecks.CreateOwnedLicense());
         var root = (FrameworkElement)window.Content;
         var gallery = (System.Windows.Controls.ListBox)window.FindName("WallpaperGallery");
         try

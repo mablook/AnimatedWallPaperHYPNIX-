@@ -1,6 +1,63 @@
 # Independent wallpapers per monitor
 
+## Simultaneous previews and simulated displays
+
+The Preview mode selector offers **Selected display**, **All connected displays**,
+**Simulate 3 displays**, and **Simulate 4 displays**. The multiple-display views use
+the full preview workspace and adapt their rows and columns to the available window
+size. Each card runs its own live renderer, with the display's proportions preserved.
+
+In the connected-display view, choose a wallpaper in a card, then use **Apply to
+display N** to change that display's desktop. Preview choices for the other cards
+stay independent. Selecting a new wallpaper does not apply it automatically.
+
+Simulation uses temporary, in-memory choices and never creates Windows monitors or
+desktop wallpaper targets. Three displays include a portrait screen; four add an
+ultrawide screen. Switching between three and four preserves each simulated choice.
+Desktop Apply and display customization controls are unavailable in simulation;
+the global **Stop all** action still explicitly stops real desktop playback.
+
+Each preview is capped at 30 FPS (or the lower configured cap). Hidden previews,
+minimized windows, license expiry, and closing the preview release their rendering
+sessions. Changing one preview reuses the other cards' renderer windows.
+
+Run the isolated native preview checks with:
+
+```powershell
+dotnet run --project Tests/Hypnix.NativeSmoke -c Release -- artifacts/multi-preview/gpu --multi-preview
+```
+
+The preview checks use production GPU renderers and recorded desktop-session test
+doubles, so simulating monitors does not touch real wallpaper assignments. The real
+desktop E2E below separately verifies applying to physically connected monitors.
+
+Validated on 2026-09-20: 284 unit tests, the existing display/layout/license WPF
+suites, and the new GPU preview suite passed. The preview suite exercises simultaneous
+frames, independent draft choices, Apply all, portrait/ultrawide proportions at
+1280/760/640 window widths, simulation isolation, and cleanup after hide/mode changes
+and close. The real desktop E2E also verified two actual wallpapers plus both previews
+rendering concurrently, without replacing either desktop window.
+Reports: `artifacts/multi-preview/gpu/multi-preview-report.json` and
+`artifacts/multi-preview/desktop/display-desktop-report.json`; both passed with no
+remaining tracked native windows or video decoders.
+
 ## Behavior
+
+Living Fire fits its source bed to each viewport independently of the Size control.
+Emitter count follows viewport aspect divided by flame size (6–48 sources), while
+vertical flame size follows viewport height. Reducing Size adds sources instead of
+shrinking the entire band; increasing monitor width adds sources without making the
+flames taller. Position controls still intentionally move the effect. Source-count
+edits preserve the running fluid/particle simulation and remap smoothed FFT bands.
+
+The ultrawide regression reproduced 571 unlit columns at 1280x360, Size 0.5 before
+the correction, then zero unlit columns across 12 landscape/portrait/size cases.
+At normal size, typical flame height was 110/107/109 pixels across 16:9/21:9/32:9
+with equal viewport height. All 296 unit tests and the existing native fire checks
+(audio response, settings, background, sparks, pause/resume, and 4K) passed.
+Evidence: `artifacts/fire-ultrawide-after/living-fire-ultrawide-checks.json` and
+`artifacts/fire-ultrawide/regression.trx`. Reproduce the focused GPU checks with
+`dotnet run --project Tests/Hypnix.NativeSmoke -- artifacts/fire-ultrawide --fire-ultrawide`.
 
 Choose a display in the selector above the library or in the preview diagram, choose
 a wallpaper, then use **Apply to display N**. Browsing changes only the preview.
@@ -18,7 +75,7 @@ renderer failures preserve other working displays and surface an error.
 
 ## Automated coverage
 
-- Unit suite: 262 tests passed on 2026-09-20. New tests cover independent sessions,
+- Unit suite: 284 tests passed on 2026-09-20. New tests cover independent sessions,
   failed replacement rollback, competing starts, stopping during preparation,
   disconnect during preparation, pause routing, global FPS/audio, settings isolation,
   stable-ID reconnection/reordering/geometry recovery, cancellation and persistence.
@@ -70,3 +127,55 @@ with several 4K displays.
 The test executable uses the same PerMonitorV2 manifest as production. This matters
 across asynchronous video loading and Explorer parenting; a thread-only DPI override
 did not reproduce production correctly and was replaced by the shared manifest.
+
+## Crash regression: foreground polling before the WPF message loop
+
+The Windows .NET Runtime event from 2026-09-20 at 14:47:50 identified a cross-thread
+`InvalidOperationException` in `MainWindow.Decision`, reached from the foreground
+monitor's timer. The saved assignments were Living Fire on the 3840x2160 display
+and Kaleidoscope on the 1920x1080 display, with the live preview enabled.
+
+The interactive demo constructed `ForegroundAppMonitor` before `Application.Run`. Without a WPF
+synchronization context, its fallback posted state changes to the thread pool,
+where reading the window's ComboBox caused the process to terminate. Earlier desktop
+checks installed a WPF synchronization context before constructing the window and
+therefore missed that startup condition.
+
+The service now captures its owning WPF Dispatcher directly, posts timer results
+there, and ignores results after disposal or dispatcher shutdown. `RefreshNow`
+continues to apply synchronously on the owner thread. The demo also preserves its
+saved monitor choices when reopened.
+
+Validation after the correction: all 266 unit tests passed, including four new
+foreground-monitor tests. Two of the new tests failed before the correction,
+demonstrating callbacks on a worker thread for both null and generic ambient contexts.
+The WPF display interaction suite also passed.
+
+Real desktop E2E passed on the same two physical displays with Living Fire and
+Kaleidoscope, a visible preview with advancing GPU frames, repeated Apply on both
+displays, and two actual timer callbacks recorded on the UI thread. Mixed video/shader,
+selective pause, replacement, startup restoration and cleanup also passed, with no
+remaining test windows or decoder processes. Evidence is saved in
+`artifacts/crash-regression/desktop/display-desktop-report.json` and
+`artifacts/crash-regression/regression.trx`.
+
+## Ultrawide simulation preview regression
+
+The multi-monitor preview previously painted the entire spare card area black,
+making its letterbox margins look like part of the simulated screen. Cards now
+outline the actual screen and use the card color outside it. Each simulated
+display has its own 16:9, 21:9, 32:9 or portrait format selector. These choices
+are temporary and survive switching between three and four simulated displays.
+
+The previous multi-preview test assigned Living Fire only to its first, 16:9
+card. The expanded `--multi-preview` test selects Living Fire on the fourth card
+and changes its format through the actual WPF selector. At window widths
+1280/760/640 and flame scales 1/.5, it verifies the native client dimensions,
+the active GPU simulation's source count and continuing time/presentation.
+Default-size source counts are 15/19/29 for 16:9/21:9/32:9; reduced-size counts
+are 29/38/48. It also checks that preferences and desktop sessions stay unchanged.
+
+Validation: 302 unit tests and the complete multi-preview E2E suite passed.
+Evidence: `artifacts/fire-preview-e2e/regression.trx` and
+`artifacts/fire-preview-e2e/multi-preview-report.json`. WPF layout PNGs exclude
+native GPU content; the JSON records actual native renderer measurements.

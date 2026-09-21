@@ -42,7 +42,8 @@
    <Border x:Name="LicenseBanner" Visibility="Collapsed" Background="#171D22" BorderBrush="#30414B" BorderThickness="1" CornerRadius="3" Padding="16,12" Margin="0,0,0,24">
     <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <StackPanel VerticalAlignment="Center" Margin="0,0,16,0"><TextBlock x:Name="LicenseBannerTitle" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/><TextBlock x:Name="LicenseBannerDetail" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap"/></StackPanel>
-     <Button x:Name="LicenseBuyButton" Grid.Column="1" Content="Buy HYPNIX" Click="BuyLicense_Click" Style="{StaticResource PrimaryButtonStyle}" Margin="0" VerticalAlignment="Center"/>
+     <StackPanel Grid.Column="1" VerticalAlignment="Center"><Button x:Name="LicenseBuyButton" Content="Buy HYPNIX" Click="BuyLicense_Click" Style="{StaticResource PrimaryButtonStyle}" Margin="0"/>
+      <Button x:Name="LicenseEnterKeyButton" Content="Enter license key" Click="ShowLicenseSettings_Click" Margin="0,6,0,0" Visibility="Collapsed"/></StackPanel>
     </Grid>
    </Border>
    <Grid x:Name="WorkspacePages" Grid.Row="1">
@@ -81,16 +82,24 @@
      <Border x:Name="PreviewPanel" Grid.Column="2" Visibility="Collapsed" BorderBrush="#2B2F35" BorderThickness="1,0,0,0" Padding="24,0,0,0">
       <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
        <DockPanel Margin="0,0,0,20"><Button x:Name="ClosePreviewButton" Content="Hide preview" DockPanel.Dock="Right" Click="ClosePreview_Click" MinWidth="100" Margin="0" Style="{StaticResource QuietButtonStyle}"/><TextBlock Text="Preview" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
-       <Grid Grid.Row="1" Margin="0,0,0,14"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-        <Canvas x:Name="MonitorMap" Height="72" SizeChanged="MonitorMap_SizeChanged" AutomationProperties.Name="Display arrangement"/>
-        <ComboBox x:Name="PreviewDisplayCombo" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="PreviewDisplay_SelectionChanged" AutomationProperties.Name="Display shown in preview" ToolTip="Select the display to preview, customize and apply to."/>
+       <StackPanel Grid.Row="1" Margin="0,0,0,14">
+        <ComboBox x:Name="PreviewModeCombo" SelectedIndex="0" SelectionChanged="PreviewMode_SelectionChanged" AutomationProperties.Name="Preview mode">
+         <ComboBoxItem Content="Selected display"/><ComboBoxItem Content="All connected displays"/><ComboBoxItem Content="Simulate 3 displays"/><ComboBoxItem Content="Simulate 4 displays"/>
+        </ComboBox>
+        <StackPanel x:Name="FocusedDisplayControls">
+         <Canvas x:Name="MonitorMap" Height="72" SizeChanged="MonitorMap_SizeChanged" AutomationProperties.Name="Display arrangement"/>
+         <ComboBox x:Name="PreviewDisplayCombo" DisplayMemberPath="Label" SelectionChanged="PreviewDisplay_SelectionChanged" AutomationProperties.Name="Display shown in preview" ToolTip="Select the display to preview, customize and apply to."/>
+        </StackPanel>
+       </StackPanel>
+       <Grid Grid.Row="2">
+        <Border x:Name="SinglePreviewSurface" Background="#080808" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1"><controls:AspectRatioDecorator x:Name="PreviewAspect"><local:WallpaperPreviewControl x:Name="LivePreview"/></controls:AspectRatioDecorator></Border>
+        <controls:MonitorPreviewGrid x:Name="MultiPreview" Visibility="Collapsed"/>
        </Grid>
-       <Border Grid.Row="2" Background="#080808" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1"><controls:AspectRatioDecorator x:Name="PreviewAspect"><local:WallpaperPreviewControl x:Name="LivePreview"/></controls:AspectRatioDecorator></Border>
-       <StackPanel Grid.Row="3" Margin="0,12,0,0"><TextBlock x:Name="PreviewStatusText" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"/><TextBlock Text="Preview only · your desktop changes when you apply" Margin="0,5,0,0" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"/></StackPanel>
+       <StackPanel Grid.Row="3" Margin="0,12,0,0"><TextBlock x:Name="PreviewStatusText" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"/><TextBlock x:Name="PreviewHelpText" Text="Preview only · your desktop changes when you apply" Margin="0,5,0,0" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"/></StackPanel>
       </Grid>
      </Border>
     </Grid>
-    <Border Grid.Row="2" BorderBrush="#2B2F35" BorderThickness="0,1,0,0" Padding="0,16,0,0" Margin="0,16,0,0">
+    <Border x:Name="SelectionFooter" Grid.Row="2" BorderBrush="#2B2F35" BorderThickness="0,1,0,0" Padding="0,16,0,0" Margin="0,16,0,0">
      <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
        <TextBlock Text="SELECTED WALLPAPER" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
@@ -118,6 +127,12 @@
        <TextBlock x:Name="LicenseSettingsTitle" FontWeight="SemiBold" TextWrapping="Wrap"/>
        <TextBlock x:Name="LicenseSettingsDetail" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,14"/>
        <WrapPanel><Button x:Name="LicenseSettingsBuyButton" Content="Buy HYPNIX" Click="BuyLicense_Click" Style="{StaticResource PrimaryButtonStyle}"/><Button x:Name="LicenseCheckButton" Content="Check license" Click="CheckLicense_Click"/></WrapPanel>
+       <StackPanel x:Name="LicenseKeyPanel" Visibility="Collapsed" Margin="0,12,0,0">
+        <TextBlock Text="License key" Margin="0,0,0,6"/>
+        <PasswordBox x:Name="LicenseKeyInput" MaxLength="256" Padding="10" Background="#101419" Foreground="White" BorderBrush="#3A414B" AutomationProperties.Name="License key"/>
+        <WrapPanel Margin="0,10,0,0"><Button x:Name="LicenseActivateButton" Content="Activate license" Click="ActivateLicense_Click" Style="{StaticResource PrimaryButtonStyle}"/><Button x:Name="LicenseDeactivateButton" Content="Deactivate this PC" Click="DeactivateLicense_Click"/></WrapPanel>
+        <TextBlock Text="Purchases are processed by Lemon Squeezy in your browser. Your key is stored securely on this Windows profile. Internet is required for activation and at least once every 7 days." TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+       </StackPanel>
        <TextBlock x:Name="LicenseNoticeText" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
       </StackPanel></Border>
       <Border Style="{StaticResource SettingsCard}"><StackPanel>
@@ -145,6 +160,12 @@
        <TextBlock Text="One-time purchase · No subscription" Foreground="{StaticResource AccentBrush}"/>
       </StackPanel>
       <WrapPanel><Button x:Name="LicenseGateBuyButton" Content="Buy HYPNIX" Click="BuyLicense_Click" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,12,8"/><Button x:Name="LicenseGateCheckButton" Content="Check license" Click="CheckLicense_Click" Margin="0,0,0,8"/></WrapPanel>
+      <StackPanel x:Name="LicenseGateKeyPanel" Visibility="Collapsed" Margin="0,12,0,0">
+       <TextBlock Text="Already purchased? Enter your license key" TextWrapping="Wrap" Margin="0,0,0,6"/>
+       <PasswordBox x:Name="LicenseGateKeyInput" MaxLength="256" Padding="10" Background="#101419" Foreground="White" BorderBrush="#3A414B" AutomationProperties.Name="License key"/>
+       <WrapPanel Margin="0,10,0,0"><Button x:Name="LicenseGateActivateButton" Content="Activate license" Click="ActivateLicense_Click" Style="{StaticResource PrimaryButtonStyle}"/><Button x:Name="LicenseGateDeactivateButton" Content="Deactivate this PC" Click="DeactivateLicense_Click"/></WrapPanel>
+       <TextBlock Text="Purchases are processed by Lemon Squeezy in your browser. Internet is required for activation and at least once every 7 days. Support: hello@mablook.com" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+      </StackPanel>
       <TextBlock x:Name="LicenseGateNotice" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
      </StackPanel>
     </Border>

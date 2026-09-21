@@ -14,6 +14,12 @@ using Color = System.Windows.Media.Color;
 
 internal static class LicenseWindowChecks
 {
+    internal static AppLicenseService CreateOwnedLicense()
+    {
+        var service = new AppLicenseService(new DemoProvider { Current = new(AppLicenseKind.Owned) });
+        service.RefreshAsync().GetAwaiter().GetResult();
+        return service;
+    }
     // This provider lives only in the test executable, which is excluded from distribution.
     private sealed class DemoProvider : IAppLicenseProvider
     {
@@ -135,8 +141,9 @@ internal static class LicenseWindowChecks
     {
         var provider = new DemoProvider();
         var license = new AppLicenseService(provider);
-        var settings = new AppSettingsStore(Path.Combine(output, "demo-settings.json"));
-        settings.Save(new AppSettings { SelectedWallpaperId = "living-fire" });
+        var settingsPath = Path.Combine(output, "demo-settings.json");
+        var settings = new AppSettingsStore(settingsPath);
+        if (!File.Exists(settingsPath)) settings.Save(new AppSettings { SelectedWallpaperId = "living-fire" });
         // Only commerce is simulated; wallpaper application uses the production desktop pipeline.
         var controller = new DisplayWallpaperController();
         var window = new MainWindow(settings, Path.Combine(output, "demo-library"), controller, license) { Title = "HYPNIX · License preview" };
@@ -151,6 +158,8 @@ internal static class LicenseWindowChecks
             provider.Set(choices.SelectedIndex switch { 2 => AppLicenseKind.Expired, 3 => AppLicenseKind.Owned, _ => AppLicenseKind.Trial }, choices.SelectedIndex == 1 ? 1 : 15);
         };
         window.Loaded += (_, _) => {
+            if (DesktopWorker.GetMonitorTargets().Length > 1)
+                ((ComboBox)window.FindName("PreviewModeCombo")).SelectedIndex = 1;
             toolbar.Owner = window;
             var area = SystemParameters.WorkArea;
             toolbar.Left = Math.Clamp(window.Left + (window.Width - toolbar.Width) / 2, area.Left, Math.Max(area.Left, area.Right - toolbar.Width));

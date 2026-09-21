@@ -43,6 +43,7 @@ internal static class DisplayDesktopChecks
         var started = DateTimeOffset.UtcNow;
         var checks = new List<string>();
         var geometryEvidence = new List<object>();
+        var foregroundEvidence = new List<object>();
         var tracked = new List<TrackedHost>();
         var decoders = new List<Process>();
         var videoRequested = !string.IsNullOrWhiteSpace(mediaTools) || !string.IsNullOrWhiteSpace(videoPath);
@@ -123,6 +124,58 @@ internal static class DisplayDesktopChecks
                 DecoderProcessId = host.Session.ProcessId
             });
         }
+        void CheckLivePreview(string wallpaper)
+        {
+            var preview = Control<WallpaperPreviewControl>(window!, "LivePreview");
+            var previewController = (WallpaperController)typeof(WallpaperPreviewControl)
+                .GetField("_controller", PrivateInstance)!.GetValue(preview)!;
+            WaitUntil(() => preview.IsVisible && previewController.IsHealthy &&
+                previewController.ActiveRequest?.Id == wallpaper, window!, wallpaper + " live preview");
+            var session = (IWallpaperSession)typeof(WallpaperController).GetField("_session", PrivateInstance)!
+                .GetValue(previewController)!;
+            var host = (NativeWallpaperHost)session.GetType().GetField("_host", PrivateInstance)!.GetValue(session)!;
+            var previewHost = new TrackedHost(previewController.ActiveRequest!, session, host, host.Handle);
+            Assert(previewHost.Request.Preview is not null && IsWindowVisible(host.Handle),
+                "Live preview is not using a visible native preview host.");
+            var before = PresentCount(previewHost);
+            WaitUntil(() => PresentCount(previewHost) >= before + 3, window!, wallpaper + " preview GPU frames");
+        }
+        void CheckPeriodicForegroundTick(string step)
+        {
+            var monitor = (ForegroundAppMonitor)typeof(MainWindow).GetField("_foregroundMonitor", PrivateInstance)!
+                .GetValue(window)!;
+            var ownerThread = Environment.CurrentManagedThreadId;
+            var callbackThread = 0;
+            var callbacks = 0;
+            void OnStateChanged(object? sender, EventArgs args)
+            {
+                Volatile.Write(ref callbackThread, Environment.CurrentManagedThreadId);
+                Interlocked.Increment(ref callbacks);
+            }
+            monitor.StateChanged += OnStateChanged;
+            try
+            {
+                // Guarantee a change without opening, maximizing or otherwise manipulating a
+                // foreign app. Only the real timer's detection result can replace this sentinel:
+                // do not invoke RefreshNow or Apply during this wait.
+                typeof(ForegroundAppMonitor).GetField("<CoveredMonitors>k__BackingField", PrivateInstance)!
+                    .SetValue(monitor, new[] { -1 });
+                WaitUntil(() => Volatile.Read(ref callbacks) > 0, window!, step + " periodic foreground callback");
+                Assert(Volatile.Read(ref callbackThread) == ownerThread && window!.Dispatcher.CheckAccess(),
+                    "Periodic foreground StateChanged ran outside the MainWindow dispatcher thread.");
+                Assert(!monitor.CoveredMonitors.Contains(-1), "The periodic sweep did not replace the injected sentinel.");
+                Assert(Ready(window!) && controller!.IsHealthy && controller.ActiveRequests.Count == 2,
+                    "The periodic foreground callback damaged UI readiness or an active wallpaper.");
+                foregroundEvidence.Add(new
+                {
+                    Step = step, OwnerThread = ownerThread, CallbackThread = Volatile.Read(ref callbackThread),
+                    CallbackCount = Volatile.Read(ref callbacks), CoveredMonitors = monitor.CoveredMonitors.ToArray(),
+                    FullscreenMonitors = monitor.FullscreenMonitors.ToArray(),
+                    LivePreviewVisible = Control<WallpaperPreviewControl>(window!, "LivePreview").IsVisible
+                });
+            }
+            finally { monitor.StateChanged -= OnStateChanged; }
+        }
 
         try
         {
@@ -149,22 +202,74 @@ internal static class DisplayDesktopChecks
             window = CreateWindow(store, controller, output);
             window.Show();
             WaitUntil(() => window.IsLoaded && Control<Button>(window, "StartButton").IsEnabled, window, "Initial window readiness");
-            window.Hide(); // Rendering is on the real desktop; no extra animated preview consumes GPU during assertions.
+            Click(window, "PreviewButton");
+            CheckLivePreview("living-fire");
 
             Select(window, monitors[0].DeviceId, "living-fire");
             Click(window, "StartButton");
             WaitUntil(() => IsApplied(controller, monitors[0], "living-fire") && Ready(window), window, "Apply first display");
             CheckHost("first-display", monitors[0]);
             var originalFirst = ActiveHost(monitors[0].DeviceId);
-            Select(window, monitors[1].DeviceId, "event-horizon");
+            Select(window, monitors[1].DeviceId, "kaleidoscope");
             Click(window, "StartButton");
-            WaitUntil(() => IsApplied(controller, monitors[1], "event-horizon") && Ready(window), window, "Apply second display");
+            WaitUntil(() => IsApplied(controller, monitors[1], "kaleidoscope") && Ready(window), window, "Apply second display");
             Assert(controller.ActiveRequests.Count == 2, "Independent apply did not leave exactly two active displays.");
             CheckHost("two-distinct-wallpapers-first", monitors[0]);
             CheckHost("two-distinct-wallpapers-second", monitors[1]);
             var originalSecond = ActiveHost(monitors[1].DeviceId);
             Assert(originalFirst.Handle != originalSecond.Handle, "Independent displays share the same HWND.");
-            Passed("UI applies Living Fire and Event Horizon to separate real Explorer-hosted monitor windows");
+            CheckLivePreview("kaleidoscope");
+            CheckPeriodicForegroundTick("different-wallpapers-with-preview");
+            Passed("UI applies Living Fire and Kaleidoscope to separate real Explorer-hosted monitor windows with an animated preview");
+
+            Select(window, monitors[0].DeviceId, "living-fire");
+            Click(window, "StartButton");
+            WaitUntil(() => IsApplied(controller, monitors[0], "living-fire") && Ready(window), window, "Reapply first display with preview");
+            Assert(!IsWindow(originalFirst.Handle) && ActiveHost(monitors[1].DeviceId).Handle == originalSecond.Handle,
+                "Reapplying display one leaked its previous HWND or replaced display two.");
+            originalFirst = ActiveHost(monitors[0].DeviceId);
+            CheckLivePreview("living-fire");
+            Select(window, monitors[1].DeviceId, "kaleidoscope");
+            Click(window, "StartButton");
+            WaitUntil(() => IsApplied(controller, monitors[1], "kaleidoscope") && Ready(window), window, "Reapply second display with preview");
+            Assert(!IsWindow(originalSecond.Handle) && ActiveHost(monitors[0].DeviceId).Handle == originalFirst.Handle,
+                "Reapplying display two leaked its previous HWND or replaced display one.");
+            originalSecond = ActiveHost(monitors[1].DeviceId);
+            CheckLivePreview("kaleidoscope");
+            CheckPeriodicForegroundTick("reapplied-wallpapers-with-preview");
+            CheckHost("reapplied-first-with-preview", monitors[0]);
+            CheckHost("reapplied-second-with-preview", monitors[1]);
+            Passed("Switching and reapplying both displays preserves the other HWND; real periodic foreground callbacks stay on the UI thread after construction without a SynchronizationContext");
+
+            Control<ComboBox>(window, "PreviewModeCombo").SelectedIndex = 1;
+            var previews = Control<AnimatedWallPaper.Controls.MonitorPreviewGrid>(window, "MultiPreview");
+            WallpaperController PreviewController(WallpaperPreviewControl preview) => (WallpaperController)typeof(WallpaperPreviewControl)
+                .GetField("_controller", PrivateInstance)!.GetValue(preview)!;
+            WaitUntil(() => previews.Previews.Count == 2 && previews.Previews.All(preview =>
+                preview.IsVisible && PreviewController(preview).IsHealthy), window, "Both connected monitor previews");
+            var previewHosts = previews.Previews.Select(preview =>
+            {
+                var previewController = PreviewController(preview);
+                var session = (IWallpaperSession)typeof(WallpaperController).GetField("_session", PrivateInstance)!.GetValue(previewController)!;
+                var host = (NativeWallpaperHost)session.GetType().GetField("_host", PrivateInstance)!.GetValue(session)!;
+                return new TrackedHost(previewController.ActiveRequest!, session, host, host.Handle);
+            }).ToArray();
+            var previewCounts = previewHosts.Select(PresentCount).ToArray();
+            var firstCount = PresentCount(originalFirst);
+            var secondCount = PresentCount(originalSecond);
+            WaitUntil(() => previewHosts.Select((host, index) => PresentCount(host) >= previewCounts[index] + 3).All(value => value)
+                && PresentCount(originalFirst) >= firstCount + 3 && PresentCount(originalSecond) >= secondCount + 3,
+                window, "Two desktop wallpapers and two previews rendering simultaneously");
+            Assert(previewHosts.Select(host => host.Request.Id).ToHashSet().SetEquals(["living-fire", "kaleidoscope"])
+                && previewHosts.All(host => host.Request is { Preview: not null, Target: null }),
+                "The connected previews did not match the independently applied wallpapers.");
+            Assert(ActiveHost(monitors[0].DeviceId).Handle == originalFirst.Handle &&
+                ActiveHost(monitors[1].DeviceId).Handle == originalSecond.Handle,
+                "Opening simultaneous previews replaced a real desktop wallpaper.");
+            Passed("Both real desktop wallpapers and both connected-display previews advance GPU frames simultaneously without replacing desktop HWNDs");
+            Control<ComboBox>(window, "PreviewModeCombo").SelectedIndex = 0;
+            Assert(previewHosts.All(host => !IsWindow(host.Handle)), "Leaving connected previews leaked a renderer window.");
+            window.Hide(); // Keep later video and selective-pause assertions focused on the desktop render workers.
 
             Process? videoDecoder = null;
             if (videoRequested)
@@ -275,9 +380,10 @@ internal static class DisplayDesktopChecks
             {
                 StartedUtc = started, FinishedUtc = DateTimeOffset.UtcNow, Passed = failure is null && remaining.Length == 0 && remainingDecoders.Length == 0,
                 Failure = failure, MonitorCount = monitors.Length, Checks = checks, GeometryEvidence = geometryEvidence,
+                ForegroundTimerEvidence = foregroundEvidence,
                 RemainingTestWindows = remaining, RemainingDecoderProcesses = remainingDecoders,
                 VideoSkipped = !videoRequested, VideoCheckStatus = videoStatus, SettingsScope = "Isolated under this report directory",
-                PauseScope = "Coordinator to native worker; foreign-app coverage detection is covered separately",
+                PauseScope = "Real periodic foreground detection dispatch plus coordinator to native worker; foreign-app window geometry classification is covered separately",
                 DesktopScreenshotsCaptured = false
             }, new JsonSerializerOptions { WriteIndented = true }));
             foreach (var decoder in decoders) decoder.Dispose();
@@ -287,8 +393,19 @@ internal static class DisplayDesktopChecks
     }
 
     private static MainWindow CreateWindow(AppSettingsStore store, DisplayWallpaperController controller, string output)
-        => new(store, Path.Combine(output, "display-desktop-library"), controller,
-            new AppLicenseService(new DesktopTestLicense())) { Title = "HYPNIX · Display desktop E2E" };
+    {
+        // The interactive demo constructs MainWindow before Application.Run; callers cannot
+        // assume a dispatcher context is already installed during service construction.
+        // Installing one here hid a crash in the production foreground-monitor service.
+        var previousContext = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(null);
+        try
+        {
+            return new(store, Path.Combine(output, "display-desktop-library"), controller,
+                new AppLicenseService(new DesktopTestLicense())) { Title = "HYPNIX · Display desktop E2E" };
+        }
+        finally { SynchronizationContext.SetSynchronizationContext(previousContext); }
+    }
     private static T Control<T>(MainWindow window, string name) where T : FrameworkElement
         => window.FindName(name) as T ?? throw new InvalidOperationException("Missing UI control: " + name);
     private static bool Ready(MainWindow window) => Control<Button>(window, "StartButton").IsEnabled;

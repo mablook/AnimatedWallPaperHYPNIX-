@@ -1,9 +1,22 @@
 # Release pending items
 
+Current commerce plan (2026-09-21): free Microsoft Store distribution, Lemon Squeezy
+one-time licences, app-managed 15-day trial. Public identifiers and checkout URL
+are configured for confirmed Test mode; publication is blocked. Live configuration
+and live commerce tests remain pending.
+Earlier Store-purchase requirements and package evidence below are
+historical; see [the current checklist](LEMON_SQUEEZY.md).
+
 Tracks what is still required before a public release, per channel. EXE and classic MSI lifecycle
 tests passed on 2026-09-20 after correcting two MSI packaging defects. MSIX packing and test signing
 passed; installation was blocked by certificate trust (0x800B0109). See the
 [distribution test report](DISTRIBUTION_TEST_REPORT.md) and [install and updates](INSTALL_AND_UPDATES.md).
+
+Latest Store-candidate audit: [Store readiness](STORE_READINESS.md). A fresh 1.1.0 MSIX
+includes the current fixes; its extracted binaries passed 43 native checks, WPF
+layout/license/multi-preview checks and real two-monitor video/shader E2E. Subsequent
+installed-MSIX lifecycle and full local WACK checks passed; real Store licensing,
+Store certification and clean-machine validation remain pending.
 
 Fresh retest: 191 regression tests, 42 native/video checks and all seven automated EXE/MSI lifecycle
 steps passed. The original destructive MSI is now rejected before installation. New build scripts emit
@@ -43,6 +56,9 @@ replace the external release gates below.
 
 ## Microsoft Store (MSIX)
 
+- [ ] **Store listing support contact** — use `hello@mablook.com`, the confirmed HYPNIX
+  support email. The Partner Center listing still needs to be updated with this contact.
+
 - [x] **Store licensing implementation (1.0.1)** — full-featured trial, remaining-days banner,
   purchase, expiration enforcement and paid unlock. 217 unit tests and WPF license/layout
   checks pass. See [Store licensing](STORE_LICENSING.md).
@@ -56,14 +72,15 @@ replace the external release gates below.
   Do **not** self-sign for submission — Partner Center signs.
 - [ ] **Additional logo scales** — only base sizes are generated (44/150/50/310). Add scaled variants
   (scale-125/150/200/400 and target-size icons) for a polished Store listing.
-- [ ] **Windows App Certification Kit** — run `appcert.exe` (elevated) before submitting to catch
-  Store certification issues early.
+- [x] **Windows App Certification Kit** — the 1.1.0 candidate passed the full local
+  Desktop Bridge/Centennial run overall with WACK 10.0.26100.7705: 23 individual
+  passes and one optional `Blocked executables` finding for review. See [evidence](STORE_READINESS.md).
 - [ ] **`runFullTrust` justification** — the wallpaper hosting (`SetParent` to Progman/WorkerW) needs
   the full-trust capability, which is reviewed at certification. Prepare the rationale (wallpaper apps
   are allowed, but review is expected).
-- [ ] **Final sideload validation** — `makeappx pack` and `signtool sign` were verified locally;
-  `Add-AppxPackage` needs an elevated shell to trust the self-signed cert. Run once on an admin
-  machine: `Import-Certificate ... Cert:\LocalMachine\TrustedPeople` then `Add-AppxPackage`.
+- [x] **Final sideload validation** — signed test copies installed, upgraded from 1.0.1
+  to 1.1.0, launched with actual package identity and uninstalled. Data preservation
+  and removal of temporary certificate trust were verified. Store commerce remains untested.
 
 ## Tooling / environment
 

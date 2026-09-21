@@ -37,7 +37,14 @@ float4 burner(int index) {
 // each border, so it scales with the source count for any aspect ratio). The visible edges are then
 // covered by sources with neighbors on both sides, giving a full-width bed instead of a lower
 // "arch" at the far left/right.
-float pixelScale() { return (scene.x>.5?view.x/(grid.x-2*emitters.y-sourceSpacing()):view.y*.0082)*layout.x; }
+float2 pixelScale() {
+    // Size controls each flame, never the total width of the source bed. More sources
+    // are supplied for wider viewports/smaller flames. Keep vertical geometry based
+    // on height so ultrawide monitors do not stretch the flames upwards.
+    if(scene.x>.5)return float2(view.x/(grid.x-2*emitters.y-sourceSpacing()),view.y*emitters.z*layout.x);
+    float single=view.y*.0082*layout.x;
+    return float2(single,single);
+}
 // Base sits near the very bottom of the monitor by default so the flame roots at the edge;
 // position Y (layout.z) still moves it up/down from there.
 float2 origin() { return float2(view.x*(.5+layout.y*.5),view.y*(.99-layout.z*.5)); }
@@ -151,8 +158,8 @@ float3 hotColor(float heat) {
 }
 float4 PSMain(Vertex input):SV_Target {
     float2 pixel=input.uv*view.xy;
-    float scale=pixelScale();
-    float2 cell=float2((pixel.x-origin().x)/scale+grid.x*.5,(origin().y-pixel.y)/scale);
+    float2 scale=pixelScale();
+    float2 cell=float2((pixel.x-origin().x)/scale.x+grid.x*.5,(origin().y-pixel.y)/scale.y);
     if(any(cell<0)||any(cell>grid.xy))return float4(.001,.001,.001,1);
     float3 col=0; float trans=1;
     const int steps=72; float ds=grid.z/steps;
@@ -213,13 +220,13 @@ struct SparkVertex {float4 pos:SV_Position;float2 uv:TEXCOORD0;float heat:TEXCOO
 SparkVertex SparksVS(uint id:SV_VertexID,uint instance:SV_InstanceID) {
     const float2 corners[6]={float2(-1,-1),float2(1,-1),float2(-1,1),float2(-1,1),float2(1,-1),float2(1,1)};
     float4 a=particles.Load(int3(instance,0,0)),b=particles.Load(int3(instance,1,0));
-    float scale=pixelScale();
-    float2 center=float2(origin().x+(a.x-grid.x*.5)*scale,origin().y-a.y*scale);
-    float2 direction=normalize(float2(b.x,-b.y)+float2(0,-.001));
+    float2 scale=pixelScale();
+    float2 center=float2(origin().x+(a.x-grid.x*.5)*scale.x,origin().y-a.y*scale.y);
+    float2 direction=normalize(float2(b.x*scale.x,-b.y*scale.y)+float2(0,-.001));
     float2 normal=float2(-direction.y,direction.x);
     float2 corner=corners[id];
     float radius=.6+hash(float3(instance,1,9))*.55;
-    float tail=1.4+min(length(b.xy)*scale*.022,5);
+    float tail=1.4+min(length(b.xy*scale)*.022,5);
     float2 pixel=center+normal*corner.x*radius+direction*corner.y*tail;
     SparkVertex o;o.pos=float4(pixel/view.xy*float2(2,-2)+float2(-1,1),0,1);
     o.uv=corner;o.heat=a.w>=0?b.w:0;o.depth=a.z;return o;
@@ -227,8 +234,8 @@ SparkVertex SparksVS(uint id:SV_VertexID,uint instance:SV_InstanceID) {
 float4 SparksPS(SparkVertex i):SV_Target {
     float shape=pow(saturate(1-dot(i.uv,i.uv)),1.7);
     float fade=smoothstep(0,.2,i.heat)*shape;
-    float scale=pixelScale();
-    float2 cell=float2((i.pos.x-origin().x)/scale+grid.x*.5,(origin().y-i.pos.y)/scale);
+    float2 scale=pixelScale();
+    float2 cell=float2((i.pos.x-origin().x)/scale.x+grid.x*.5,(origin().y-i.pos.y)/scale.y);
     float soot=material.SampleLevel(linearClamp,float3(cell,i.depth*.5)/grid.xyz,0).z;
     float3 color=lerp(float3(.8,.07,.001),float3(1,.62,.15),i.heat);
     color=lerp(color,lerp(paletteLow.rgb,paletteHigh.rgb,i.heat),paletteLow.w);

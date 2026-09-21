@@ -1,7 +1,16 @@
 # HYPNIX
 
+Licensing preparation: Microsoft Store distribution with Lemon Squeezy purchases.
+See [commerce setup and release gates](docs/LEMON_SQUEEZY.md). Publishing is blocked
+while the configured product is in Test mode. The test checkout and real licence
+API passed validation; live configuration and final packages remain pending.
+See the [validation report](docs/LEMON_SQUEEZY_TEST_REPORT.md) and
+[current development handoff](docs/DEVELOPMENT_STATUS_20260921.md).
+
 Windows desktop app for local animated and audio-reactive wallpapers, built with WPF/.NET 8,
 Win32 desktop hosting, WASAPI and Direct3D 11.
+
+Support: [hello@mablook.com](mailto:hello@mablook.com).
 
 ## Current behavior
 

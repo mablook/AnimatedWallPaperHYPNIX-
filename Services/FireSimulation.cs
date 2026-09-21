@@ -13,7 +13,7 @@ namespace AnimatedWallPaper.Services;
 
 internal sealed class FireSimulation : IDisposable
 {
-    internal const int Width=1080, Height=640, X=288, Y=128, Z=40;
+    internal const int Width=1080, Height=640, X=FireEmitterLayout.GridWidth, Y=128, Z=40;
     internal const int SpeedMultiplier=4;
     // Audio envelope smoothing rates, expressed per real-time second (the /(60*SpeedMultiplier)
     // divisor makes them independent of the substep count, so attack tau = 1/rate). A quick attack
@@ -45,7 +45,30 @@ internal sealed class FireSimulation : IDisposable
     public Vector3 AudioEnvelope { get; private set; }
     readonly float[] frequencyTargets=new float[FireEmitterLayout.MaxCount];
     readonly float[] frequencyEnvelope=new float[FireEmitterLayout.MaxCount];
-    public int FlameCount { get; }
+    public int FlameCount { get; private set; }
+    public void SetFlameCount(int count)
+    {
+        if(count<1||count>FireEmitterLayout.MaxCount)throw new ArgumentOutOfRangeException(nameof(count));
+        if(count==FlameCount)return;
+        // Size edits redistribute sources without resetting the fluid, particles or clock.
+        // Keep the smoothed audio spatially aligned from treble on the left to bass on the right.
+        RemapBands(frequencyEnvelope,FlameCount,count);
+        RemapBands(frequencyTargets,FlameCount,count);
+        FlameCount=count;
+    }
+    static void RemapBands(float[] bands,int previousCount,int count)
+    {
+        Span<float> previous=stackalloc float[FireEmitterLayout.MaxCount];
+        bands.CopyTo(previous);
+        Array.Clear(bands);
+        for(int index=0;index<count;index++)
+        {
+            var position=Math.Clamp((index+.5f)*previousCount/count-.5f,0,previousCount-1);
+            var left=(int)position;
+            var right=Math.Min(left+1,previousCount-1);
+            bands[index]=previous[left]+(previous[right]-previous[left])*(position-left);
+        }
+    }
     bool hasSpectrum;
     public void UseGroupedAudio()=>hasSpectrum=false;
     public void SetFrequencyTargets(ReadOnlySpan<float> values)
@@ -116,7 +139,7 @@ internal sealed class FireSimulation : IDisposable
         data[3]=Layout;data[4]=PaletteLow;data[5]=PaletteHigh;
         for(int i=0;i<FireEmitterLayout.MaxCount/4;i++)
             data[6+i]=new(frequencyEnvelope[i*4],frequencyEnvelope[i*4+1],frequencyEnvelope[i*4+2],frequencyEnvelope[i*4+3]);
-        data[18]=new(FlameCount,FireEmitterLayout.EdgePadding,0,0);
+        data[18]=new(FlameCount,FireEmitterLayout.EdgePadding,FireEmitterLayout.VerticalPixelsPerHeight,0);
         data[19]=BackgroundColor;data[20]=BackgroundSize;
         context.Unmap(constants,0);
     }

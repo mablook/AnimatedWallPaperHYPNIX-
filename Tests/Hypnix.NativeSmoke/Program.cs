@@ -17,6 +17,11 @@ internal static class Program
         Directory.CreateDirectory(output);
         try
         {
+            if (args.Contains("--lemon-remote"))
+            {
+                LemonRemoteChecks.RunAsync(output).GetAwaiter().GetResult();
+                return 0;
+            }
             if (args.Contains("--audio-probe"))
             {
                 EventHorizonRenderChecks.ProbeLiveAudio(output);
@@ -29,9 +34,23 @@ internal static class Program
                 "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
                 string.Concat(resourceXml.Nodes()) + "</ResourceDictionary>");
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (args.Contains("--show-product-preview"))
+            {
+                // Isolated presentation fixture; real gallery and GPU previews, no commerce requests.
+                var previewSettings = new AppSettingsStore(Path.Combine(output, "product-preview-settings.json"));
+                previewSettings.Save(new AppSettings { SelectedWallpaperId = "event-horizon", AudioReactive = false,
+                    FramesPerSecond = 30, PreviewPaneCollapsed = true });
+                var productWindow = new MainWindow(previewSettings, Path.Combine(output, "product-library"),
+                    license: LicenseWindowChecks.CreateOwnedLicense()) { Width = 1440, Height = 900, Title = "HYPNIX" };
+                productWindow.Loaded += (_, _) => { productWindow.Width = 1280; productWindow.Height = 1040; };
+                app.Run(productWindow);
+                return 0;
+            }
+            if (args.Contains("--lemon-license")) { LemonLicenseWindowChecks.Run(output); return 0; }
             if (args.Contains("--license-only")) { LicenseWindowChecks.Run(output); return 0; }
             if (args.Contains("--show-license-demo")) { LicenseWindowChecks.ShowDemo(app, output); return 0; }
             if (args.Contains("--displays-ui")) { DisplayWindowChecks.Run(output); return 0; }
+            if (args.Contains("--multi-preview")) { MultiPreviewChecks.Run(output); return 0; }
             if (args.Contains("--displays-desktop")) { DisplayDesktopChecks.Run(output, args.ElementAtOrDefault(2), args.ElementAtOrDefault(3)); return 0; }
             if (args.Contains("--capture-thumbnails"))
             {
@@ -49,7 +68,7 @@ internal static class Program
             {
                 var reviewSettings=new AppSettingsStore(Path.Combine(output,"gallery-review-settings.json"));
                 reviewSettings.Save(new AppSettings {SelectedWallpaperId="living-fire"});
-                var reviewWindow=new MainWindow(reviewSettings,Path.Combine(output,"gallery-review-library"));
+                var reviewWindow=new MainWindow(reviewSettings,Path.Combine(output,"gallery-review-library"), license: LicenseWindowChecks.CreateOwnedLicense());
                 app.Run(reviewWindow);
                 return 0;
             }
@@ -69,8 +88,10 @@ internal static class Program
                     SpectralBloomRenderChecks.Run(parent, output);
                     return 0;
                 }
+                if (args.Contains("--fire-ultrawide")) {FireUltrawideChecks.Run(parent,output);return 0;}
                 if (args.Contains("--fire-only")) {FireRenderChecks.Run(parent,output);return 0;}
                 FireRenderChecks.Run(parent,output);
+                FireUltrawideChecks.Run(parent,output);
                 NeonRibbonsRenderChecks.Run(parent, output);
                 NeonRibbonsRenderChecks.Run(parent, output, "LiquidOrbs.hlsl", "liquid-orbs");
                 NeonRibbonsRenderChecks.Run(parent, output, "FractalPyramid.hlsl", "fractal-pyramid");
@@ -127,7 +148,7 @@ internal static class Program
                 finally { DestroyWindow(parent); }
             }
 
-            var window = new MainWindow(new AppSettingsStore(Path.Combine(output, "settings.json")), Path.Combine(output, "library"));
+            var window = new MainWindow(new AppSettingsStore(Path.Combine(output, "settings.json")), Path.Combine(output, "library"), license: LicenseWindowChecks.CreateOwnedLicense());
             new WindowInteropHelper(window).EnsureHandle();
             var gallery = (System.Windows.Controls.ListBox)window.FindName("WallpaperGallery");
             if (gallery.Items.Count < 5) throw new InvalidOperationException("Built-in catalog was not packaged correctly.");
