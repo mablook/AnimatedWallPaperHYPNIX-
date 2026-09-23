@@ -1,5 +1,10 @@
 # Microsoft Store licensing
 
+> Historical implementation, superseded on 2026-09-21. Production HYPNIX uses
+> [Lemon Squeezy licensing](LEMON_SQUEEZY.md) across all channels. The Microsoft
+> purchase/trial setup below is retained for legacy regression context and is not
+> a current configuration instruction or launch requirement.
+
 HYPNIX uses Windows.Services.Store for the MSIX channel. The Store supplies the license,
 trial expiration and localized purchase price. Configure **4.99 EUR, one-time purchase**
 and **15 days, full-featured trial** in Partner Center for product `9MTRP976K91M`.

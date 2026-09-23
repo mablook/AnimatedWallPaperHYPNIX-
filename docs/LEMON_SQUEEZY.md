@@ -1,11 +1,40 @@
 # HYPNIX — Microsoft Store distribution and Lemon Squeezy licensing
 
+## Product identifiers — owner reference, 2026-09-23
+
+Identifiers and one-time prices supplied by the owner:
+
+| Identifier | Just Fits Pro | HYPNIX |
+| --- | --- | --- |
+| Lemon Squeezy Store ID | `479529` | `479529` |
+| Product ID | `1381996` | `1382043` |
+| Variant ID | `2159154` | `2159220` |
+| Microsoft Store ID | `9N93RTWN38DF` | `9MTRP976K91M` |
+| One-time price | €2,99 | €3,99 |
+
+`packaging/Commerce.props` now uses the published **Live** HYPNIX product and
+checkout `https://mablook.lemonsqueezy.com/checkout/buy/a117a3f9-3a8c-4c78-804c-3ea051f29a89`.
+The one-time license has no expiry and allows five activations. Version 1.1.1
+is the Microsoft Store build for this configuration. See
+[the Live build record](STORE_LIVE_BUILD_20260923.md) for package checks and limits.
+The earlier Test configuration and its validation remain recorded below as history.
+
+Live follow-up on 2026-09-23: the exact 1.1.1 MSIX licensing classes passed
+activation, online validation, encrypted persistence, restoration in a new process,
+and deactivation using an issued EUR 0 Live-order license. One activation, five
+validations and one deactivation all returned HTTP 200. The isolated entitlement
+was cleared and the original trial start preserved. This did not install the MSIX
+or test WACK/Store certification; receipt email delivery is unconfirmed. See
+[the dated evidence](STORE_LIVE_BUILD_20260923.md#live-license-lifecycle-follow-up--2026-09-23).
+
+## Historical implementation status — 2026-09-21
+
 Status: implementation prepared on 2026-09-21. The owner supplied Store ID
 `479529`, Product ID `1377284`, Variant ID `2151696`, and checkout URL
 `https://mablook.lemonsqueezy.com/checkout/buy/116a9d7d-9a17-4fd3-97d6-8769347438c5`.
-These are saved in `packaging/Commerce.props`. The owner confirmed Test mode;
+These were saved in `packaging/Commerce.props` at the time. The owner confirmed Test mode;
 the browser checkout also displays its Test mode banner. `LemonSqueezyMode` is
-set to `Test`, which blocks publication while allowing normal builds and tests.
+then set to `Test`, blocking publication while allowing normal builds and tests.
 The checkout displays EUR 3.99, rather than the originally proposed EUR 5.00.
 One approved test purchase and one declined test payment were verified in the
 browser. The owner performed the final payment clicks. The issued test key passed
@@ -22,17 +51,45 @@ After Test mode was confirmed, an explicit publication guard was added.
 These earlier checks verified local configuration only. Subsequent Test mode
 checkout and real API results are recorded in [the test report](LEMON_SQUEEZY_TEST_REPORT.md).
 
-## Product setup
+## Responsibility boundary — owner direction, 2026-09-21
+
+Lemon Squeezy manages the commercial operation. HYPNIX development owns a correctly
+working application and its integration with the provider's licensing API.
+
+| Area | Owner | HYPNIX engineering scope |
+| --- | --- | --- |
+| Checkout, purchases, payment processing, receipts, taxes, refunds and chargebacks | Lemon Squeezy | Open the configured hosted checkout; keep payment processing outside the app. |
+| Licence issuance and provider-side licence status/activation allowance | Lemon Squeezy | Consume the License API and correctly handle its results. |
+| Trial, activation UI, licence persistence, validation, deactivation and offline behavior | HYPNIX | Implement and test the application's complete licence lifecycle. |
+| Wallpapers, real-time audio reaction, monitors, settings, stability and installation | HYPNIX | Ensure the actual application works correctly across supported scenarios. |
+
+Checkout correctness, receipt delivery and the provider's financial operations
+are not HYPNIX engineering acceptance tests. Do not add a payment backend, receipt
+service, tax logic, refund processing or financial webhooks to this project's
+backlog. Price and provider account/product settings are external configuration
+inputs, not application features to implement.
+
+The boundary still includes a working checkout link and the app's response to
+valid, invalid, expired or revoked licences, activation-limit errors, network
+failures and recovery. A provider-returned invalid licence must be handled
+correctly regardless of the commercial reason. Opening or returning from checkout
+never proves entitlement. The app does not decide whether a refund occurred or
+how Lemon Squeezy translates a commercial event into licence status.
+
+## Provider product configuration reference
+
+These fields and messages record the provider setup and proposed product copy.
+They are not a HYPNIX-owned checkout, billing or receipt implementation.
 
 | Field | Value |
 | --- | --- |
 | Name | HYPNIX — Animated Wallpapers for Windows |
 | Description | Bring your desktop to life with animated wallpapers, audio-reactive effects and independent backgrounds for each monitor. One-time purchase. |
 | Pricing | Single payment |
-| Price | Test checkout shows EUR 3.99; EUR 5.00 was the initial proposal. Confirm final live price and tax presentation. |
+| Price | Test checkout shows EUR 3.99; EUR 5.00 was the initial proposal. Final offer is provider-side configuration supplied for launch. |
 | Generate license keys | Enabled |
 | License length | Unlimited |
-| Activation limit | Owner choice; 2 PCs suggested, screenshot currently shows 5 |
+| Activation limit | Five activations, confirmed for the published Live product on 2026-09-23 |
 | Additional variants | None required |
 | Storefront visibility | Keep hidden until launch; this is not a substitute for test mode |
 | Support | hello@mablook.com |
@@ -69,7 +126,7 @@ and hosted HTTPS `/buy/` or `/checkout/buy/` checkout URL. They are embedded in 
 merchant API key belongs in source, build output, environment overrides in the
 installed app, URLs, or user settings. `dotnet publish` and packaging scripts
 that call it fail while required configuration is missing, malformed, or
-`LemonSqueezyMode` is not `Live`. Current mode is `Test`.
+`LemonSqueezyMode` is not `Live`. Current mode is `Live`.
 
 All production channels (MSIX, EXE/MSI, portable) now use the same Lemon Squeezy
 provider. A free Store acquisition does not unlock paid features. The legacy
@@ -85,7 +142,9 @@ not grant access. Customers enter the key from the receipt; the public License A
 validates product identity before activation and validates the exact saved instance.
 
 Keys, instance IDs, installation ID and time checkpoints are stored using Windows
-DPAPI for the current user in `%LocalAppData%/HYPNIX/licensing/license.dat`.
+DPAPI for the current user in `%LocalAppData%/HYPNIX/licensing/license-479529-1382043-2159220.dat`.
+On first use, the legacy `license.dat` supplies trial/install history; the scoped
+file accepts only its matching product entitlement and leaves the legacy file intact.
 No customer name/email is retained from API responses. The instance name uses a
 random installation ID, not the Windows username, computer name or hardware serial.
 License request failures log only exception type, never response bodies or keys.
@@ -125,17 +184,18 @@ starting a new trial; support recovery is required.
   `LEMON_SQUEEZY_POLICY_UPDATES.md`; publication/adoption remains pending.
 - Reconcile the repository's current proprietary LICENSE with customer usage rights
   before release. This integration does not silently change the legal grant.
-- Confirm live merchant approval, tax presentation, price and activation limit.
-- Test-mode checkout, key activation and deactivation/reactivation passed.
-  Still verify receipt delivery, real slot exhaustion, remotely disabled keys
-  and refund/chargeback handling. Do not
-  assume refunds automatically disable keys: verify behavior and define a support
-  process or a server-side signed-webhook workflow. No webhook server was added.
-- Configure live IDs only after testing; run a controlled live transaction separately.
-- Rebuild MSIX, test actual Store acquisition, re-run installed package checks/WACK
+- Live configuration and checkout were verified in the final 1.1.1 MSIX. The
+  packaged provider accepted the issued Live HYPNIX license on 2026-09-23.
+  Provider-side financial operations follow the responsibility boundary above.
+- Verify application behavior for activation-limit responses, invalid/disabled
+  licences, API failures, restart/offline use and recovery. Use controlled licence
+  fixtures and provider-issued keys; payment processing and receipt delivery are
+  outside this acceptance scope. Unit/UI fixtures and both historical Test-mode
+  and final-payload Live activation/restoration/deactivation checks passed.
+- The Live MSIX is built; test actual Store acquisition, re-run installed package checks/WACK
   and certification on that exact package. Earlier WACK results are historical.
 
-## Local verification
+## Historical local verification — 2026-09-21
 
 Verified on 2026-09-21:
 
@@ -153,9 +213,9 @@ Verified on 2026-09-21:
 - Publication with missing configuration: blocked as intended. A non-Lemon checkout
   URL also fails the publication validation target.
 
-No new distributable has been produced. The previous MSIX remains unchanged and
-does not contain this integration. Live product setup and live end-to-end validation
-are still required.
+At the time of the 2026-09-21 checks, no new distributable had been produced. The previous MSIX remained unchanged and
+did not contain this integration. Live configuration and final-package licensing
+validation were pending then; the 2026-09-23 build and Live follow-up above supersede that status.
 
 `dotnet test Tests/Hypnix.Tests/Hypnix.Tests.csproj -c Release` exercises the actual
 provider through an injected HTTP handler: trial restart/expiry, identity and

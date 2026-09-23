@@ -3,6 +3,14 @@
 Result: the test purchase produced a licence accepted by the application's actual
 Lemon Squeezy provider. Test mode is not a live release approval.
 
+Follow-up, 2026-09-23: the published Live configuration is now included in MSIX
+1.1.1.0, and the actual packaged licensing classes passed the Live API lifecycle
+with an issued EUR 0-order license. Activation, online instance validation,
+DPAPI persistence, new-process restore and final deactivation all passed; the
+isolated trial start was preserved. See [the Live build record](STORE_LIVE_BUILD_20260923.md).
+The rest of this report retains the 2026-09-21 Test-mode evidence and its then-pending
+release checks. WACK/installed-MSIX validation remains separate and pending.
+
 ## Browser checkout
 
 - The checkout explicitly displayed **Test mode is currently enabled**.
@@ -47,13 +55,19 @@ key file was removed in a finally block.
 - `RequireCommerceConfiguration` rejects publication with the confirmed Test mode
   configuration. Normal builds remain available.
 
-## Remaining release checks
+## Application release checks recorded on 2026-09-21
 
-- Decide whether EUR 3.99 or the previously proposed EUR 5.00 is the final price.
-- Copy/configure the product in Live mode, verify the new IDs and checkout, then
-  set `LemonSqueezyMode` to `Live` only after confirming the live configuration.
-- Verify merchant approval, live purchase, receipt delivery, real device activation
-  limit, refund/chargeback revocation handling and support recovery.
+Scope clarified by the owner on 2026-09-21: Lemon Squeezy manages purchases,
+payments, receipts and the commercial operation. The historical browser observations
+above remain evidence; they do not create an obligation to test or implement the
+provider's financial services. See [responsibilities](LEMON_SQUEEZY.md#responsibility-boundary--owner-direction-2026-09-21).
+
+- Verify the supplied Live product IDs and hosted checkout URL in the app, then
+  set `LemonSqueezyMode` to `Live` only after confirming that configuration.
+- Verify the app's handling of licence activation limits, invalid/revoked keys,
+  offline use, network errors and recovery, alongside activation/deactivation.
+  Use controlled fixtures and provider-issued keys; a live payment is not an
+  application acceptance requirement.
 - Rebuild and validate the final MSIX/installers with the live configuration;
   the older packages predate this integration.
 - Complete public policies and Microsoft Store submission requirements.

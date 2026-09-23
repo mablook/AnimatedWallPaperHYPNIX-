@@ -29,7 +29,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>HYPNIX</AssemblyName>
     <!-- SemVer for releases and update comparison. Velopack packs this version; bump it per release. -->
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <!-- Velopack needs a custom Main (App.xaml becomes a Page below), so name the entry point. -->
     <StartupObject>AnimatedWallPaper.App</StartupObject>
     <Authors>Marcelo Bossle</Authors>

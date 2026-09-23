@@ -43,3 +43,17 @@ internal sealed class LicenseStateStore(string path) : ILicenseStateStore
         finally { CryptographicOperations.ZeroMemory(data); }
     }
 }
+
+// Each product keeps its own activation. The legacy state supplies the original trial and
+// installation history once; migrating from Test must not reset the trial or revoke its key.
+internal sealed class ScopedLicenseStateStore(ILicenseStateStore current, ILicenseStateStore legacy, string scope) : ILicenseStateStore
+{
+    public LicenseState? Load()
+    {
+        var state = current.Load() ?? legacy.Load();
+        return state is not null && state.Scope != scope
+            ? state with { Key = null, InstanceId = null, Scope = null, VerifiedUntil = null }
+            : state;
+    }
+    public void Save(LicenseState state) => current.Save(state);
+}

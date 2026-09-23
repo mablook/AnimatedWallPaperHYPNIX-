@@ -1,5 +1,10 @@
 # Designing relaxing animations
 
+Scope: this guide covers the **Relax** pillar of HYPNIX. The overall product also
+embraces enjoying music and expressing personal style: **Relax. Have fun. Be cool.**
+See [positioning and sales strategy](MARKETING_STRATEGY.md). The calm-response
+rules below apply when authoring or presenting a scene for relaxation.
+
 This document turns the neuroscience of relaxation into concrete, actionable rules for
 authoring and tuning HYPNIX wallpapers. HYPNIX content runs for hours in the periphery of a
 person's attention, so "relaxing" is a measurable design target, not decoration. The goal is
@@ -112,8 +117,8 @@ These are the authoring rules. They are intentionally specific so they can be re
 
 ### Audio reactivity (when enabled)
 
-Audio-reactive wallpapers must relax, not excite. The FFT pipeline already smooths input, and
-the product rule is that a visualizer stays **quiet at silence**.
+Audio-reactive scenes intended for relaxation should respond gently. The FFT
+pipeline already smooths input, and a visualizer stays **quiet at silence**.
 
 - **Linear, stable response.** Map audio to gentle, continuous change (shear, warmth, gentle
   swell), not to sudden scale/flash. Reproduce steady dopamine, not spikes.

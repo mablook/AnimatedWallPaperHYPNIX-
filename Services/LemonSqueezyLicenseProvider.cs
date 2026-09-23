@@ -27,9 +27,16 @@ internal sealed class LemonSqueezyLicenseProvider : IAppLicenseProvider, IKeyLic
     public bool CanPurchase => _config.IsConfigured;
     public event Action? LicenseChanged { add { } remove { } }
     public void Initialize(IntPtr owner) { }
-    public static LemonSqueezyLicenseProvider Create() => new(LemonSqueezyConfiguration.Current,
-        new LemonSqueezyLicenseClient(new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(12) }),
-        new LicenseStateStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HYPNIX", "licensing", "license.dat")));
+    public static LemonSqueezyLicenseProvider Create()
+    {
+        var config = LemonSqueezyConfiguration.Current;
+        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HYPNIX", "licensing");
+        return new(config,
+            new LemonSqueezyLicenseClient(new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(12) }),
+            new ScopedLicenseStateStore(
+                new LicenseStateStore(Path.Combine(directory, $"license-{config.StoreId}-{config.ProductId}-{config.VariantId}.dat")),
+                new LicenseStateStore(Path.Combine(directory, "license.dat")), config.Scope));
+    }
     public LemonSqueezyLicenseProvider(LemonSqueezyConfiguration config, LemonSqueezyLicenseClient client,
         ILicenseStateStore store, TimeProvider? clock = null, Action<string>? openCheckout = null)
     {

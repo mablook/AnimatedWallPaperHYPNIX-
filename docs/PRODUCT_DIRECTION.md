@@ -1,6 +1,18 @@
 # Product direction
 
-This document turns the most useful product ideas from reference research into independent requirements for Animated WallPaper. It describes intended behavior, not a dependency on another wallpaper product or API.
+This document turns product-owner direction and useful ideas from reference research into independent requirements for HYPNIX. It includes intended behavior as well as implemented milestones; it is not a list of shipped features or a dependency on another wallpaper product or API.
+
+## Product purpose
+
+**Relax. Have fun. Be cool.** HYPNIX gives people an enjoyable desktop atmosphere,
+real-time visual reactions to their music, and a way to express their personal
+style. Both quiet breaks and lively music sessions belong in the product.
+
+Recorded product-owner direction, 2026-09-21: sell the experience of relaxing,
+having fun and making the desktop look great. Use the
+[positioning and sales strategy](MARKETING_STRATEGY.md) for customer-facing copy,
+demos and channel messaging. Calm-animation guidance applies to the Relax pillar;
+it does not require every effect or music session to have the same intensity.
 
 ## Product principles
 

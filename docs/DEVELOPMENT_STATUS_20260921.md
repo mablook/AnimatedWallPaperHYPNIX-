@@ -4,8 +4,18 @@ The working application includes independent monitor wallpapers, simultaneous li
 previews and Lemon Squeezy licensing. Test-mode commerce has passed checkout and
 actual License API validation. Public distribution is still pending.
 
+Owner scope clarification, 2026-09-21: Lemon Squeezy manages purchases, payments,
+receipts, taxes, refunds and chargebacks. Our engineering focus is the functioning
+application, including correct integration with the licence API. Do not turn
+provider financial operations into HYPNIX implementation or acceptance tasks.
+See [responsibilities](LEMON_SQUEEZY.md#responsibility-boundary--owner-direction-2026-09-21).
+
 ## Changes included
 
+- Product positioning now centers on **Relax. Have fun. Be cool.**: relaxing,
+  enjoying music through real-time visuals and giving the desktop personal style.
+  Repository sales guidance is recorded; public copy and a music-reactive demo
+  remain launch tasks.
 - Foreground monitor callbacks return to the owning WPF Dispatcher even when the
   monitor is constructed before the WPF synchronization context exists. This
   addresses the cross-thread crash observed while changing monitor backgrounds.
@@ -27,6 +37,7 @@ actual License API validation. Public distribution is still pending.
 
 | Area | Repository document |
 | --- | --- |
+| Product positioning, benefit-led copy and sales demos | [Sales strategy](MARKETING_STRATEGY.md) |
 | Commerce configuration, design and launch steps | [Lemon Squeezy](LEMON_SQUEEZY.md) |
 | Checkout, actual API and local test results | [Commerce test report](LEMON_SQUEEZY_TEST_REPORT.md) |
 | English policy amendments, not yet published/adopted | [Policy drafts](LEMON_SQUEEZY_POLICY_UPDATES.md) |
@@ -42,7 +53,7 @@ restoration, validation, deactivation and reactivation. Final cleanup released t
 test slot. The key and customer/order data are excluded from source control.
 
 The test checkout displays EUR 3.99. EUR 5.00 was an earlier proposal. Final live
-pricing and device activation limits need confirmation. Store 479529, Product
+pricing and device activation limits are provider-side configuration inputs. Store 479529, Product
 1377284 and Variant 2151696 are the tested configuration, not approved live values.
 
 Local logs, test reports, encrypted state and installers remain in ignored
@@ -52,8 +63,10 @@ separately so they remain available from a fresh checkout.
 
 ## Before release
 
-Complete Live product configuration and commerce checks, receipt/activation-limit
-and refund handling, public English policies, customer licence terms and Partner
-Center settings. Rebuild and validate the exact final packages and run clean-machine
-checks. Earlier EXE/MSI/MSIX packages and WACK evidence predate the latest commerce
-integration and do not establish readiness for this sales model.
+Verify the supplied Live licence configuration and the app's licence lifecycle,
+including invalid/limit responses, network failure and recovery. Rebuild and
+validate the exact final packages: startup/window/tray, wallpaper/audio reaction,
+monitors, settings, pause/resume/stop, installation and clean-machine checks.
+Product policies, customer licence terms and Partner Center settings remain
+distribution work. Earlier EXE/MSI/MSIX packages and WACK evidence predate the
+latest licence integration and do not establish readiness for the final package.

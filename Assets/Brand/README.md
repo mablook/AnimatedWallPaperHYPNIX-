@@ -2,6 +2,10 @@
 
 HYPNIX is the official application and product name.
 
+Brand line: **Relax. Have fun. Be cool.** Lead with atmosphere, enjoying music
+through live visuals, and personal desktop style. Use the
+[positioning and sales strategy](../../docs/MARKETING_STRATEGY.md) for sales copy.
+
 Files:
 
 - `hypnix-icon-v2.png`: current high-impact application mark used by the WPF shell.

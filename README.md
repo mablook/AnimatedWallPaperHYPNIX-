@@ -1,9 +1,20 @@
 # HYPNIX
 
+**Relax. Have fun. Be cool.**
+
+Give your Windows desktop a mood of its own. Put on music in your usual player,
+watch audio-reactive animations respond in real time, and choose a look for
+relaxing, enjoying the beat or making your setup feel like you.
+See the [positioning and sales strategy](docs/MARKETING_STRATEGY.md).
+
 Licensing preparation: Microsoft Store distribution with Lemon Squeezy purchases.
-See [commerce setup and release gates](docs/LEMON_SQUEEZY.md). Publishing is blocked
-while the configured product is in Test mode. The test checkout and real licence
-API passed validation; live configuration and final packages remain pending.
+Lemon Squeezy manages the commercial operation; HYPNIX development focuses on the
+application and licence integration. See [responsibilities](docs/LEMON_SQUEEZY.md#responsibility-boundary--owner-direction-2026-09-21).
+See [commerce setup and release gates](docs/LEMON_SQUEEZY.md). Version 1.1.1 uses
+the verified Live product configuration. The final MSIX's licensing classes passed
+Live activation, validation, encrypted persistence, restoration and deactivation.
+Store distribution remains pending; see [the build record](docs/STORE_LIVE_BUILD_20260923.md).
+The publication guard still rejects Test or malformed configurations.
 See the [validation report](docs/LEMON_SQUEEZY_TEST_REPORT.md) and
 [current development handoff](docs/DEVELOPMENT_STATUS_20260921.md).
 
@@ -187,7 +198,7 @@ for extraction, shared settings, integrity checks and the remaining release vali
 
 ## Engineering notes
 
-- [Release pending items](docs/RELEASE_PENDING.md) tracks what remains before a public release (code signing, feed host, Store/Partner Center) per channel.
+- [Release pending items](docs/RELEASE_PENDING.md) tracks application reliability, licence integration, sales materials, final-package validation and distribution requirements per channel.
 - Read [desktop integration findings](docs/DESKTOP_INTEGRATION_FINDINGS.md) before changing Win32 hosting.
 - [Testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md) covers automated and manual regression gates.
 - [Product direction](docs/PRODUCT_DIRECTION.md) and [UI architecture](docs/UI_ARCHITECTURE.md) distinguish future work.
@@ -197,7 +208,7 @@ for extraction, shared settings, integrity checks and the remaining release vali
 - [Standalone fire preview](Tests/Hypnix.FirePreview/README.md) exercises the shared Living Fire renderer with system-audio response, limited MacCormack transport, flow-driven embers and GPU state checks.
 - The approved FireRingV1 assets remain unchanged. The rejected volumetric prototype remains excluded from the gallery.
 - No microphone capture, stored raw audio, telemetry or administrator requirement in normal operation.
-- Code signing (SmartScreen trust), MSIX/Store certification, arbitrary per-display assignments and hardware-accelerated video decode remain future work.
+- Code signing for direct downloads (SmartScreen trust), final MSIX/Store certification and hardware-accelerated video decode remain pending. Independent per-display assignments are implemented; see [validation](docs/PER_MONITOR_VALIDATION.md).
 - A [macOS port study](docs/MACOS_PORT_STUDY.md) documents a future, not-yet-started plan (NSWindow desktop hosting, Metal, ScreenCaptureKit audio, notarization). It is design-only and changes no Windows behavior.
 
 - [Living Fire integration](docs/LIVING_FIRE.md) documents the gallery effect, per-monitor simulation, controls and measured GPU cost.

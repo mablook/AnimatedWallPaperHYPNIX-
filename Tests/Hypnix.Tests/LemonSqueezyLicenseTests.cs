@@ -226,6 +226,67 @@ public sealed class LemonSqueezyLicenseTests
     public void UnsafeOrTestCheckoutUrlsAreRejected(string url) => Assert.False(LemonSqueezyConfiguration.IsCheckoutUrl(url));
 
     [Fact]
+    public async Task TestToLiveMigrationPreservesTrialAndLegacyActivationWhileAcceptingLiveKey()
+    {
+        var clock = new Clock();
+        var original = new LicenseState(clock.Now.AddDays(-20), clock.Now, "existing-installation")
+        {
+            Scope = "479529/1377284/2151696", Key = "previous-test-key", InstanceId = "test-instance",
+            VerifiedUntil = clock.Now.AddDays(7)
+        };
+        var legacy = new Store { State = original }; var current = new Store(); var api = new Api();
+        var scoped = new ScopedLicenseStateStore(current, legacy, Config.Scope);
+        using (var p = new LemonSqueezyLicenseProvider(Config, new(new HttpClient(api, disposeHandler: false)), scoped, clock))
+        {
+            Assert.Equal(AppLicenseKind.Expired, (await p.GetLicenseAsync(default)).Kind);
+            Assert.False(p.HasActivation); Assert.Equal(0, api.Validations);
+            Assert.Equal(original.TrialStartedAt, current.State!.TrialStartedAt);
+            Assert.Equal(original.InstallationId, current.State.InstallationId);
+            Assert.Null(current.State.Key); Assert.Null(current.State.VerifiedUntil);
+            await p.ActivateAsync(Key, default);
+            Assert.Equal(AppLicenseKind.Owned, (await p.GetLicenseAsync(default)).Kind);
+        }
+        Assert.Equal(original, legacy.State); Assert.Equal(0, api.Deactivations);
+        Assert.Equal(Config.Scope, current.State!.Scope); Assert.Equal(1, api.Activations);
+        using var restarted = new LemonSqueezyLicenseProvider(Config, new(new HttpClient(api)), scoped, clock);
+        Assert.Equal(AppLicenseKind.Owned, (await restarted.GetLicenseAsync(default)).Kind);
+        Assert.Equal(original.TrialStartedAt, current.State.TrialStartedAt);
+    }
+
+    [Fact]
+    public async Task ScopeMigrationKeepsClockRollbackProtectionAndNeverReimportsLegacyAfterDeactivation()
+    {
+        var clock = new Clock();
+        var legacy = new Store { State = new(clock.Now.AddDays(-20), clock.Now.AddHours(1), "existing-installation")
+            { Scope = "old/scope", Key = "previous-test-key", InstanceId = "test-instance" } };
+        var current = new Store(); var scoped = new ScopedLicenseStateStore(current, legacy, Config.Scope);
+        var api = new Api();
+        using (var p = new LemonSqueezyLicenseProvider(Config, new(new HttpClient(api, disposeHandler: false)), scoped, clock))
+            await Assert.ThrowsAsync<LicenseOperationException>(() => p.GetLicenseAsync(default));
+        clock.Now = clock.Now.AddHours(1);
+        using (var p = new LemonSqueezyLicenseProvider(Config, new(new HttpClient(api, disposeHandler: false)), scoped, clock))
+        {
+            await p.ActivateAsync(Key, default); await p.DeactivateAsync(default);
+        }
+        using var restarted = new LemonSqueezyLicenseProvider(Config, new(new HttpClient(api)), scoped, clock);
+        Assert.Equal(AppLicenseKind.Expired, (await restarted.GetLicenseAsync(default)).Kind);
+        Assert.False(restarted.HasActivation); Assert.Equal(1, api.Deactivations);
+        Assert.Equal("previous-test-key", legacy.State!.Key); Assert.Null(current.State!.Key);
+    }
+
+    [Fact]
+    public void SameProductLegacyActivationIsRetainedDuringFileMigration()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var original = new LicenseState(now.AddDays(-2), now, "installation")
+            { Scope = Config.Scope, Key = Key, InstanceId = "instance-1", VerifiedUntil = now.AddDays(7) };
+        var legacy = new Store { State = original }; var current = new Store();
+        var scoped = new ScopedLicenseStateStore(current, legacy, Config.Scope);
+        Assert.Equal(original, scoped.Load());
+        scoped.Save(original);
+        Assert.Equal(original, current.State); Assert.Equal(original, legacy.State);
+    }
+    [Fact]
     public void PersistedLicenseIsEncryptedAndCorruptionIsNotAReset()
     {
         var folder = Path.Combine(Path.GetTempPath(), "hypnix-license-test-" + Guid.NewGuid().ToString("N"));

@@ -1,11 +1,11 @@
 <Project>
   <!-- Public identifiers only. Never put a Lemon Squeezy API key in the desktop app.
-       Current values belong to TEST mode. Replace with LIVE values before publishing. -->
+       Live identifiers verified for the published HYPNIX product on 2026-09-23. -->
   <PropertyGroup>
-    <LemonSqueezyMode>Test</LemonSqueezyMode>
+    <LemonSqueezyMode>Live</LemonSqueezyMode>
     <LemonSqueezyStoreId>479529</LemonSqueezyStoreId>
-    <LemonSqueezyProductId>1377284</LemonSqueezyProductId>
-    <LemonSqueezyVariantId>2151696</LemonSqueezyVariantId>
-    <LemonSqueezyCheckoutUrl>https://mablook.lemonsqueezy.com/checkout/buy/116a9d7d-9a17-4fd3-97d6-8769347438c5</LemonSqueezyCheckoutUrl>
+    <LemonSqueezyProductId>1382043</LemonSqueezyProductId>
+    <LemonSqueezyVariantId>2159220</LemonSqueezyVariantId>
+    <LemonSqueezyCheckoutUrl>https://mablook.lemonsqueezy.com/checkout/buy/a117a3f9-3a8c-4c78-804c-3ea051f29a89</LemonSqueezyCheckoutUrl>
   </PropertyGroup>
 </Project>
