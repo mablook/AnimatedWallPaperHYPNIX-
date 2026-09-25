@@ -4,7 +4,14 @@ using NAudio.Wave;
 
 namespace AnimatedWallPaper.Services;
 
-internal sealed class AudioSpectrumService : IDisposable
+internal interface IAudioSpectrumStream : IDisposable
+{
+    event Action<float[]>? BandsAvailable;
+    void Start();
+}
+
+// Samples are transient FFT input only: no file writer, playback or network path.
+internal sealed class AudioSpectrumService(bool microphone = false) : IAudioSpectrumStream
 {
     private const int FftSize = 2048;
     // FFT length must be a power of two; the exponent is derived so FftSize can be retuned safely.
@@ -19,7 +26,7 @@ internal sealed class AudioSpectrumService : IDisposable
     private Task? _worker;
     // Written on the worker/StartCapture thread, read on the NAudio capture thread.
     private volatile MMDevice? _device;
-    private volatile WasapiLoopbackCapture? _capture;
+    private volatile WasapiCapture? _capture;
     private int _sampleCount;
     private volatile bool _disposed;
     private volatile bool _captureStopped;
@@ -27,6 +34,10 @@ internal sealed class AudioSpectrumService : IDisposable
     private volatile bool _startFaultLogged;
 
     public event Action<float[]>? BandsAvailable;
+    internal Task Completion => _worker ?? Task.CompletedTask;
+    internal bool IsCapturing => _capture?.CaptureState == CaptureState.Capturing;
+    private DataFlow EndpointFlow => microphone ? DataFlow.Capture : DataFlow.Render;
+    private string SourceName => microphone ? "Microphone" : "Audio loopback";
 
     public void Start()
     {
@@ -49,7 +60,7 @@ internal sealed class AudioSpectrumService : IDisposable
                     try
                     {
                         using var enumerator = new MMDeviceEnumerator();
-                        using var current = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                        using var current = enumerator.GetDefaultAudioEndpoint(EndpointFlow, Role.Multimedia);
                         if (current.ID != _device?.ID) break;
                     }
                     catch (Exception exception)
@@ -72,9 +83,10 @@ internal sealed class AudioSpectrumService : IDisposable
         try
         {
             using var enumerator = new MMDeviceEnumerator();
-            var device = _device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            var capture = new WasapiLoopbackCapture(device);
+            var device = _device = enumerator.GetDefaultAudioEndpoint(EndpointFlow, Role.Multimedia);
+            WasapiCapture capture = microphone ? new WasapiCapture(device) : new WasapiLoopbackCapture(device);
             _capture = capture;
+            if (_disposed) { ReleaseCapture(); return true; }
             _sampleCount = 0;
             Array.Clear(_bands);
             _captureStopped = false;
@@ -82,7 +94,7 @@ internal sealed class AudioSpectrumService : IDisposable
             capture.DataAvailable += CaptureOnDataAvailable;
             capture.RecordingStopped += CaptureOnRecordingStopped;
             capture.StartRecording();
-            AppLog.Write($"Audio loopback started. Device={device.FriendlyName}; Format={capture.WaveFormat}; " +
+            AppLog.Write($"{SourceName} started. Format={capture.WaveFormat}; " +
                          $"SampleRate={capture.WaveFormat.SampleRate}; Channels={capture.WaveFormat.Channels}; " +
                          $"Bits={capture.WaveFormat.BitsPerSample}");
             _startFaultLogged = false;
@@ -95,7 +107,7 @@ internal sealed class AudioSpectrumService : IDisposable
             if (!_startFaultLogged)
             {
                 _startFaultLogged = true;
-                AppLog.WriteException("Audio loopback start failed", exception);
+                AppLog.WriteException($"{SourceName} unavailable", exception);
             }
             ReleaseCapture();
             return false;
@@ -104,8 +116,9 @@ internal sealed class AudioSpectrumService : IDisposable
 
     private void CaptureOnRecordingStopped(object? sender, StoppedEventArgs args)
     {
-        if (args.Exception is not null) AppLog.WriteException("Audio loopback stopped", args.Exception);
-        else AppLog.Write("Audio loopback stopped; endpoint may have changed");
+        if (sender != _capture || _disposed) return;
+        if (args.Exception is not null) AppLog.WriteException($"{SourceName} stopped", args.Exception);
+        else AppLog.Write($"{SourceName} stopped; endpoint may have changed");
         _captureStopped = true;
     }
 
@@ -124,11 +137,18 @@ internal sealed class AudioSpectrumService : IDisposable
         }
         _device?.Dispose();
         _device = null;
+        // Discard transient samples as soon as the endpoint is released.
+        Array.Clear(_sampleWindow);
+        Array.Clear(_fft);
+        Array.Clear(_nextBands);
+        Array.Clear(_bands);
+        _sampleCount = 0;
+        if (!_disposed) BandsAvailable?.Invoke(new float[BandCount]);
     }
 
     private void CaptureOnDataAvailable(object? sender, WaveInEventArgs args)
     {
-        var capture = sender as WasapiLoopbackCapture;
+        var capture = sender as WasapiCapture;
         if (_disposed || capture is null || capture != _capture) return;
         var format = capture.WaveFormat;
         var bytesPerSample = format.BitsPerSample / 8;
@@ -148,7 +168,8 @@ internal sealed class AudioSpectrumService : IDisposable
                     mono += ReadSample(args.Buffer, sampleOffset, format);
                 }
                 mono /= Math.Max(1, format.Channels);
-                _sampleWindow[_sampleCount++] = mono;
+                // Ignore the quiet microphone noise floor without boosting ambient hiss.
+                _sampleWindow[_sampleCount++] = microphone && Math.Abs(mono) < 0.002f ? 0 : mono;
                 if (_sampleCount == FftSize)
                 {
                     Analyze(format.SampleRate);
@@ -242,6 +263,6 @@ internal sealed class AudioSpectrumService : IDisposable
         // The worker owns WASAPI teardown; never wait for it while holding an FFT lock.
         if (_worker is null) _shutdown.Dispose();
         else _ = _worker.ContinueWith(_ => _shutdown.Dispose(), TaskScheduler.Default);
-        AppLog.Write("Audio loopback disposed");
+        AppLog.Write($"{SourceName} disposed");
     }
 }

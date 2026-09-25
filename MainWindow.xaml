@@ -143,7 +143,12 @@
        <CheckBox x:Name="PauseBatteryCheckBox" Content="Pause on battery" Checked="PolicyChanged" Unchecked="PolicyChanged"/>
        <TextBlock Text="Frame cap" Margin="0,18,0,6"/><ComboBox x:Name="FpsComboBox" SelectionChanged="FpsComboBox_SelectionChanged" AutomationProperties.Name="Frame cap"><ComboBoxItem Content="15 FPS" Tag="15"/><ComboBoxItem Content="30 FPS" Tag="30"/><ComboBoxItem Content="60 FPS" Tag="60"/></ComboBox>
       </StackPanel></Border>
-      <Border Style="{StaticResource SettingsCard}"><StackPanel><TextBlock Text="Sound" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,16"/><CheckBox x:Name="AudioReactiveCheckBox" Content="Audio reactive" Style="{StaticResource ToggleSwitchStyle}" Checked="AudioReactiveChanged" Unchecked="AudioReactiveChanged" AutomationProperties.Name="Audio reactive" ToolTip="When off, animation continues without capturing system audio."/></StackPanel></Border>
+      <Border Style="{StaticResource SettingsCard}"><StackPanel>
+       <TextBlock Text="Sound" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,16"/>
+       <CheckBox x:Name="AudioReactiveCheckBox" Content="Audio reactive" Style="{StaticResource ToggleSwitchStyle}" Checked="AudioReactiveChanged" Unchecked="AudioReactiveChanged" AutomationProperties.Name="Audio reactive" ToolTip="When off, animation continues without using system or microphone audio."/>
+       <CheckBox x:Name="MicrophoneReactiveCheckBox" Content="React to microphone" Style="{StaticResource ToggleSwitchStyle}" Margin="0,18,0,0" Checked="MicrophoneReactiveChanged" Unchecked="MicrophoneReactiveChanged" AutomationProperties.Name="React to microphone"/>
+       <TextBlock Text="Uses your default microphone when available. Audio is never saved or sent." TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"/>
+      </StackPanel></Border>
       <Border Style="{StaticResource SettingsCard}"><StackPanel><TextBlock Text="Library &amp; tools" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,16"/><WrapPanel><Button Content="Open library folder" Click="OpenLibrary_Click" Margin="0,0,8,8"/><Button Content="Media tools…" Click="MediaTools_Click" Margin="0,0,8,8"/><Button Content="Open diagnostics" Click="OpenDiagnostics_Click" Margin="0,0,0,8"/></WrapPanel></StackPanel></Border>
      </StackPanel>
     </ScrollViewer>

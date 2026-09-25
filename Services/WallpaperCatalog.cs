@@ -26,6 +26,12 @@ internal sealed record WallpaperEntry(string Id, string Title, WallpaperKind Kin
     // colors live in the authored particle effect and are not recolored from the palette.
     public bool SupportsColorTheme => IsVisualizer
         && Kind is not (WallpaperKind.AethelisFlameBurst or WallpaperKind.FlamethrowerRingV2);
+    // Glow drives the bloom/halo of every visualizer except the two Effekseer fire effects:
+    // their background shader pass declares Glow but never reads it, and the native particle
+    // update takes no glow parameter, so the control is hidden there to keep every shown
+    // control effective.
+    public bool SupportsGlow => IsVisualizer
+        && Kind is not (WallpaperKind.AethelisFlameBurst or WallpaperKind.FlamethrowerRingV2);
     public string Description => Kind == WallpaperKind.ExampleVideo ? "Local video · muted · fit per display" :
         IsVisualizer ? "Audio reactive · system output" : "Native procedural wallpaper";
 }

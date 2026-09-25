@@ -1,12 +1,14 @@
 HYPNIX Privacy Policy
-Last updated: 21 September 2026
+Last updated: 23 September 2026
 
 Mablook publishes HYPNIX. For privacy questions or requests concerning information handled by Mablook, contact hello@mablook.com.
 
 Local desktop and audio processing
 HYPNIX uses display information, wallpaper preferences, selected local media and desktop window state to render wallpapers and apply automatic pause rules. Settings can include monitor identifiers and layout, local media paths, presets and playback preferences. These are stored locally in your Windows user profile.
 
-When Audio reactive is enabled, HYPNIX analyzes system playback locally using Windows audio loopback to animate visuals. It does not open the microphone, record raw audio to files or upload audio or wallpaper content to Mablook. You can disable Audio reactive or stop wallpaper playback in the app. HYPNIX does not include advertising trackers or automatic analytics uploads.
+When Audio reactive is enabled, HYPNIX analyzes system playback locally using Windows audio loopback to animate visuals. The separate React to microphone option is off by default. If you enable it and a microphone is available and accessible, HYPNIX also analyzes that microphone's live audio locally while an active wallpaper or preview needs audio reaction. If microphone access is unavailable or denied, system-playback reaction can continue independently.
+
+Audio samples are processed temporarily in memory. HYPNIX does not save audio recordings, send audio over the network or play microphone input through the speakers. It does not upload wallpaper content to Mablook. Turn off React to microphone to release microphone access, or turn off Audio reactive to stop both audio sources. Audio processing also stops when no active wallpaper or preview needs it. HYPNIX does not include advertising trackers or automatic analytics uploads.
 
 Local diagnostics
 HYPNIX keeps rotating diagnostic logs in its local application-data folder. Logs can contain timestamps, application and operating-system information, file paths and technical errors. Logs are not automatically sent to Mablook. Review and remove sensitive details before choosing to send a log or screenshot for support.

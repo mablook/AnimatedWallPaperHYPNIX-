@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _recoveryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private System.Windows.Forms.ToolStripMenuItem? _trayAudioItem;
+    private System.Windows.Forms.ToolStripMenuItem? _trayMicrophoneItem;
     private System.Windows.Forms.ToolStripMenuItem? _trayUpdateItem;
     private System.Drawing.Icon? _trayDrawingIcon;
     private UpdateService? _updateService;
@@ -67,6 +68,7 @@ public partial class MainWindow : Window
         _settingsStore = settingsStore;
         _wallpaperLibrary = new WallpaperLibraryService(libraryRoot);
         _settings = _settingsStore.Load();
+        AudioSpectrumSource.SetMicrophoneEnabled(_settings.AudioReactive && _settings.MicrophoneReactive);
         InitializeComponent();
         InitializeMonitorPreviews();
         InitializeTrayIcon();
@@ -74,6 +76,8 @@ public partial class MainWindow : Window
         PausePerMonitorToggle.IsChecked = _settings.PausePerMonitor;
         PauseBatteryCheckBox.IsChecked = _settings.PauseOnBattery;
         AudioReactiveCheckBox.IsChecked = _settings.AudioReactive;
+        MicrophoneReactiveCheckBox.IsChecked = _settings.MicrophoneReactive;
+        UpdateMicrophoneReactiveControls();
         _wallpaperController.SetAudioEnabled(_settings.AudioReactive);
         LivePreview.SetAudioEnabled(_settings.AudioReactive);
         FpsComboBox.SelectedIndex = _settings.FramesPerSecond == 15 ? 0 : _settings.FramesPerSecond == 60 ? 2 : 1;
@@ -261,12 +265,29 @@ public partial class MainWindow : Window
         if (!_isUiInitialized) return;
         var enabled = AudioReactiveCheckBox.IsChecked == true;
         _settings.AudioReactive = enabled;
+        UpdateMicrophoneReactiveControls();
         _wallpaperController.SetAudioEnabled(enabled);
         LivePreview.SetAudioEnabled(enabled);
         MultiPreview.SetAudioEnabled(enabled);
         _settingsWindow?.SetAudioEnabled(enabled);
         if (_trayAudioItem is not null && _trayAudioItem.Checked != enabled) _trayAudioItem.Checked = enabled;
         QueueSave();
+    }
+    private void MicrophoneReactiveChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_isUiInitialized) return;
+        _settings.MicrophoneReactive = MicrophoneReactiveCheckBox.IsChecked == true;
+        UpdateMicrophoneReactiveControls();
+        QueueSave();
+    }
+    private void UpdateMicrophoneReactiveControls()
+    {
+        AudioSpectrumSource.SetMicrophoneEnabled(_settings.AudioReactive && _settings.MicrophoneReactive);
+        MicrophoneReactiveCheckBox.IsEnabled = _settings.AudioReactive;
+        if (_trayMicrophoneItem is null) return;
+        _trayMicrophoneItem.Enabled = _settings.AudioReactive;
+        if (_trayMicrophoneItem.Checked != _settings.MicrophoneReactive)
+            _trayMicrophoneItem.Checked = _settings.MicrophoneReactive;
     }
     private void PolicyChanged(object sender, RoutedEventArgs e) { if (_isUiInitialized) { QueueSave(); ApplyPlaybackPolicy(); } }
     private void PolicyModeChanged(object sender, SelectionChangedEventArgs e) { if (_isUiInitialized) { UpdatePauseControlsEnabled(); QueueSave(); ApplyPlaybackPolicy(); } }
@@ -465,6 +486,7 @@ public partial class MainWindow : Window
         _settings.PausePerMonitor = PausePerMonitorToggle.IsChecked == true;
         _settings.PauseOnBattery = PauseBatteryCheckBox.IsChecked == true;
         _settings.AudioReactive = AudioReactiveCheckBox.IsChecked == true;
+        _settings.MicrophoneReactive = MicrophoneReactiveCheckBox.IsChecked == true;
         _settings.FramesPerSecond = GetSelectedFps();
         _saveTimer.Stop();
         _saveTimer.Start();
@@ -522,6 +544,18 @@ public partial class MainWindow : Window
             if ((AudioReactiveCheckBox.IsChecked == true) != _trayAudioItem!.Checked) AudioReactiveCheckBox.IsChecked = _trayAudioItem.Checked;
         });
         menu.Items.Add(_trayAudioItem);
+        _trayMicrophoneItem = new System.Windows.Forms.ToolStripMenuItem("React to microphone")
+        {
+            Checked = _settings.MicrophoneReactive,
+            CheckOnClick = true,
+            Enabled = _settings.AudioReactive
+        };
+        _trayMicrophoneItem.CheckedChanged += (_, _) => Dispatcher.Invoke(() =>
+        {
+            if ((MicrophoneReactiveCheckBox.IsChecked == true) != _trayMicrophoneItem!.Checked)
+                MicrophoneReactiveCheckBox.IsChecked = _trayMicrophoneItem.Checked;
+        });
+        menu.Items.Add(_trayMicrophoneItem);
         menu.Items.Add("Quit HYPNIX", null, (_, _) => Dispatcher.Invoke(() => { _isQuitting = true; Close(); }));
         _trayIcon = new System.Windows.Forms.NotifyIcon { Icon = _trayDrawingIcon, Text = "HYPNIX", ContextMenuStrip = menu, Visible = true };
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowMainWindow);

@@ -86,6 +86,7 @@ public partial class VisualizerSettingsWindow : Window
         LayoutUnavailable.Visibility=Visible(!entry.SupportsLayoutControls);
         ResetViewButton.Visibility=Visible(entry.SupportsLayoutControls);
         ColorsCard.Visibility=Visible(entry.SupportsColorTheme);
+        GlowControls.Visibility=Visible(entry.SupportsGlow);
         BackgroundCard.Visibility=Visible(entry.SupportsBackground);
         SparksCheckBox.Visibility=Visible(entry.SupportsSparks);
         FrequencyHint.Visibility=Visible(entry.Kind==WallpaperKind.LivingFire);

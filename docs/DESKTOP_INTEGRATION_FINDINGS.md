@@ -335,9 +335,9 @@ LivePaper currently supports only one display and uses the classic WorkerW path,
 17. Compute visual geometry from the selected monitor's shorter axis, not the full virtual-desktop width.
 18. For mixed-resolution displays, apply video fit/crop independently inside every monitor rectangle. A single crop calculated from the combined virtual desktop produces incorrect composition on each display.
 19. Per-monitor pause must freeze presentation state, not start a second decoder or audio pipeline. Battery pause remains global.
-20. Audio-reactive wallpapers capture only the default render endpoint through WASAPI loopback. Never fall back to the microphone implicitly.
+20. Audio-reactive wallpapers use the default render endpoint through WASAPI loopback. The default input endpoint may additionally be analyzed only with the explicit, default-off **React to microphone** preference and global **Audio reactive** enabled. Never fall back to the microphone implicitly; missing or denied input must leave system-output reaction working independently.
 21. Treat the endpoint mix format as authoritative. Do not hardcode 44.1 kHz for wireless devices; log the real format and convert during analysis.
-22. Endpoint changes and disconnects are recoverable runtime events. Retry the current default render endpoint and keep Stop deterministic.
+22. Endpoint changes and disconnects are recoverable runtime events. Retry each enabled source's current default endpoint independently and keep Stop deterministic. Release microphone capture when its preference is off or no wallpaper/preview consumes audio; keep raw samples transient in memory without files, uploads or speaker monitoring.
 23. A Bluetooth endpoint was validated at 32-bit IEEE float, 48 kHz, stereo. Real FFT reaction worked, proving that forcing 44.1 kHz is unnecessary when the endpoint mix format is healthy.
 24. Audio-reactive validation requires a visual response to real playback plus a logged endpoint format. A successful capture start alone is insufficient.
 25. Renderer-specific settings must be contextual and no-op for unrelated wallpaper types. Updating visualizer appearance must not restart capture, recreate the desktop host, or alter ambient/video defaults.
@@ -397,6 +397,77 @@ The first Direct3D 11 Aethelis experiments established several additional rules:
 37. Do not describe mathematical hash particles as fluid simulation or billions of particles. Product language
     must match the actual renderer. A future Aethelis attempt needs a genuine multipass fluid/particle pipeline,
     temporal buffers, bloom, and depth layers, or a deliberately pre-rendered high-quality alternative.
+
+## Classic GDI wallpapers and Windows compatibility (2026-09-25)
+
+The Store report was narrowed to **Built-in ambient** and **Audio Visualizer**; Aethelis and
+the other GPU wallpapers apply successfully. These two use `WS_EX_LAYERED` and are converted
+to `WS_CHILD` before `SetParent`. Their previews and the GPU wallpaper hosts are not layered,
+so successful previews or GPU checks do not exercise this Windows compatibility requirement.
+
+Both the source manifest and the embedded Win32 manifest extracted from the shipped 1.1.1
+`HYPNIX.exe` lacked `compatibility/supportedOS`. Microsoft requires Windows-aware manifest
+declarations for layered child windows; `app.manifest` now declares the Windows 10/11 GUID
+`{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}` as described in
+[Using Layered Windows](https://learn.microsoft.com/en-us/windows/win32/winmsg/using-windows#using-layered-windows).
+The separate MSIX `TargetDeviceFamily` declaration does not replace the executable manifest.
+
+An A/B native test used the same code with only the manifest declaration changed. Without it,
+Windows rejected direct `WS_EX_LAYERED | WS_CHILD` creation; with it, creation and opaque-alpha
+checks passed, followed by both production GDI hosts' reparenting, geometry, frame rendering,
+paused reveal, resume and disposal. The corrected declaration was also extracted from the rebuilt
+`HYPNIX.exe` with the Windows SDK manifest tool. Evidence is under `artifacts/layered-child-before/`
+and `artifacts/layered-child-after/`.
+
+The fixture uses an owned hidden parent, so this proves runtime layered-child compatibility,
+not Explorer composition. A newly built Store package still needs desktop visual validation
+before claiming the user's installed version is fixed. No installed package was replaced or
+published during this investigation.
+
+## Applying while already paused (2026-09-25)
+
+The installed Store 1.1.1 package contained the first three wallpapers' required assets, and its
+logs showed successful preparation/reveal without renderer errors. An additional, independent
+paused-reveal defect was reproduced. Playback policy was set to
+pause for maximized/fullscreen apps. The controller can call `Pause()` before `Show()`; previously,
+the native host rejected every render request while paused, including the presentation needed
+after revealing its hidden HWND. A prepared frame alone does not guarantee visible desktop content.
+
+`Show()` now requests one presentation even when paused. GDI copies the prepared back buffer;
+GPU rendering receives the frozen-effect flag and the animation clock remains stopped. Continuous
+rendering resumes only when playback resumes. The native regression reproduces the old failure
+and covers Ambient, Audio Visualizer and Aethelis; see `TESTING_AND_REGRESSION_GUIDE.md` for the
+command and evidence limits. This fix is in source and has not been published to Microsoft Store.
+
+## GDI wallpapers show black on the Windows 11 raised desktop (2026-09-25)
+
+The deferred desktop visual validation was performed against a freshly built app on a real,
+multi-monitor Windows 11 desktop (`scripts/e2e-desktop-smoke.ps1`, screenshots under
+`artifacts/e2e-desktop*`). It exposed a defect the hidden-parent checks cannot: the two GDI
+wallpapers (**Built-in ambient**, **Audio Visualizer**) rendered **completely black** on the
+desktop, while every GPU wallpaper (Aethelis, Fire Burst, etc.) displayed correctly. The
+automated checks passed only because they read the in-memory back buffer, not the composited
+window surface.
+
+Root cause, confirmed by the attach logs: this desktop is a Windows 11 "raised desktop"
+(`Progman` carries `WS_EX_NOREDIRECTIONBITMAP`, `raisedDesktop=True`, host = `Progman`). A GDI
+child of `Progman` has no redirection surface, so DWM never composites a `Graphics.FromHwnd`
+BitBlt even with `WS_EX_LAYERED` + `SetLayeredWindowAttributes(alpha=255)` (the layered style
+survives `SetParent` here as `0x080800A0`). The shader wallpapers work because a DXGI flip swap
+chain owns its own composition surface. The `supportedOS` manifest declaration and the paused
+-reveal fix were both necessary but neither addresses composition.
+
+Fix: present the GDI wallpapers through a DXGI swap chain, exactly like the shader wallpapers.
+`Services/GdiWallpaperSwapChain.cs` creates a `B8G8R8A8_UNorm` flip swap chain for the wallpaper
+HWND; each frame the existing System.Drawing back buffer is uploaded to a dynamic texture and
+drawn to the swap-chain surface (`Shaders/GdiPresent.hlsl`), then presented. The GDI drawing is
+unchanged; only presentation moves to the GPU. `NativeWallpaperHost` uses this path only for the
+desktop surface (`preview is null`); previews keep the direct GDI blit, and any swap-chain
+creation failure falls back to the blit. Headless verification: `--gdi-present` renders a two
+-colour frame through the swap chain and reads the back buffer back. Desktop verification: after
+the fix, `01-ambient.png` shows the ambient gradient and drifting orbs and `02-visualizer-audio
+.png` shows the audio-reactive ring, while the GPU wallpapers are unchanged. This fix is in
+source and has not been published to Microsoft Store.
 
 ## Recommended next steps
 

@@ -13,6 +13,7 @@ internal sealed class AppSettings
     public bool PausePerMonitor { get; set; }
     public bool PauseOnBattery { get; set; }
     public bool AudioReactive { get; set; } = true;
+    public bool MicrophoneReactive { get; set; }
     public bool PreviewPaneCollapsed { get; set; }
     public string? MediaToolsDirectory { get; set; }
     public Dictionary<string, VisualizerPreferences> Visualizers { get; set; } = [];

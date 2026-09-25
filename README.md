@@ -28,9 +28,13 @@ Support: [hello@mablook.com](mailto:hello@mablook.com).
 - Thirteen built-in wallpapers in a manifest-driven gallery: ambient, classic audio visualizer, Aethelis,
   Fire Burst, Flamethrower Ring V2, Spectral Bloom, Neon Ribbons, Liquid Orbs, Event Horizon,
   Fractal Pyramid, Kaleidoscope, Lotus and Living Fire.
-- Live preview using the same renderer as the wallpaper. Desktop and preview share one WASAPI capture.
-- **Audio reactive** in the window and tray toggles system-audio reaction for both desktop and preview;
+- Live preview using the same renderer as the wallpaper. Desktop and preview share the audio analysis service.
+- **Audio reactive** in the window and tray toggles audio reaction for both desktop and preview;
   the preference persists across restarts. It does not mute other applications or stop animation.
+- **React to microphone** in Sound and the tray optionally adds live microphone reaction alongside system
+  playback. It is off by default and requires **Audio reactive**. Analysis runs locally while an active
+  wallpaper or preview needs it; no audio is saved or sent. Missing or unavailable microphones are skipped
+  without interrupting system-audio reaction.
 - Per-wallpaper intensity (0–8), audio sensitivity (0–12), glow (0–3) and four color themes.
   Every control the settings window shows actually affects its wallpaper: the color themes recolor
   every visualizer (the classic visualizer, Aethelis and all shader wallpapers), except the two
@@ -207,7 +211,8 @@ for extraction, shared settings, integrity checks and the remaining release vali
 - [Realistic fire study](docs/FIRE_RENDERING_STUDY.md) analyzes the three supplied Shadertoy examples and proposes a volumetric fire pipeline, GPU budgets and visual validation gates (Portuguese; design only).
 - [Standalone fire preview](Tests/Hypnix.FirePreview/README.md) exercises the shared Living Fire renderer with system-audio response, limited MacCormack transport, flow-driven embers and GPU state checks.
 - The approved FireRingV1 assets remain unchanged. The rejected volumetric prototype remains excluded from the gallery.
-- No microphone capture, stored raw audio, telemetry or administrator requirement in normal operation.
+- Optional microphone use requires the **React to microphone** preference. No stored raw audio, audio uploads,
+  telemetry or administrator requirement in normal operation.
 - Code signing for direct downloads (SmartScreen trust), final MSIX/Store certification and hardware-accelerated video decode remain pending. Independent per-display assignments are implemented; see [validation](docs/PER_MONITOR_VALIDATION.md).
 - A [macOS port study](docs/MACOS_PORT_STUDY.md) documents a future, not-yet-started plan (NSWindow desktop hosting, Metal, ScreenCaptureKit audio, notarization). It is design-only and changes no Windows behavior.
 

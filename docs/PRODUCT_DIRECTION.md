@@ -155,11 +155,13 @@ Audio playback and audio-reactive visuals are separate capabilities.
 
 ### Audio visualizer
 
-An audio visualizer should consume system output through Windows audio loopback capture, then provide normalized spectrum data to trusted renderers.
+An audio visualizer consumes system output through Windows audio loopback capture, with optional microphone
+input enabled explicitly by the user, then provides normalized spectrum data to trusted renderers.
 
 Proposed pipeline:
 
-1. WASAPI loopback capture service receives system output samples.
+1. WASAPI loopback capture receives system output samples; an independent microphone capture is added only
+   when **React to microphone** is enabled and a usable input endpoint exists.
 2. Samples are mixed/downsampled into a bounded analysis buffer.
 3. FFT analysis produces normalized frequency bands, peak, and RMS values.
 4. Renderers receive only numeric analysis data.
@@ -167,18 +169,20 @@ Proposed pipeline:
 
 ### Implemented audio-reactive prototype
 
-The visualizer now uses the default Windows render endpoint through WASAPI loopback instead of simulated
-wave values. NAudio 2.3.0 (MIT) is used only as the maintained .NET wrapper around WASAPI and sample formats;
+The visualizer uses the default Windows render endpoint through WASAPI loopback instead of simulated
+wave values. The optional microphone source uses the default Windows capture endpoint. NAudio 2.3.0 (MIT)
+is used only as the maintained .NET wrapper around WASAPI and sample formats;
 FFT band analysis, smoothing, lifecycle, rendering, and privacy behavior are implemented in this project.
 
 Current analysis contract:
 
-- Capture the shared-mode mix format reported by the active output endpoint.
-- Mix all output channels to mono for analysis only.
+- Capture the shared-mode mix format reported by each active endpoint.
+- Mix each source's channels to mono for analysis only.
 - Analyze overlapping 2048-sample windows with a Hamming window and FFT.
 - Produce 64 logarithmic bands from approximately 35 Hz to the endpoint Nyquist limit, capped at 18 kHz.
 - Apply faster attack and slower release smoothing before publishing normalized values to the renderer.
-- Mirror the bands around the circular visualizer while keeping one capture stream for every display.
+- Mirror the bands around the circular visualizer while sharing each source's capture across every display
+  and preview.
 
 ### Premium VFX renderer gate
 
@@ -189,19 +193,26 @@ samples are never presented as finished HYPNIX wallpapers.
 Visual development proceeds from one readable effect to controlled complexity. The first accepted gate is a single
 fire circle: quiet ember motion at silence, bass-driven thickness and impact, mid-driven turbulence, and restrained
 heat response to highs. A feature is not added merely because the renderer supports it.
-- Capture starts only for an audio-reactive wallpaper and stops when that wallpaper is replaced or stopped.
-- Endpoint failure/disconnection schedules a reopen of the current default render endpoint.
+- Capture starts only while **Audio reactive** is enabled and an active wallpaper or preview needs it,
+  and stops when there are no remaining consumers.
+- Endpoint failure/disconnection schedules a reopen of the current default endpoint. The microphone and
+  system-output sources recover independently; unavailable or denied microphone access does not interrupt
+  system-audio reaction or display a blocking prompt.
 
-No microphone endpoint is opened, and raw samples are never written to disk or sent over the network.
+**React to microphone** is off by default and persists as an explicit preference in Sound and the tray.
+When enabled with **Audio reactive**, an available microphone contributes live analysis alongside system
+playback. Audio samples are used transiently in memory and are never written to disk, sent over the network,
+or played back through the speakers. Turning off microphone reaction releases its input capture; turning
+off **Audio reactive** stops both sources.
 
 Safety and UX:
 
 - Clearly indicate when audio-reactive mode is active.
-- Never capture microphone input implicitly.
-- Stop capture when no active wallpaper needs it.
+- Never capture microphone input implicitly, including as a fallback for unavailable system output.
+- Stop capture when no active wallpaper or preview needs it.
 - Rate-limit analysis updates independently from display FPS.
 - Use a fixed, documented band format so native, shader, and web renderers behave consistently.
-- Allow users to disable system-audio analysis globally.
+- Allow users to disable all audio analysis globally and microphone analysis independently.
 
 ### Wireless and Bluetooth output
 

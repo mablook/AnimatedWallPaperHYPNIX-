@@ -46,6 +46,33 @@ is a separate repository branch-protection setting; adding this file does not en
 
 ## Automated regression coverage
 
+### Optional microphone reaction
+
+The microphone remains off for new and legacy preferences until explicitly enabled. Router tests cover
+shared desktop/preview subscriptions, independent silent or unavailable inputs, mixing frequency bands
+without doubling them, clearing the microphone contribution on disable, rejecting late callbacks,
+expiring stale input and restoring fresh streams after all consumers pause or stop.
+
+Focused native checks:
+
+```powershell
+dotnet run --project Tests/Hypnix.NativeSmoke -c Release -- artifacts/microphone-ui --microphone-ui
+dotnet run --project Tests/Hypnix.NativeSmoke -c Release -- artifacts/microphone-lifecycle --microphone-lifecycle
+dotnet run --project Tests/Hypnix.NativeSmoke -c Release -- artifacts/microphone-live --microphone-probe
+```
+
+The UI fixture checks actual Sound/tray controls and preference persistence without opening an audio
+device. The lifecycle fixture verifies that re-enabling audio on a paused native session keeps capture
+closed until resume, and that disabling/disposal releases its subscription. Its microphone remains off.
+The explicit live probe uses the microphone for five seconds and retains only frame counts and
+peak band values. It saves no audio and waits for the endpoint worker to close.
+
+Verified on 2026-09-23: Release build had zero warnings/errors; 353 unit tests passed; the microphone UI
+and lifecycle fixtures passed, and the rendered Sound section was inspected. The local microphone opened and produced
+230 silent FFT frames, then closed successfully. Voice reaction on physical hardware remains unverified
+because this probe received silence. Build validation used `UseSharedCompilation=false` and isolated
+intermediate/output directories after the shared compiler could not write its output.
+
 ### Per-monitor visualizer pause
 
 The original defect froze animation time while continuing to feed current FFT values to the paused monitor.
@@ -134,6 +161,17 @@ Run before releases and Store submissions:
 - Confirm every audio-reactive wallpaper reacts to real system audio on both displays.
 - Toggle Audio reactive in both the window and tray; verify desktop and preview return to calm animation,
   resume reacting when enabled, and retain the preference after restart.
+- On a fresh profile, confirm **React to microphone** is off and the app does not open an input endpoint.
+  Enable it in Sound, then in the tray, with **Audio reactive** on; confirm the two controls stay synchronized,
+  the choice survives restart, and speaking into an available microphone animates the wallpaper and preview
+  while system playback is silent. Confirm system playback still drives reaction independently.
+- Turn **React to microphone** off and verify the microphone is released while system-audio reaction remains
+  active. Turn **Audio reactive** off and verify both sources stop. Stop desktop playback and close/minimize
+  all previews; confirm microphone access ends when no audio consumer remains.
+- Test no microphone, denied Windows microphone access, unplug/reconnect and a changed default input.
+  Verify no blocking prompt or crash, system-output reaction continues, and an enabled microphone source
+  recovers when input becomes available. Verify audio is not saved to files, logged as samples, sent over the
+  network or monitored through the speakers.
 - Enable `Pause only the display in use` + set `Maximized or fullscreen apps`; maximize an app on display 1 and confirm only display 1 freezes while display 2 keeps animating.
 - Maximize an app on display 2 as well and confirm both displays freeze; minimize one and confirm that display resumes while the other stays frozen.
 - Confirm a transparent/tool overlay (e.g. the NVIDIA GeForce overlay) does not pause a monitor that has no real app on it.
@@ -266,6 +304,71 @@ The native build is pinned and executable through `scripts/build-native.ps1`; `-
 because the existing committed runtime remains the default for ordinary .NET builds.
 
 ## First-frame timeout and deferred render cleanup
+
+### Layered child compatibility for the two GDI wallpapers
+
+```powershell
+dotnet build Tests/Hypnix.NativeSmoke -c Release -p:UseSharedCompilation=false
+& ./Tests/Hypnix.NativeSmoke/bin/Release/net8.0-windows10.0.19041.0/Hypnix.NativeSmoke.exe artifacts/layered-child --layered-child
+```
+
+Launch the executable, not `dotnet Hypnix.NativeSmoke.dll`: the apphost's embedded Windows
+compatibility manifest is part of this regression. The harness shares production `app.manifest`.
+`LayeredChildWindowChecks` creates only owned, hidden HWNDs. It verifies direct layered-child
+creation, then the Ambient and Audio Visualizer desktop constructors followed by child-style
+conversion, reparenting, alpha preservation, geometry, GDI frames, paused reveal and disposal.
+No user preferences, Explorer windows or audio devices are changed.
+
+On 2026-09-25, the same code built with the old manifest failed direct layered-child creation;
+adding the Windows 10/11 `supportedOS` declaration passed that check and both GDI lifecycles.
+Both Release builds had zero warnings/errors. `layered-child-windows.json` captures native
+states and failures. Source, shipped 1.1.1 and rebuilt EXE manifests were compared. These
+checks establish runtime compatibility; final Store/Explorer visual validation is separate.
+
+### Applying a wallpaper while automatic pause is active
+
+`PausedWallpaperRevealChecks` reproduces hidden preparation followed by `Pause()` and `Show()`
+for the first three gallery entries: Built-in ambient, Audio Visualizer and Aethelis Audio Reactive.
+It requires one completed presentation after reveal, a stopped animation clock and no ongoing
+rendering until resume. The two GDI modes also require identical prepared, revealed and paused
+pixels. Aethelis checks render/present counters and time; it does not compare GPU pixels.
+
+```powershell
+dotnet run --project Tests/Hypnix.NativeSmoke -c Release -- artifacts/paused-reveal --paused-reveal
+```
+
+The fixture uses a hidden parent without changing Explorer, user settings or audio devices.
+It saves counter evidence to `paused-wallpaper-reveal.json` and GDI images to the output folder.
+On 2026-09-25, restoring the old paused guard reproduced an Ambient timeout after `Show()`;
+the corrected build passed all three modes (1 prepared, 2 after reveal, still 2 while paused,
+at least 5 after resume). The Release build had zero warnings/errors and all 353 unit tests passed.
+This proves the paused-reveal regression; visual application on the desktop from a newly built
+Store package remains a release check. The installed Store 1.1.1 package was not replaced.
+
+### GDI wallpaper GPU presentation (Windows 11 raised desktop)
+
+The deferred desktop visual check (`scripts/e2e-desktop-smoke.ps1`) found that Built-in ambient
+and Audio Visualizer rendered black on a real Windows 11 raised desktop while GPU wallpapers
+displayed, because a GDI child of `Progman` (which carries `WS_EX_NOREDIRECTIONBITMAP`) is not
+composited by DWM. The fix presents the GDI back buffer through a DXGI swap chain
+(`GdiWallpaperSwapChain`, `Shaders/GdiPresent.hlsl`); see `DESKTOP_INTEGRATION_FINDINGS.md`.
+
+`--gdi-present` verifies the presenter headlessly: it renders a two-colour frame through the swap
+chain and reads the back buffer back, asserting the presented colours. It needs Direct3D 11 but
+no desktop, Explorer or audio device (owned hidden STATIC window).
+
+```powershell
+dotnet run --project Tests/Hypnix.NativeSmoke -c Release -- artifacts/gdi-present --gdi-present
+```
+
+On 2026-09-25 the presenter check passed (upper R=200,G=30,B=40; lower R=40,G=60,B=200) and the
+desktop e2e was re-run against the fixed build: `01-ambient.png` shows the ambient gradient with
+drifting orbs and `02-visualizer-audio.png` shows the audio-reactive ring, with the GPU wallpapers
+(`03`, `04`) unchanged. Release build zero warnings/errors; 367 unit tests passed; paused-reveal,
+layered-child and settings checks still pass. Screenshots are under `artifacts/e2e-desktop-fixed`.
+The installed Store package was not replaced; this fix is in source only.
+
+### Startup timeout and cleanup
 
 `WallpaperRenderWorkerTests` holds initialization behind a gate to reproduce both successful and
 failed completion after startup and shutdown timeouts. It requires that timed-out initialization

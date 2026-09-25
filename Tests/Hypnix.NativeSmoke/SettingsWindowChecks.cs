@@ -38,8 +38,10 @@ internal static class SettingsWindowChecks
         w.SetWallpaper(catalog.Single(e=>e.Kind==WallpaperKind.Lotus));
         if(((ItemsControl)w.FindName("QuickPresets")).Items.Count!=0)throw new Exception("Presets leaked across wallpapers");
         if(((FrameworkElement)w.FindName("BackgroundCard")).Visibility!=Visibility.Visible)throw new Exception("Background not offered for a supported shader");
+        if(((FrameworkElement)w.FindName("GlowControls")).Visibility!=Visibility.Visible)throw new Exception("Glow not offered for a shader that reads it");
         w.SetWallpaper(catalog.Single(e=>e.Kind==WallpaperKind.AethelisFlameBurst));
         if(((FrameworkElement)w.FindName("BackgroundCard")).Visibility!=Visibility.Collapsed)throw new Exception("Background offered for an unsupported Effekseer effect");
+        if(((FrameworkElement)w.FindName("GlowControls")).Visibility!=Visibility.Collapsed)throw new Exception("Glow offered for an Effekseer effect that ignores it");
         w.SetWallpaper(catalog.Single(e=>e.Kind==WallpaperKind.LivingFire));w.LoadValues(new(Glow:0,ColorTheme:1));
         foreach(string tab in new[]{"View","Effects","More"}) {
             ((RadioButton)w.FindName(tab+"Tab")).IsChecked=true;

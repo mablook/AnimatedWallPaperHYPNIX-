@@ -105,6 +105,15 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private FireGpuRenderer? _fireGpuRenderer;
     private long _fireAudioReceived;
     private volatile bool _isShown;
+    private int _repaintRequested;
+    private long _presentedFrameCount;
+    // Desktop GDI wallpapers (Ambient, Audio Visualizer, video) present their System.Drawing frame
+    // through a DXGI swap chain so they composite on the Windows 11 raised desktop, where a GDI
+    // child of Progman shows black. Previews keep the plain GDI blit; failure falls back to it too.
+    private readonly bool _isDesktopSurface;
+    private GdiWallpaperSwapChain? _gdiSwapChain;
+    private Bitmap? _gdiFrameBitmap;
+    private bool _gdiPresentUnavailable;
     private static readonly object WindowClassLock = new();
     private static readonly WindowProcedure WindowProcedureDelegate = HostWindowProcedure;
     private static readonly IntPtr ModuleHandle = GetModuleHandle(null);
@@ -114,6 +123,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         string? customBackground = null, PreviewTarget? preview = null, DesktopWorker.WallpaperTarget? target = null)
     {
         _renderMode = renderMode;
+        _isDesktopSurface = preview is null;
         var geometry = WallpaperRenderGeometry.Resolve(renderTargets, preview, target);
         _renderTargets = geometry.RenderTargets;
         var backgroundPath = customBackground ?? (renderMode switch
@@ -220,6 +230,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
     public IntPtr Handle { get; private set; }
     public bool IsHealthy => !_disposed && !_failed && Handle != IntPtr.Zero && IsWindow(Handle);
+    internal long PresentedFrameCount => Interlocked.Read(ref _presentedFrameCount);
 
     public void Start(int framesPerSecond, bool reveal = true)
     {
@@ -252,7 +263,9 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             AppLog.Write("Native host revealed after first frame was ready");
         }
 
-        // Wake the render loop: it now free-runs at the frame cap and repaints the just-shown window.
+        // A frame prepared against a hidden HWND may not have reached the desktop. A policy
+        // pause can already be active here, so request one presentation without resuming it.
+        Interlocked.Exchange(ref _repaintRequested, 1);
         _renderWorker?.Signal();
     }
 
@@ -345,7 +358,9 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
     private void RenderFrame()
     {
-        if (_paused || Handle == IntPtr.Zero || !GetClientRect(Handle, out var rect))
+        var repaintRequested = Interlocked.Exchange(ref _repaintRequested, 0) != 0;
+        var paused = _paused;
+        if ((paused && !repaintRequested) || Handle == IntPtr.Zero || !GetClientRect(Handle, out var rect))
         {
             return;
         }
@@ -358,7 +373,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
         if (_fireGpuRenderer is not null)
         {
-            RenderFireGpuFrame(width,height);
+            RenderFireGpuFrame(width,height,paused);
+            Interlocked.Increment(ref _presentedFrameCount);
             return;
         }
 
@@ -368,11 +384,19 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire) &&
             _aethelisGpuRenderer is not null)
         {
-            RenderAethelisGpuFrame(width, height);
+            RenderAethelisGpuFrame(width, height, paused);
+            Interlocked.Increment(ref _presentedFrameCount);
             return;
         }
 
         using var target = Graphics.FromHwnd(Handle);
+        if (paused && _backBuffer is not null && _bufferSize == new Size(width, height))
+        {
+            // Re-present the frozen GDI image; do not resample audio, time or video frames.
+            PresentGdiFrame(_backBuffer, width, height, target);
+            Interlocked.Increment(ref _presentedFrameCount);
+            return;
+        }
         if (_backBuffer is null || _bufferSize != new Size(width, height))
         {
             _backBuffer?.Dispose();
@@ -387,7 +411,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         if (_renderMode == NativeRenderMode.Video)
         {
             RenderVideoFrame(graphics, width, height);
-            frame.Render(target);
+            PresentGdiFrame(frame, width, height, target);
+            Interlocked.Increment(ref _presentedFrameCount);
             return;
         }
 
@@ -414,7 +439,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             {
                 RenderVisualizer(graphics, width, height, _clock.Elapsed.TotalSeconds, GetAudioBands());
             }
-            frame.Render(target);
+            PresentGdiFrame(frame, width, height, target);
+            Interlocked.Increment(ref _presentedFrameCount);
             return;
         }
 
@@ -434,7 +460,40 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             }
         }
 
-        frame.Render(target);
+        PresentGdiFrame(frame, width, height, target);
+        Interlocked.Increment(ref _presentedFrameCount);
+    }
+
+    // Presents a GDI frame. On the desktop the classic wallpapers go through a DXGI swap chain so
+    // they composite on the Windows 11 raised desktop; previews and any GPU/creation failure use
+    // the original GDI blit to the window.
+    private void PresentGdiFrame(BufferedGraphics frame, int width, int height, Graphics windowTarget)
+    {
+        if (_isDesktopSurface && !_gdiPresentUnavailable)
+        {
+            try
+            {
+                _gdiSwapChain ??= new GdiWallpaperSwapChain(Handle, width, height);
+                if (_gdiFrameBitmap is null || _gdiFrameBitmap.Width != width || _gdiFrameBitmap.Height != height)
+                {
+                    _gdiFrameBitmap?.Dispose();
+                    _gdiFrameBitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                }
+                using (var bitmapTarget = Graphics.FromImage(_gdiFrameBitmap)) frame.Render(bitmapTarget);
+                _gdiSwapChain.Present(_gdiFrameBitmap);
+                return;
+            }
+            catch (Exception exception)
+            {
+                _gdiPresentUnavailable = true;
+                _gdiSwapChain?.Dispose();
+                _gdiSwapChain = null;
+                _gdiFrameBitmap?.Dispose();
+                _gdiFrameBitmap = null;
+                AppLog.WriteException("GDI GPU presentation unavailable; using the direct GDI blit", exception);
+            }
+        }
+        frame.Render(windowTarget);
     }
 
     private void RenderVisualizer(Graphics graphics, int width, int height, double time, float[] bands)
@@ -493,7 +552,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         graphics.DrawImage(image, new Rectangle(0, 0, width, height), source, GraphicsUnit.Pixel);
     }
 
-    private void RenderAethelisGpuFrame(int width, int height)
+    private void RenderAethelisGpuFrame(int width, int height, bool paused)
     {
         if (_aethelisGpuRenderer is null) return;
 
@@ -506,7 +565,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
                 var sample = _visualizerFreezeState.Resolve(index, _clock.Elapsed.TotalSeconds, GetAudioBands());
                 var profile = AethelisAudioProfile.Analyze(sample.Bands, _visualizerSettings.Sensitivity);
                 _aethelisGpuRenderer.RenderViewport(target.X, target.Y, target.Width, target.Height,
-                    sample.TimeSeconds, profile, _visualizerSettings, sample.IsFrozen, sample.Bands);
+                    sample.TimeSeconds, profile, _visualizerSettings, paused || sample.IsFrozen, sample.Bands);
             }
         }
         else
@@ -514,13 +573,13 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             var bands = GetAudioBands();
             var profile = AethelisAudioProfile.Analyze(bands, _visualizerSettings.Sensitivity);
             _aethelisGpuRenderer.RenderViewport(0, 0, width, height, _clock.Elapsed.TotalSeconds,
-                profile, _visualizerSettings, spectrum: bands);
+                profile, _visualizerSettings, freezeEffect: paused, spectrum: bands);
         }
 
         _aethelisGpuRenderer.EndFrame();
     }
 
-    private void RenderFireGpuFrame(int width,int height)
+    private void RenderFireGpuFrame(int width,int height,bool paused)
     {
         var renderer=_fireGpuRenderer!;
         long received=Interlocked.Read(ref _fireAudioReceived);
@@ -533,11 +592,11 @@ internal sealed partial class NativeWallpaperHost : IDisposable
                 var target=_renderTargets[index];
                 var sample=_visualizerFreezeState.Resolve(index,_clock.Elapsed.TotalSeconds,bands);
                 renderer.RenderViewport(target.X,target.Y,target.Width,target.Height,sample.TimeSeconds,
-                    AethelisAudioProfile.Analyze(sample.Bands,_visualizerSettings.Sensitivity),_visualizerSettings,sample.IsFrozen,sample.Bands);
+                    AethelisAudioProfile.Analyze(sample.Bands,_visualizerSettings.Sensitivity),_visualizerSettings,paused||sample.IsFrozen,sample.Bands);
             }
         }
         else renderer.RenderViewport(0,0,width,height,_clock.Elapsed.TotalSeconds,
-            AethelisAudioProfile.Analyze(bands,_visualizerSettings.Sensitivity),_visualizerSettings,spectrum:bands);
+            AethelisAudioProfile.Analyze(bands,_visualizerSettings.Sensitivity),_visualizerSettings,frozen:paused,spectrum:bands);
         renderer.EndFrame();
     }
 
@@ -966,6 +1025,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     {
         _backBuffer?.Dispose();
         _bufferContext.Dispose();
+        _gdiSwapChain?.Dispose();
+        _gdiFrameBitmap?.Dispose();
         _visualizerBackground?.Dispose();
         _aethelisGpuRenderer?.Dispose();
         _fireGpuRenderer?.Dispose();

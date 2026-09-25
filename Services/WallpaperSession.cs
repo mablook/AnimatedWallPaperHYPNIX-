@@ -6,6 +6,7 @@ internal sealed class WallpaperSession : IWallpaperSession
     private IDisposable? _audioSubscription;
     private readonly bool _usesAudio;
     private bool _audioEnabled = true;
+    private bool _paused;
     public int? ProcessId => null;
     public bool IsHealthy => _host.IsHealthy;
 
@@ -32,11 +33,13 @@ internal sealed class WallpaperSession : IWallpaperSession
     public void SetFrameCap(int framesPerSecond) => _host.SetFrameCap(framesPerSecond);
     public void Resume()
     {
+        _paused = false;
         if (_usesAudio && _audioEnabled) _audioSubscription ??= AudioSpectrumSource.Subscribe(_host.SubmitAudioBands);
         _host.Resume();
     }
     public void Pause()
     {
+        _paused = true;
         _host.Pause();
         _audioSubscription?.Dispose();
         _audioSubscription = null;
@@ -48,7 +51,7 @@ internal sealed class WallpaperSession : IWallpaperSession
         if (_audioEnabled == enabled) return;
         _audioEnabled = enabled;
         if (!_usesAudio) return;
-        if (enabled)
+        if (enabled && !_paused)
         {
             _audioSubscription ??= AudioSpectrumSource.Subscribe(_host.SubmitAudioBands);
         }

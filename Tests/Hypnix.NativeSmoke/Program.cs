@@ -34,6 +34,8 @@ internal static class Program
                 "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
                 string.Concat(resourceXml.Nodes()) + "</ResourceDictionary>");
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (args.Contains("--layered-child")) { LayeredChildWindowChecks.Run(output); return 0; }
+            if (args.Contains("--gdi-present")) { GdiPresentChecks.Run(output); return 0; }
             if (args.Contains("--show-product-preview"))
             {
                 // Isolated presentation fixture; real gallery and GPU previews, no commerce requests.
@@ -46,11 +48,17 @@ internal static class Program
                 app.Run(productWindow);
                 return 0;
             }
+            if (args.Contains("--microphone-probe"))
+            {
+                MicrophoneAudioChecks.Probe(output);
+                return 0;
+            }
             if (args.Contains("--lemon-license")) { LemonLicenseWindowChecks.Run(output); return 0; }
             if (args.Contains("--license-only")) { LicenseWindowChecks.Run(output); return 0; }
             if (args.Contains("--show-license-demo")) { LicenseWindowChecks.ShowDemo(app, output); return 0; }
             if (args.Contains("--displays-ui")) { DisplayWindowChecks.Run(output); return 0; }
             if (args.Contains("--multi-preview")) { MultiPreviewChecks.Run(output); return 0; }
+            if (args.Contains("--microphone-ui")) { MicrophoneWindowChecks.Run(output); return 0; }
             if (args.Contains("--displays-desktop")) { DisplayDesktopChecks.Run(output, args.ElementAtOrDefault(2), args.ElementAtOrDefault(3)); return 0; }
             if (args.Contains("--capture-thumbnails"))
             {
@@ -77,6 +85,16 @@ internal static class Program
             if (parent == IntPtr.Zero) throw new InvalidOperationException("Hidden native test surface could not be created.");
             try
             {
+                if (args.Contains("--paused-reveal"))
+                {
+                    PausedWallpaperRevealChecks.Run(parent, output);
+                    return 0;
+                }
+                if (args.Contains("--microphone-lifecycle"))
+                {
+                    MicrophoneLifecycleChecks.Run(parent, output);
+                    return 0;
+                }
                 if (args.Contains("--event-horizon-only"))
                 {
                     EventHorizonRenderChecks.Run(parent, output);
@@ -181,6 +199,7 @@ internal static class Program
             settingsWindow.SetWallpaper(gallery.Items.OfType<WallpaperEntry>().Single(e => e.Kind == WallpaperKind.FractalPyramid));
             var layoutControls = (FrameworkElement)settingsWindow.FindName("LayoutControls");
             var colorsCard = (FrameworkElement)settingsWindow.FindName("ColorsCard");
+            var glowControls = (FrameworkElement)settingsWindow.FindName("GlowControls");
             // Switch through every visualizer in one existing window, as gallery selection does.
             // The window must advertise exactly the controls each renderer actually honors, so
             // capabilities are the single source of truth (no control shown that does nothing).
@@ -191,8 +210,8 @@ internal static class Program
                     throw new InvalidOperationException($"Incorrect layout controls for {entry.Kind}.");
                 if ((colorsCard.Visibility == Visibility.Visible) != entry.SupportsColorTheme)
                     throw new InvalidOperationException($"Incorrect color palette visibility for {entry.Kind}.");
-                if (((FrameworkElement)settingsWindow.FindName("GlowSlider")).Visibility != Visibility.Visible)
-                    throw new InvalidOperationException($"Appearance controls hidden for {entry.Kind}.");
+                if ((glowControls.Visibility == Visibility.Visible) != entry.SupportsGlow)
+                    throw new InvalidOperationException($"Incorrect glow control visibility for {entry.Kind}.");
             }
             settingsWindow.LoadValues(new VisualizerPreferences(3f, 4f, 1.2f, 2, 1.5f, 0.25f, -0.35f));
             var roundTrip = settingsWindow.ReadValues();

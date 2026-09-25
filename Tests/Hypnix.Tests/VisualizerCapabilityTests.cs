@@ -72,16 +72,38 @@ public sealed class VisualizerCapabilityTests
     public void BackgroundSupportMatchesRendererCapability(int kind, bool supported)
         => Assert.Equal(supported, Entry((WallpaperKind)kind).SupportsBackground);
 
+    [Theory]
+    // Glow drives the bloom/halo of every visualizer whose shader or GDI path reads it.
+    [InlineData((int)WallpaperKind.VisualizerDemo, true)]
+    [InlineData((int)WallpaperKind.AethelisVisualizer, true)]
+    [InlineData((int)WallpaperKind.SpectralBloom, true)]
+    [InlineData((int)WallpaperKind.NeonRibbons, true)]
+    [InlineData((int)WallpaperKind.LiquidOrbs, true)]
+    [InlineData((int)WallpaperKind.EventHorizon, true)]
+    [InlineData((int)WallpaperKind.FractalPyramid, true)]
+    [InlineData((int)WallpaperKind.Kaleidoscope, true)]
+    [InlineData((int)WallpaperKind.Lotus, true)]
+    [InlineData((int)WallpaperKind.LivingFire, true)]
+    // The two Effekseer fire effects declare Glow in the shader but never read it, and the
+    // native particle update takes no glow parameter, so the control is hidden there.
+    [InlineData((int)WallpaperKind.AethelisFlameBurst, false)]
+    [InlineData((int)WallpaperKind.FlamethrowerRingV2, false)]
+    [InlineData((int)WallpaperKind.BuiltIn, false)]
+    [InlineData((int)WallpaperKind.ExampleVideo, false)]
+    public void GlowSupportMatchesRendererCapability(int kind, bool supported)
+        => Assert.Equal(supported, Entry((WallpaperKind)kind).SupportsGlow);
+
     [Fact]
-    public void EffekseerEffectsHideBothPaletteAndLayout()
+    public void EffekseerEffectsHidePaletteLayoutAndGlow()
     {
-        // The two authored fire effects keep only the controls that work (intensity/glow/audio).
+        // The two authored fire effects keep only the controls that work (intensity/audio).
         foreach (var kind in new[] { WallpaperKind.AethelisFlameBurst, WallpaperKind.FlamethrowerRingV2 })
         {
             var entry = Entry(kind);
             Assert.True(entry.IsVisualizer);
             Assert.False(entry.SupportsColorTheme);
             Assert.False(entry.SupportsLayoutControls);
+            Assert.False(entry.SupportsGlow);
         }
     }
 
@@ -120,7 +142,10 @@ public sealed class VisualizerCapabilityTests
         var code = File.ReadAllText(Path.Combine(root, "VisualizerSettingsWindow.xaml.cs"));
         Assert.Contains("ColorsCard.Visibility=Visible(entry.SupportsColorTheme)", code);
         Assert.Contains("LayoutControls.Visibility=Visible(entry.SupportsLayoutControls)", code);
-        Assert.Contains("x:Name=\"ColorsCard\"", File.ReadAllText(Path.Combine(root, "VisualizerSettingsWindow.xaml")));
+        Assert.Contains("GlowControls.Visibility=Visible(entry.SupportsGlow)", code);
+        var xaml = File.ReadAllText(Path.Combine(root, "VisualizerSettingsWindow.xaml"));
+        Assert.Contains("x:Name=\"ColorsCard\"", xaml);
+        Assert.Contains("x:Name=\"GlowControls\"", xaml);
     }
 
     [Fact]

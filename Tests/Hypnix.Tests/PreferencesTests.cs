@@ -38,6 +38,34 @@ public sealed class PreferencesTests : IDisposable
         Assert.True(new AppSettingsStore(FilePath).Load().AudioReactive); // stays enabled
     }
 
+    [Fact]
+    public void MicrophoneReactivityRequiresOptInForNewAndExistingUsers()
+    {
+        Assert.False(new AppSettings().MicrophoneReactive);
+        var store = new AppSettingsStore(FilePath);
+        Assert.False(store.Load().MicrophoneReactive);
+
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(FilePath, """{"AudioReactive":true,"FramesPerSecond":30}""");
+        var legacy = store.Load();
+        Assert.True(legacy.AudioReactive);
+        Assert.False(legacy.MicrophoneReactive);
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    public void MicrophonePreferenceRoundTripsIndependentlyOfAudioReactivity(bool audio, bool microphone)
+    {
+        var store = new AppSettingsStore(FilePath);
+        Assert.True(store.Save(new AppSettings { AudioReactive = audio, MicrophoneReactive = microphone }));
+        var restored = store.Load();
+        Assert.Equal(audio, restored.AudioReactive);
+        Assert.Equal(microphone, restored.MicrophoneReactive);
+    }
+
     [Theory]
     [InlineData("{broken")]
     [InlineData("null")]

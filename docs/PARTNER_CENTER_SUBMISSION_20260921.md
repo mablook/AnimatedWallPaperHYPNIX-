@@ -6,6 +6,14 @@ The Test configuration and package status below describe that date; the
 and licensing details. This is not a claim that the application has been submitted,
 certified or published.
 
+Audio behavior update, 2026-09-23: the source now supports optional **React to microphone** in Sound and
+the tray, off by default and dependent on **Audio reactive**. It analyzes an available microphone locally
+without saving recordings or sending audio. Missing or denied input leaves system-playback reaction working.
+The listing and reviewer notes reproduced below remain the historical saved text, including their
+system-playback-only claims. Before submitting a package with this feature, replace those claims with the
+current behavior and update the portal's privacy text from [the current policy](PRIVACY_POLICY.md).
+This repository change does not attest an update to Partner Center or a previously built package.
+
 ## Identity
 
 User supplied these official values; manifest Name, Publisher and
