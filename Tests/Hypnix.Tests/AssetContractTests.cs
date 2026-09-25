@@ -276,6 +276,34 @@ public sealed class AssetContractTests
         Assert.Contains("AudioReactiveChanged", xaml);
     }
 
+    [Fact]
+    public void AudioSourceSelectorAndDeviceControlsAreExposedInTheUi()
+    {
+        var xaml = File.ReadAllText(Path.Combine(RepositoryRoot, "MainWindow.xaml"));
+        // One explicit source choice with all three modes.
+        Assert.Contains("AudioSourceCombo", xaml);
+        Assert.Contains("Tag=\"System\"", xaml);
+        Assert.Contains("Tag=\"Microphone\"", xaml);
+        Assert.Contains("Tag=\"SystemAndMicrophone\"", xaml);
+        // Separate device lists for microphones and system outputs, plus the live meter + test.
+        Assert.Contains("MicrophoneDeviceCombo", xaml);
+        Assert.Contains("SystemDeviceCombo", xaml);
+        Assert.Contains("MicLevelMeter", xaml);
+        Assert.Contains("MicrophoneTest_Click", xaml);
+        // The removed legacy control must be gone so the two models cannot both ship.
+        Assert.DoesNotContain("MicrophoneReactiveCheckBox", xaml);
+    }
+
+    [Fact]
+    public void WallpaperSettingsButtonIsRenamedAndDiscoverable()
+    {
+        var xaml = File.ReadAllText(Path.Combine(RepositoryRoot, "MainWindow.xaml"));
+        Assert.Contains("VisualizerSettingsButton", xaml);          // handler wiring is preserved
+        Assert.Contains("Wallpaper settings", xaml);                // clearer label
+        Assert.Contains("Adjust sensitivity, intensity and appearance", xaml); // supporting description
+        Assert.DoesNotContain("Content=\"Customize\"", xaml);       // the vague label is gone
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

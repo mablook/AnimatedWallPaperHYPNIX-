@@ -46,6 +46,76 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
   wallpaper playback and real-time music reaction, settings persistence,
   independent monitors, pause/resume/stop and recovery. Follow the
   [testing guide](TESTING_AND_REGRESSION_GUIDE.md) on the release candidate.
+- [ ] **Windows notification bell flickers while HYPNIX is in the foreground** —
+  reported during manual testing of local 1.1.2 on 2026-09-25. The Windows notification
+  bell next to the taskbar clock repeatedly disappears and reappears while the main
+  app window is in front; the user reports that the symptom stops after applying a
+  wallpaper. This concerns the Windows bell (Focus Assist / quiet-hours indicator),
+  not HYPNIX's notification-area icon.
+  Best-effort mitigation applied (needs on-device confirmation): the live-preview GPU
+  swap chains (`AethelisGpuRenderer`, `FireGpuRenderer`) now request
+  `DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER` on window association. During
+  preview these swap chains' HWND is a child of the foreground app window; the default
+  DXGI hook couples that window to swap-chain presentation, which can make the shell
+  toggle its fullscreen/Focus-Assist state (the bell). Associating the desktop
+  wallpaper's swap chain with WorkerW instead of the app window is consistent with the
+  reporter's note that the flicker stops after Apply. We recreate swap chains on resize
+  ourselves, so ignoring window changes is safe.
+  Verification: with a GPU visualizer selected and the preview open, keep the HYPNIX
+  window in the foreground and watch the taskbar bell; then Apply and hide the app.
+  Acceptance: the bell remains visually stable across those states. If it still
+  flickers, the next suspect is DirectFlip/MPO overlay promotion of the preview swap
+  chain — switch the preview surface to the BitBlt swap model (`SwapEffect.Discard`)
+  while keeping FlipDiscard on the desktop. Status: mitigation shipped for the preview
+  swap chains; not yet independently reproduced or confirmed fixed on a real desktop.
+  [User screenshot](assets/notification-bell-flicker-20260925.png).
+- [x] **Make wallpaper settings easier to recognize and find** — manual feedback
+  on local 1.1.2, 2026-09-25: the label `Customize` did not explain what the button
+  opens and its visual emphasis was too weak. Implemented: the button in the selection
+  footer is renamed `Wallpaper settings` with a settings (gear) glyph, an accent border
+  and a raised background for contrast, a tooltip + accessible help text "Adjust
+  sensitivity, intensity and appearance", and `AutomationProperties.Name` updated to
+  match. It stays in the always-visible footer (available with the preview closed), the
+  accent-filled `Apply` remains the distinct primary action, and the label uses
+  `TextTrimming` with a modest `MinWidth` so it degrades gracefully at compact widths
+  and high DPI. The editor already shows only controls each wallpaper supports
+  (SupportsColorTheme/Layout/Glow/Background/Sparks). Status: implemented; pending the
+  on-device visual/high-DPI pass. [User screenshot](assets/wallpaper-settings-button-feedback-20260925.png).
+- [x] **Allow system audio, microphone or both as explicit reactive sources** —
+  manual feedback on local 1.1.2, 2026-09-25: the old `React to microphone` mixed both
+  inputs and depended on the parent toggle, so microphone-only could not be selected.
+  Implemented: the Sound settings now offer one `Audio source` choice — `System audio`,
+  `Microphone`, or `System audio + microphone` — beside the general `Audio reactive`
+  on/off switch, mirrored by an `Audio source` submenu in the tray. The router
+  (`AudioSpectrumRouter.SetSource`) opens only the selected sources; microphone-only
+  never starts the system loopback. Switching releases the deselected source and clears
+  its residual bands immediately. The selection persists (`AudioSource`, serialized as a
+  readable name) and migrates existing files without changing behavior (old microphone
+  on = both; off = system; master off stays off); new profiles default to system audio.
+  A missing/denied microphone keeps retrying without silently switching sources, and the
+  analysis stays local (no saved/transmitted audio). Covered by unit tests for the
+  router source/device behavior and the settings migration. Status: implemented; the
+  three-mode manual matrix (simultaneous system + mic, off, source changes, restart,
+  unavailable mic) remains for on-device validation.
+  [User screenshot](assets/audio-source-selection-feedback-20260925.png).
+- [x] **List audio devices and show live microphone feedback** — manual feedback
+  on local 1.1.2, 2026-09-25, with Teams as the interaction reference. Implemented via a
+  new `AudioDeviceService` (NAudio `MMDeviceEnumerator` + `IMMNotificationClient`): the
+  Sound panel lists microphones by their Windows friendly names with a `System default
+  (Name)` entry that follows Windows, marks the current default, and refreshes on
+  connect/disconnect. Explicit selections persist by stable device id
+  (`MicrophoneDeviceId`/`SystemAudioDeviceId`) and a chosen-but-absent device is kept as
+  "unavailable" rather than silently switched. System-audio reaction offers the output
+  devices separately from the microphone list. A new `AudioLevelMeter` drives a
+  Teams-style segmented `LevelMeter` control from a microphone-only capture, so combined
+  mode shows the mic's own level (system playback cannot fake it), with status text for
+  "No microphone found", "Microphone unavailable", "Microphone access is blocked",
+  "Listening" and "Sound detected". Enumeration/opening the list never captures: the
+  meter runs only while the panel is visible and either the microphone is the active
+  source or the user starts an explicit `Test`, and it is released when the test ends or
+  the panel closes. Analysis is transient/local — nothing recorded, replayed or sent.
+  Status: implemented; the physical device-hotplug, denied-access and per-device meter
+  passes remain for on-device validation. [User reference](assets/audio-devices-level-feedback-20260925.png).
 - [x] **Verify supplied Live configuration** — `packaging/Commerce.props` now uses
   the published Live product and checkout. All identifiers were verified inside
   the final 1.1.1 MSIX assembly; the Test-mode publication guard remains active.
@@ -75,9 +145,11 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
   without a separate written agreement. Decide and provide the intended end-user license for public distribution.
 - [ ] **Clean-machine validation** — test the installers on a Windows x64 machine without a .NET SDK,
   plus the real desktop/audio/mixed-DPI regression matrix. Developer-machine smoke tests are not a substitute.
-- [x] **Bump `<Version>`** — 1.1.1 for this Live build in `AnimatedWallPaper.csproj`. Continue bumping for every release (SemVer). It flows to the
-  Velopack package version and the MSIX `x.y.z.0` version. Confirm the next version
-  against any existing submissions; do not reuse old example version numbers.
+- [x] **Bump `<Version>`** — 1.2.0 in `AnimatedWallPaper.csproj` for the Sound/audio-source,
+  device-feedback and wallpaper-settings feature release (was 1.1.1 for the prior Live build).
+  Continue bumping for every release (SemVer). It flows to the Velopack package version and the
+  MSIX `x.y.z.0` version. Confirm the next version against any existing submissions; do not reuse
+  old example version numbers.
 - [ ] **Complete installed-package validation** — the exact Live 1.1.1 MSIX is built,
   its contents and licensing classes are validated. Installed-package lifecycle,
   broader native regression and clean-machine/Store checks remain. Historical

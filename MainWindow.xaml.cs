@@ -41,8 +41,15 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _recoveryTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private System.Windows.Forms.ToolStripMenuItem? _trayAudioItem;
-    private System.Windows.Forms.ToolStripMenuItem? _trayMicrophoneItem;
+    private System.Windows.Forms.ToolStripMenuItem? _traySourceItem;
+    private readonly Dictionary<AudioReactionSource, System.Windows.Forms.ToolStripMenuItem> _traySourceOptions = new();
     private System.Windows.Forms.ToolStripMenuItem? _trayUpdateItem;
+    private readonly AudioDeviceService _audioDevices = new();
+    private readonly AudioLevelMeter _levelMeter = new();
+    private bool _micTestActive;
+    private bool _syncingAudioUi;
+    private bool _meterRunning;
+    private string? _meterDeviceId;
     private System.Drawing.Icon? _trayDrawingIcon;
     private UpdateService? _updateService;
     private Velopack.UpdateInfo? _pendingUpdate;
@@ -68,7 +75,9 @@ public partial class MainWindow : Window
         _settingsStore = settingsStore;
         _wallpaperLibrary = new WallpaperLibraryService(libraryRoot);
         _settings = _settingsStore.Load();
-        AudioSpectrumSource.SetMicrophoneEnabled(_settings.AudioReactive && _settings.MicrophoneReactive);
+        AudioSpectrumSource.SetSystemDevice(_settings.SystemAudioDeviceId);
+        AudioSpectrumSource.SetMicrophoneDevice(_settings.MicrophoneDeviceId);
+        AudioSpectrumSource.SetSource(_settings.AudioSource);
         InitializeComponent();
         InitializeMonitorPreviews();
         InitializeTrayIcon();
@@ -76,8 +85,7 @@ public partial class MainWindow : Window
         PausePerMonitorToggle.IsChecked = _settings.PausePerMonitor;
         PauseBatteryCheckBox.IsChecked = _settings.PauseOnBattery;
         AudioReactiveCheckBox.IsChecked = _settings.AudioReactive;
-        MicrophoneReactiveCheckBox.IsChecked = _settings.MicrophoneReactive;
-        UpdateMicrophoneReactiveControls();
+        InitializeAudioUi();
         _wallpaperController.SetAudioEnabled(_settings.AudioReactive);
         LivePreview.SetAudioEnabled(_settings.AudioReactive);
         FpsComboBox.SelectedIndex = _settings.FramesPerSecond == 15 ? 0 : _settings.FramesPerSecond == 60 ? 2 : 1;
@@ -97,8 +105,11 @@ public partial class MainWindow : Window
             if (_wallpaperController.IsRunning && !_wallpaperController.IsHealthy) ScheduleRecovery();
         };
         LivePreview.StatusChanged += status => PreviewStatusText.Text = status;
-        IsVisibleChanged += (_, _) => UpdatePreviewSuspension();
-        StateChanged += (_, _) => UpdatePreviewSuspension();
+        IsVisibleChanged += (_, _) => { UpdatePreviewSuspension(); UpdateMicrophoneMeter(); };
+        StateChanged += (_, _) => { UpdatePreviewSuspension(); UpdateMicrophoneMeter(); };
+        _audioDevices.DevicesChanged += OnAudioDevicesChanged;
+        _levelMeter.LevelChanged += OnMeterLevelChanged;
+        _levelMeter.StatusChanged += OnMeterStatusChanged;
         _foregroundMonitor.Start();
         RememberDisplays();
         _license.Changed += UpdateLicenseUi;
@@ -265,29 +276,206 @@ public partial class MainWindow : Window
         if (!_isUiInitialized) return;
         var enabled = AudioReactiveCheckBox.IsChecked == true;
         _settings.AudioReactive = enabled;
-        UpdateMicrophoneReactiveControls();
         _wallpaperController.SetAudioEnabled(enabled);
         LivePreview.SetAudioEnabled(enabled);
         MultiPreview.SetAudioEnabled(enabled);
         _settingsWindow?.SetAudioEnabled(enabled);
         if (_trayAudioItem is not null && _trayAudioItem.Checked != enabled) _trayAudioItem.Checked = enabled;
+        UpdateAudioSourceUi();
+        UpdateMicrophoneMeter();
         QueueSave();
     }
-    private void MicrophoneReactiveChanged(object sender, RoutedEventArgs e)
+
+    private void InitializeAudioUi()
+    {
+        PopulateAudioDevices();
+        UpdateAudioSourceUi();
+    }
+
+    private void AudioSourceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isUiInitialized || _syncingAudioUi) return;
+        ApplyAudioSource(SelectedAudioSource());
+    }
+
+    // Shared by the combo and the tray submenu so both stay in sync with the router and settings.
+    private void ApplyAudioSource(AudioReactionSource source)
+    {
+        source = source.Normalize();
+        _settings.AudioSource = source;
+        _settings.MicrophoneReactive = source.UsesMicrophone();
+        // Each mode opens and analyzes only its inputs; the deselected source is released and its
+        // residual contribution cleared inside the router.
+        AudioSpectrumSource.SetSource(source);
+        UpdateAudioSourceUi();
+        UpdateMicrophoneMeter();
+        QueueSave();
+    }
+
+    private void SetAudioSourceFromTray(AudioReactionSource source)
+    {
+        if (_settings.AudioSource == source) { UpdateTraySource(); return; }
+        ApplyAudioSource(source);
+    }
+
+    private AudioReactionSource SelectedAudioSource()
+        => AudioSourceCombo.SelectedItem is System.Windows.Controls.ComboBoxItem item &&
+           Enum.TryParse<AudioReactionSource>(item.Tag?.ToString(), out var source)
+            ? source.Normalize() : AudioReactionSource.System;
+
+    private void MicrophoneDeviceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isUiInitialized || _syncingAudioUi) return;
+        _settings.MicrophoneDeviceId = (MicrophoneDeviceCombo.SelectedItem as AudioDeviceInfo)?.Id;
+        AudioSpectrumSource.SetMicrophoneDevice(_settings.MicrophoneDeviceId);
+        // Rebind a running meter/test to the newly chosen input immediately.
+        UpdateMicrophoneMeter(restart: true);
+        QueueSave();
+    }
+
+    private void SystemDeviceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isUiInitialized || _syncingAudioUi) return;
+        _settings.SystemAudioDeviceId = (SystemDeviceCombo.SelectedItem as AudioDeviceInfo)?.Id;
+        AudioSpectrumSource.SetSystemDevice(_settings.SystemAudioDeviceId);
+        QueueSave();
+    }
+
+    // Explicit temporary microphone test: only used when the microphone is not already the active
+    // reactive source. Opening the device list never activates capture; this button does.
+    private void MicrophoneTest_Click(object sender, RoutedEventArgs e)
+    {
+        _micTestActive = !_micTestActive;
+        UpdateMicrophoneMeter(restart: true);
+    }
+
+    private void UpdateAudioSourceUi()
+    {
+        var source = _settings.AudioSource;
+        _syncingAudioUi = true;
+        try
+        {
+            foreach (var item in AudioSourceCombo.Items.Cast<System.Windows.Controls.ComboBoxItem>())
+                if (string.Equals(item.Tag?.ToString(), source.ToString(), StringComparison.Ordinal))
+                {
+                    AudioSourceCombo.SelectedItem = item;
+                    break;
+                }
+        }
+        finally { _syncingAudioUi = false; }
+        SystemDevicePanel.Visibility = source.UsesSystem() ? Visibility.Visible : Visibility.Collapsed;
+        MicrophonePanel.Visibility = source.UsesMicrophone() ? Visibility.Visible : Visibility.Collapsed;
+        UpdateMicTestButton();
+        UpdateTraySource();
+    }
+
+    private void UpdateMicTestButton()
+    {
+        var source = _settings.AudioSource;
+        // The meter runs automatically while the microphone is the active reactive source; the
+        // explicit test is only offered when it is not (e.g. Audio reactive is off).
+        var micIsActiveSource = _settings.AudioReactive && source.UsesMicrophone();
+        MicTestButton.Visibility = source.UsesMicrophone() && !micIsActiveSource ? Visibility.Visible : Visibility.Collapsed;
+        MicTestButton.Content = _micTestActive ? "Stop test" : "Test";
+    }
+
+    private void UpdateTraySource()
+    {
+        if (_traySourceItem is not null) _traySourceItem.Enabled = _settings.AudioReactive;
+        foreach (var (source, item) in _traySourceOptions)
+            if (item.Checked != (source == _settings.AudioSource)) item.Checked = source == _settings.AudioSource;
+    }
+
+    private void PopulateAudioDevices()
+    {
+        _syncingAudioUi = true;
+        try
+        {
+            BindDeviceCombo(MicrophoneDeviceCombo, _audioDevices.GetMicrophones(), _settings.MicrophoneDeviceId, "microphone");
+            BindDeviceCombo(SystemDeviceCombo, _audioDevices.GetOutputs(), _settings.SystemAudioDeviceId, "output");
+        }
+        finally { _syncingAudioUi = false; }
+    }
+
+    // Builds a "System default (Name)" entry that follows Windows plus each device by its Windows
+    // name. A specific-but-absent selection is preserved by id (shown as unavailable) so it is
+    // never silently switched; it re-binds to the real device when it reconnects.
+    private static void BindDeviceCombo(System.Windows.Controls.ComboBox combo,
+        IReadOnlyList<AudioDeviceInfo> devices, string? selectedId, string kind)
+    {
+        var defaultName = devices.FirstOrDefault(device => device.IsDefault)?.Name;
+        var items = new List<AudioDeviceInfo>
+        {
+            new(null, defaultName is null ? "System default" : $"System default ({defaultName})", false)
+        };
+        foreach (var device in devices)
+            items.Add(device with { Name = device.IsDefault ? $"{device.Name}  ·  Default" : device.Name });
+        if (selectedId is not null && !items.Any(item => string.Equals(item.Id, selectedId, StringComparison.OrdinalIgnoreCase)))
+            items.Add(new AudioDeviceInfo(selectedId, $"Selected {kind} (unavailable)", false));
+        combo.ItemsSource = items;
+        combo.SelectedItem = items.FirstOrDefault(item => string.Equals(item.Id, selectedId, StringComparison.OrdinalIgnoreCase))
+            ?? items[0];
+    }
+
+    private void OnAudioDevicesChanged()
+        => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_isQuitting) return;
+            PopulateAudioDevices();
+            // A reconnected selection must recover; a removed one must surface without blocking.
+            UpdateMicrophoneMeter(restart: true);
+        }));
+
+    // Runs the microphone meter only when it is legitimate to capture: the Sound panel is on screen
+    // and either the microphone is the active reactive source, or the user started an explicit test.
+    // Enumerating or opening the device list alone never reaches here.
+    private void UpdateMicrophoneMeter(bool restart = false)
     {
         if (!_isUiInitialized) return;
-        _settings.MicrophoneReactive = MicrophoneReactiveCheckBox.IsChecked == true;
-        UpdateMicrophoneReactiveControls();
-        QueueSave();
+        var source = _settings.AudioSource;
+        var panelVisible = _appSettingsOpen && !LicenseGateVisible && IsVisible && WindowState != WindowState.Minimized;
+        var micIsActiveSource = _settings.AudioReactive && source.UsesMicrophone();
+        var shouldRun = panelVisible && source.UsesMicrophone() && (micIsActiveSource || _micTestActive);
+        if (shouldRun)
+        {
+            if (!_meterRunning || restart || !string.Equals(_meterDeviceId, _settings.MicrophoneDeviceId, StringComparison.OrdinalIgnoreCase))
+            {
+                _meterRunning = true;
+                _meterDeviceId = _settings.MicrophoneDeviceId;
+                _levelMeter.Start(_settings.MicrophoneDeviceId);
+            }
+        }
+        else
+        {
+            if (_meterRunning) { _meterRunning = false; _levelMeter.Stop(); }
+            _micTestActive = false;
+            MicLevelMeter.Level = 0;
+            MicLevelMeter.Active = false;
+            MicStatusText.Text = "";
+        }
+        UpdateMicTestButton();
     }
-    private void UpdateMicrophoneReactiveControls()
+
+    private void OnMeterLevelChanged(float level)
+        => Dispatcher.BeginInvoke(new Action(() => { if (!_isQuitting) MicLevelMeter.Level = level; }));
+
+    private void OnMeterStatusChanged(MicrophoneStatus status)
+        => Dispatcher.BeginInvoke(new Action(() => { if (!_isQuitting) ApplyMicStatus(status); }));
+
+    private void ApplyMicStatus(MicrophoneStatus status)
     {
-        AudioSpectrumSource.SetMicrophoneEnabled(_settings.AudioReactive && _settings.MicrophoneReactive);
-        MicrophoneReactiveCheckBox.IsEnabled = _settings.AudioReactive;
-        if (_trayMicrophoneItem is null) return;
-        _trayMicrophoneItem.Enabled = _settings.AudioReactive;
-        if (_trayMicrophoneItem.Checked != _settings.MicrophoneReactive)
-            _trayMicrophoneItem.Checked = _settings.MicrophoneReactive;
+        var (text, active) = status switch
+        {
+            MicrophoneStatus.SoundDetected => ("Sound detected.", true),
+            MicrophoneStatus.Listening => ("Listening — speak to test your microphone.", true),
+            MicrophoneStatus.NoMicrophone => ("No microphone found.", false),
+            MicrophoneStatus.Unavailable => ("Microphone unavailable. Check the connection or your selection.", false),
+            MicrophoneStatus.AccessBlocked => ("Microphone access is blocked. Allow it in Windows privacy settings.", false),
+            _ => ("", false)
+        };
+        MicStatusText.Text = text;
+        MicLevelMeter.Active = active;
+        if (!active) MicLevelMeter.Level = 0;
     }
     private void PolicyChanged(object sender, RoutedEventArgs e) { if (_isUiInitialized) { QueueSave(); ApplyPlaybackPolicy(); } }
     private void PolicyModeChanged(object sender, SelectionChangedEventArgs e) { if (_isUiInitialized) { UpdatePauseControlsEnabled(); QueueSave(); ApplyPlaybackPolicy(); } }
@@ -486,7 +674,7 @@ public partial class MainWindow : Window
         _settings.PausePerMonitor = PausePerMonitorToggle.IsChecked == true;
         _settings.PauseOnBattery = PauseBatteryCheckBox.IsChecked == true;
         _settings.AudioReactive = AudioReactiveCheckBox.IsChecked == true;
-        _settings.MicrophoneReactive = MicrophoneReactiveCheckBox.IsChecked == true;
+        // AudioSource, MicrophoneReactive and device selections are written by their own handlers.
         _settings.FramesPerSecond = GetSelectedFps();
         _saveTimer.Stop();
         _saveTimer.Start();
@@ -544,18 +732,21 @@ public partial class MainWindow : Window
             if ((AudioReactiveCheckBox.IsChecked == true) != _trayAudioItem!.Checked) AudioReactiveCheckBox.IsChecked = _trayAudioItem.Checked;
         });
         menu.Items.Add(_trayAudioItem);
-        _trayMicrophoneItem = new System.Windows.Forms.ToolStripMenuItem("React to microphone")
+        // Audio source submenu: three radio-like options that mirror the Sound settings and persist.
+        _traySourceItem = new System.Windows.Forms.ToolStripMenuItem("Audio source") { Enabled = _settings.AudioReactive };
+        foreach (var (source, label) in new[]
         {
-            Checked = _settings.MicrophoneReactive,
-            CheckOnClick = true,
-            Enabled = _settings.AudioReactive
-        };
-        _trayMicrophoneItem.CheckedChanged += (_, _) => Dispatcher.Invoke(() =>
+            (AudioReactionSource.System, "System audio"),
+            (AudioReactionSource.Microphone, "Microphone"),
+            (AudioReactionSource.SystemAndMicrophone, "System audio + microphone")
+        })
         {
-            if ((MicrophoneReactiveCheckBox.IsChecked == true) != _trayMicrophoneItem!.Checked)
-                MicrophoneReactiveCheckBox.IsChecked = _trayMicrophoneItem.Checked;
-        });
-        menu.Items.Add(_trayMicrophoneItem);
+            var option = new System.Windows.Forms.ToolStripMenuItem(label) { Checked = _settings.AudioSource == source };
+            option.Click += (_, _) => Dispatcher.Invoke(() => SetAudioSourceFromTray(source));
+            _traySourceOptions[source] = option;
+            _traySourceItem.DropDownItems.Add(option);
+        }
+        menu.Items.Add(_traySourceItem);
         menu.Items.Add("Quit HYPNIX", null, (_, _) => Dispatcher.Invoke(() => { _isQuitting = true; Close(); }));
         _trayIcon = new System.Windows.Forms.NotifyIcon { Icon = _trayDrawingIcon, Text = "HYPNIX", ContextMenuStrip = menu, Visible = true };
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowMainWindow);
@@ -636,6 +827,8 @@ public partial class MainWindow : Window
         _recoveryTimer.Stop();
         _wallpaperLibrary.PackagesChanged -= OnPackagesChanged;
         _environment.Dispose();
+        _levelMeter.Dispose();
+        _audioDevices.Dispose();
         LivePreview.Dispose();
         MultiPreview.Dispose();
         _foregroundMonitor.Dispose();
@@ -703,8 +896,8 @@ public partial class MainWindow : Window
             _settings.PreviewPaneCollapsed = true;
         _previewRequested = false; QueueSave(); UpdateLayoutMode();
     }
-    private void AppSettings_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = true; UpdateLayoutMode(); }
-    private void BackToLibrary_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = false; if (IsMultiPreview) PreviewModeCombo.SelectedIndex = 0; _previewRequested = false; UpdateLayoutMode(); }
+    private void AppSettings_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = true; UpdateLayoutMode(); UpdateMicrophoneMeter(); }
+    private void BackToLibrary_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = false; if (IsMultiPreview) PreviewModeCombo.SelectedIndex = 0; _previewRequested = false; UpdateLayoutMode(); UpdateMicrophoneMeter(); }
     private void PreviewDisplay_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isUiInitialized || _syncingDisplaySelection) return;

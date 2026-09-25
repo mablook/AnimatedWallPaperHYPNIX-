@@ -11,7 +11,10 @@ internal interface IAudioSpectrumStream : IDisposable
 }
 
 // Samples are transient FFT input only: no file writer, playback or network path.
-internal sealed class AudioSpectrumService(bool microphone = false) : IAudioSpectrumStream
+// deviceId selects a specific endpoint by its stable MMDevice id; null follows the Windows
+// default for this flow. A requested-but-absent device is never silently replaced by the default:
+// the worker just keeps retrying until that exact device returns.
+internal sealed class AudioSpectrumService(bool microphone = false, string? deviceId = null) : IAudioSpectrumStream
 {
     private const int FftSize = 2048;
     // FFT length must be a power of two; the exponent is derived so FftSize can be retuned safely.
@@ -60,8 +63,13 @@ internal sealed class AudioSpectrumService(bool microphone = false) : IAudioSpec
                     try
                     {
                         using var enumerator = new MMDeviceEnumerator();
-                        using var current = enumerator.GetDefaultAudioEndpoint(EndpointFlow, Role.Multimedia);
-                        if (current.ID != _device?.ID) break;
+                        // Following the default: restart when Windows changes the default endpoint.
+                        // Pinned to a device: restart when that exact device disappears or is no
+                        // longer active, so it recovers on reconnect without switching devices.
+                        using var current = deviceId is null
+                            ? enumerator.GetDefaultAudioEndpoint(EndpointFlow, Role.Multimedia)
+                            : enumerator.GetDevice(deviceId);
+                        if (current.ID != _device?.ID || current.State != DeviceState.Active) break;
                     }
                     catch (Exception exception)
                     {
@@ -83,7 +91,7 @@ internal sealed class AudioSpectrumService(bool microphone = false) : IAudioSpec
         try
         {
             using var enumerator = new MMDeviceEnumerator();
-            var device = _device = enumerator.GetDefaultAudioEndpoint(EndpointFlow, Role.Multimedia);
+            var device = _device = ResolveDevice(enumerator);
             WasapiCapture capture = microphone ? new WasapiCapture(device) : new WasapiLoopbackCapture(device);
             _capture = capture;
             if (_disposed) { ReleaseCapture(); return true; }
@@ -112,6 +120,21 @@ internal sealed class AudioSpectrumService(bool microphone = false) : IAudioSpec
             ReleaseCapture();
             return false;
         }
+    }
+
+    private MMDevice ResolveDevice(MMDeviceEnumerator enumerator)
+    {
+        if (deviceId is null)
+            return enumerator.GetDefaultAudioEndpoint(EndpointFlow, Role.Multimedia);
+        // A specific device was chosen. Only that exact device is acceptable; if it is missing or
+        // inactive, fail so the worker keeps retrying instead of silently using the default.
+        var device = enumerator.GetDevice(deviceId);
+        if (device is null || device.DataFlow != EndpointFlow || device.State != DeviceState.Active)
+        {
+            device?.Dispose();
+            throw new InvalidOperationException("The selected audio device is not available.");
+        }
+        return device;
     }
 
     private void CaptureOnRecordingStopped(object? sender, StoppedEventArgs args)

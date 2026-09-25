@@ -109,7 +109,15 @@
       <StackPanel Grid.Column="1" VerticalAlignment="Center">
        <StackPanel Orientation="Horizontal">
         <Button x:Name="PreviewButton" Content="Preview" Click="Preview_Click" MinWidth="80" Padding="12,0"/>
-        <Button x:Name="VisualizerSettingsButton" Content="Customize" Click="VisualizerSettingsButton_Click" Visibility="Collapsed" AutomationProperties.Name="Customize wallpaper" MinWidth="94" Padding="14,0"/>
+         <Button x:Name="VisualizerSettingsButton" Click="VisualizerSettingsButton_Click" Visibility="Collapsed"
+                 AutomationProperties.Name="Wallpaper settings" AutomationProperties.HelpText="Adjust sensitivity, intensity and appearance"
+                 ToolTip="Adjust sensitivity, intensity and appearance for the selected wallpaper"
+                 MinWidth="150" Padding="14,0" Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource AccentBrush}">
+          <StackPanel Orientation="Horizontal">
+           <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="15" VerticalAlignment="Center" Margin="0,0,8,0"/>
+           <TextBlock Text="Wallpaper settings" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+          </StackPanel>
+         </Button>
         <Button x:Name="StartButton" Content="Apply wallpaper" Click="StartButton_Click" Style="{StaticResource PrimaryButtonStyle}" Margin="0" MinWidth="144"/>
        </StackPanel>
        <DockPanel Margin="0,4,0,0"><Button x:Name="ApplyAllButton" DockPanel.Dock="Right" Content="Apply to all displays" Click="ApplyAll_Click" Style="{StaticResource QuietButtonStyle}" Height="28" FontSize="11" Padding="8,0" Margin="8,0,0,0"/><TextBlock x:Name="ApplyTargetText" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10"/></DockPanel>
@@ -144,11 +152,32 @@
        <TextBlock Text="Frame cap" Margin="0,18,0,6"/><ComboBox x:Name="FpsComboBox" SelectionChanged="FpsComboBox_SelectionChanged" AutomationProperties.Name="Frame cap"><ComboBoxItem Content="15 FPS" Tag="15"/><ComboBoxItem Content="30 FPS" Tag="30"/><ComboBoxItem Content="60 FPS" Tag="60"/></ComboBox>
       </StackPanel></Border>
       <Border Style="{StaticResource SettingsCard}"><StackPanel>
-       <TextBlock Text="Sound" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,16"/>
-       <CheckBox x:Name="AudioReactiveCheckBox" Content="Audio reactive" Style="{StaticResource ToggleSwitchStyle}" Checked="AudioReactiveChanged" Unchecked="AudioReactiveChanged" AutomationProperties.Name="Audio reactive" ToolTip="When off, animation continues without using system or microphone audio."/>
-       <CheckBox x:Name="MicrophoneReactiveCheckBox" Content="React to microphone" Style="{StaticResource ToggleSwitchStyle}" Margin="0,18,0,0" Checked="MicrophoneReactiveChanged" Unchecked="MicrophoneReactiveChanged" AutomationProperties.Name="React to microphone"/>
-       <TextBlock Text="Uses your default microphone when available. Audio is never saved or sent." TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"/>
-      </StackPanel></Border>
+        <TextBlock Text="Sound" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,16"/>
+        <CheckBox x:Name="AudioReactiveCheckBox" Content="Audio reactive" Style="{StaticResource ToggleSwitchStyle}" Checked="AudioReactiveChanged" Unchecked="AudioReactiveChanged" AutomationProperties.Name="Audio reactive" ToolTip="When off, animation continues without using system or microphone audio."/>
+        <StackPanel x:Name="AudioSourcePanel" Margin="0,18,0,0">
+         <TextBlock Text="Audio source" Margin="0,0,0,6"/>
+         <ComboBox x:Name="AudioSourceCombo" SelectionChanged="AudioSourceChanged" AutomationProperties.Name="Audio source" ToolTip="Choose which sound HYPNIX reacts to.">
+          <ComboBoxItem Content="System audio" Tag="System"/>
+          <ComboBoxItem Content="Microphone" Tag="Microphone"/>
+          <ComboBoxItem Content="System audio + microphone" Tag="SystemAndMicrophone"/>
+         </ComboBox>
+        </StackPanel>
+        <StackPanel x:Name="SystemDevicePanel" Margin="0,16,0,0">
+         <TextBlock Text="System audio output" Margin="0,0,0,6"/>
+         <ComboBox x:Name="SystemDeviceCombo" DisplayMemberPath="Name" SelectionChanged="SystemDeviceChanged" AutomationProperties.Name="System audio output device" ToolTip="The output whose sound is analyzed. System default follows Windows."/>
+        </StackPanel>
+        <StackPanel x:Name="MicrophonePanel" Margin="0,16,0,0">
+         <TextBlock Text="Microphone" Margin="0,0,0,6"/>
+         <ComboBox x:Name="MicrophoneDeviceCombo" DisplayMemberPath="Name" SelectionChanged="MicrophoneDeviceChanged" AutomationProperties.Name="Microphone device" ToolTip="The microphone that is analyzed. System default follows Windows."/>
+         <Grid Margin="0,12,0,0">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <controls:LevelMeter x:Name="MicLevelMeter" Height="16" VerticalAlignment="Center" AutomationProperties.Name="Microphone level"/>
+          <Button x:Name="MicTestButton" Grid.Column="1" Content="Test" Click="MicrophoneTest_Click" Height="30" MinWidth="76" Margin="12,0,0,0" Style="{StaticResource QuietButtonStyle}" AutomationProperties.Name="Test microphone" ToolTip="Briefly open the microphone to check its level. Nothing is recorded."/>
+         </Grid>
+         <TextBlock x:Name="MicStatusText" Margin="0,8,0,0" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+        </StackPanel>
+        <TextBlock Text="Audio is analyzed on your PC in real time — never recorded, saved or sent." TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,16,0,0"/>
+       </StackPanel></Border>
       <Border Style="{StaticResource SettingsCard}"><StackPanel><TextBlock Text="Library &amp; tools" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,16"/><WrapPanel><Button Content="Open library folder" Click="OpenLibrary_Click" Margin="0,0,8,8"/><Button Content="Media tools…" Click="MediaTools_Click" Margin="0,0,8,8"/><Button Content="Open diagnostics" Click="OpenDiagnostics_Click" Margin="0,0,0,8"/></WrapPanel></StackPanel></Border>
      </StackPanel>
     </ScrollViewer>

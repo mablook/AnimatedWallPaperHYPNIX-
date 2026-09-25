@@ -3,16 +3,30 @@ namespace AnimatedWallPaper.Services;
 // Desktop and visible previews share one stream per source.
 internal static class AudioSpectrumSource
 {
-    private static readonly AudioSpectrumRouter Router = new(microphone => new AudioSpectrumService(microphone));
+    private static readonly AudioSpectrumRouter Router =
+        new((microphone, deviceId) => new AudioSpectrumService(microphone, deviceId));
 
     internal static bool MicrophoneEnabled => Router.MicrophoneEnabled;
+    internal static bool SystemEnabled => Router.SystemEnabled;
     public static IDisposable Subscribe(Action<float[]> listener) => Router.Subscribe(listener);
+
+    // Preferred entry point: choose which reactive inputs are analyzed. "Microphone" never opens
+    // the system loopback, so microphone-only reaction cannot be nudged by system playback.
+    public static void SetSource(AudioReactionSource source) => Router.SetSource(source);
+
+    // Legacy helper retained for older call sites/tools: toggles only the microphone on top of the
+    // system source. New code should prefer SetSource with an explicit AudioReactionSource.
     public static void SetMicrophoneEnabled(bool enabled) => Router.SetMicrophoneEnabled(enabled);
+
+    // Pin a specific endpoint by its stable MMDevice id; null follows the current Windows default.
+    public static void SetMicrophoneDevice(string? deviceId) => Router.SetMicrophoneDevice(deviceId);
+    public static void SetSystemDevice(string? deviceId) => Router.SetSystemDevice(deviceId);
 }
 
-// Source lifetimes are independent: an absent microphone never interrupts system audio.
-// Only normalized frequency bands survive a callback; raw samples stay in each FFT stream.
-internal sealed class AudioSpectrumRouter(Func<bool, IAudioSpectrumStream> createStream, Func<long>? clock = null)
+// Source lifetimes are independent: an absent microphone never interrupts system audio, and a
+// microphone-only reaction never opens the system loopback. Only normalized frequency bands
+// survive a callback; raw samples stay inside each FFT stream.
+internal sealed class AudioSpectrumRouter(Func<bool, string?, IAudioSpectrumStream> createStream, Func<long>? clock = null)
 {
     private const int BandCount = 64;
     private const long StaleAfterMilliseconds = 300;
@@ -21,13 +35,18 @@ internal sealed class AudioSpectrumRouter(Func<bool, IAudioSpectrumStream> creat
     private readonly List<Subscription> _subscriptions = [];
     private IAudioSpectrumStream? _system;
     private IAudioSpectrumStream? _microphone;
+    // System audio is the default reactive source; the microphone is opt-in.
+    private bool _systemEnabled = true;
     private bool _microphoneEnabled;
+    private string? _systemDeviceId;
+    private string? _microphoneDeviceId;
     private readonly float[] _systemBands = new float[BandCount];
     private readonly float[] _microphoneBands = new float[BandCount];
     private long _systemUpdated = long.MinValue;
     private long _microphoneUpdated = long.MinValue;
 
     internal bool MicrophoneEnabled { get { lock (_sync) return _microphoneEnabled; } }
+    internal bool SystemEnabled { get { lock (_sync) return _systemEnabled; } }
 
     public IDisposable Subscribe(Action<float[]> listener)
     {
@@ -35,32 +54,80 @@ internal sealed class AudioSpectrumRouter(Func<bool, IAudioSpectrumStream> creat
         {
             var subscription = new Subscription(this, listener);
             _subscriptions.Add(subscription);
-            if (_system is null) StartStream(false);
+            if (_systemEnabled && _system is null) StartStream(false);
             if (_microphoneEnabled && _microphone is null) StartStream(true);
             return subscription;
         }
     }
 
-    public void SetMicrophoneEnabled(bool enabled)
+    // Apply an explicit source selection: each mode opens and analyzes only its selected inputs,
+    // releasing the deselected source and clearing its residual contribution immediately.
+    public void SetSource(AudioReactionSource source)
     {
+        source = source.Normalize();
         lock (_sync)
         {
+            SetEnabled(microphone: false, source.UsesSystem());
+            SetEnabled(microphone: true, source.UsesMicrophone());
+        }
+    }
+
+    // Legacy microphone-only toggle; the system source is left untouched.
+    public void SetMicrophoneEnabled(bool enabled)
+    {
+        lock (_sync) SetEnabled(microphone: true, enabled);
+    }
+
+    public void SetMicrophoneDevice(string? deviceId) => SetDevice(microphone: true, deviceId);
+    public void SetSystemDevice(string? deviceId) => SetDevice(microphone: false, deviceId);
+
+    private void SetDevice(bool microphone, string? deviceId)
+    {
+        deviceId = string.IsNullOrWhiteSpace(deviceId) ? null : deviceId;
+        lock (_sync)
+        {
+            ref var current = ref (microphone ? ref _microphoneDeviceId : ref _systemDeviceId);
+            if (current == deviceId) return;
+            current = deviceId;
+            var enabled = microphone ? _microphoneEnabled : _systemEnabled;
+            var running = (microphone ? _microphone : _system) is not null;
+            // Rebind an active source to the new endpoint; clear the old device's residual bands.
+            if (!enabled || !running) return;
+            StopStream(microphone);
+            if (_subscriptions.Count > 0) StartStream(microphone);
+            Publish();
+        }
+    }
+
+    // Caller holds _sync. Starts or stops one source and, on disable, clears its residual bands so
+    // a just-removed input cannot linger in the mix (including while the other source is silent).
+    private void SetEnabled(bool microphone, bool enabled)
+    {
+        if (microphone)
+        {
+            if (_microphoneEnabled == enabled) return;
             _microphoneEnabled = enabled;
-            if (enabled)
-            {
-                if (_subscriptions.Count > 0 && _microphone is null) StartStream(true);
-            }
-            else
-            {
-                StopStream(true);
-                Publish(); // Clear the microphone contribution immediately, including during silence.
-            }
+        }
+        else
+        {
+            if (_systemEnabled == enabled) return;
+            _systemEnabled = enabled;
+        }
+
+        if (enabled)
+        {
+            if (_subscriptions.Count > 0 && (microphone ? _microphone : _system) is null) StartStream(microphone);
+        }
+        else
+        {
+            StopStream(microphone);
+            Publish();
         }
     }
 
     private void StartStream(bool microphone)
     {
-        var stream = createStream(microphone);
+        var stream = createStream(microphone, microphone ? _microphoneDeviceId : _systemDeviceId);
         if (microphone) _microphone = stream;
         else _system = stream;
         stream.BandsAvailable += bands => OnBands(stream, microphone, bands);
@@ -85,7 +152,8 @@ internal sealed class AudioSpectrumRouter(Func<bool, IAudioSpectrumStream> creat
     private void Publish()
     {
         var now = _clock();
-        var systemFresh = _systemUpdated != long.MinValue && now - _systemUpdated <= StaleAfterMilliseconds;
+        var systemFresh = _system is not null && _systemUpdated != long.MinValue &&
+            now - _systemUpdated <= StaleAfterMilliseconds;
         var microphoneFresh = _microphone is not null && _microphoneUpdated != long.MinValue &&
             now - _microphoneUpdated <= StaleAfterMilliseconds;
         var mixed = new float[BandCount];

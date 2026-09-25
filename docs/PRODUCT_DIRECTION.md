@@ -199,11 +199,16 @@ heat response to highs. A feature is not added merely because the renderer suppo
   system-output sources recover independently; unavailable or denied microphone access does not interrupt
   system-audio reaction or display a blocking prompt.
 
-**React to microphone** is off by default and persists as an explicit preference in Sound and the tray.
-When enabled with **Audio reactive**, an available microphone contributes live analysis alongside system
-playback. Audio samples are used transiently in memory and are never written to disk, sent over the network,
-or played back through the speakers. Turning off microphone reaction releases its input capture; turning
-off **Audio reactive** stops both sources.
+**Audio source** is an explicit choice — **System audio**, **Microphone**, or **System audio + microphone** —
+that persists in Sound and the tray, alongside the general **Audio reactive** on/off switch. New profiles
+default to system audio; upgrading a profile that previously had "React to microphone" on maps to
+system + microphone, and off maps to system. Each mode opens and analyzes only its selected inputs, so
+microphone-only never includes the system loopback; switching sources releases the deselected input and
+clears its residual contribution. A specific microphone or output can be chosen by name (with a
+"System default" option that follows Windows) and is remembered by stable device id. The Sound panel also
+shows a live, microphone-only level meter with clear device states. Audio samples are used transiently in
+memory and are never written to disk, sent over the network, or played back through the speakers. Turning
+off **Audio reactive** stops all sources.
 
 Safety and UX:
 

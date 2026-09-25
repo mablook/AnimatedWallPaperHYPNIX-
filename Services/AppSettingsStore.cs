@@ -7,13 +7,22 @@ internal sealed class AppSettings
 {
     public int SchemaVersion { get; set; } = 1;
     public int VisualizerDefaultsVersion { get; set; }
+    // Bumped when the audio-reaction preferences shape changes; drives one-time migration on load.
+    public int AudioSettingsVersion { get; set; }
     public string SelectedWallpaperId { get; set; } = "built-in-ambient";
     public int FramesPerSecond { get; set; } = 30;
     public int AppPauseMode { get; set; } = 2;
     public bool PausePerMonitor { get; set; }
     public bool PauseOnBattery { get; set; }
     public bool AudioReactive { get; set; } = true;
+    // Legacy flag retained for backward/forward compatibility and migration. AudioSource is the
+    // authority; this is kept in sync (mic included => true) so a downgrade still behaves sensibly.
     public bool MicrophoneReactive { get; set; }
+    // Which reactive input(s) to analyze while AudioReactive is on. New profiles default to system.
+    public AudioReactionSource AudioSource { get; set; } = AudioReactionSource.System;
+    // Explicit endpoint selections by stable MMDevice id; null means follow the Windows default.
+    public string? MicrophoneDeviceId { get; set; }
+    public string? SystemAudioDeviceId { get; set; }
     public bool PreviewPaneCollapsed { get; set; }
     public string? MediaToolsDirectory { get; set; }
     public Dictionary<string, VisualizerPreferences> Visualizers { get; set; } = [];
@@ -66,7 +75,14 @@ internal sealed class AppSettingsStore(string? filePath = null)
 {
     private readonly string _filePath = filePath ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HYPNIX", "settings.json");
-    private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
+        // Persist AudioSource as a readable name ("System"/"Microphone"/"SystemAndMicrophone");
+        // integer values remain accepted so a hand-edited or older file still loads.
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter(allowIntegerValues: true) }
+    };
 
     public AppSettings Load()
     {
@@ -80,6 +96,21 @@ internal sealed class AppSettingsStore(string? filePath = null)
             value.AppPauseMode = Math.Clamp(value.AppPauseMode, 0, 2);
             if (string.IsNullOrWhiteSpace(value.SelectedWallpaperId))
                 value.SelectedWallpaperId = "built-in-ambient";
+            value.AudioSource = value.AudioSource.Normalize();
+            value.MicrophoneDeviceId = Blank(value.MicrophoneDeviceId);
+            value.SystemAudioDeviceId = Blank(value.SystemAudioDeviceId);
+            if (value.AudioSettingsVersion < 1)
+            {
+                // Migrate the old two-flag model without changing effective behavior or discarding an
+                // explicit choice: a legacy file (no AudioSource) with "React to microphone" on maps
+                // to system + microphone; everything else stays system. AudioReactive (master) is
+                // untouched, so master off stays off. New profiles already default to system audio.
+                if (value.AudioSource == AudioReactionSource.System && value.MicrophoneReactive)
+                    value.AudioSource = AudioReactionSource.SystemAndMicrophone;
+                value.AudioSettingsVersion = 1;
+            }
+            // Keep the legacy flag consistent with the authoritative source for downgrade safety.
+            value.MicrophoneReactive = value.AudioSource.UsesMicrophone();
             value.Visualizers = NormalizeVisualizers(value.Visualizers);
             var displayWallpapers = new Dictionary<string, DisplayWallpaperSettings>(StringComparer.OrdinalIgnoreCase);
             foreach (var (deviceId, displaySettings) in value.DisplayWallpapers ?? [])
@@ -120,6 +151,8 @@ internal sealed class AppSettingsStore(string? filePath = null)
             return new();
         }
     }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static Dictionary<string, VisualizerPreferences> NormalizeVisualizers(
         Dictionary<string, VisualizerPreferences>? visualizers) => (visualizers ?? [])

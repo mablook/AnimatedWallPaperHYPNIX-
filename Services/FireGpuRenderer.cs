@@ -57,7 +57,11 @@ internal sealed class FireGpuRenderer : IDisposable
                 BufferUsage=Usage.RenderTargetOutput,SampleDescription=SampleDescription.Default,
                 Scaling=Scaling.Stretch,SwapEffect=SwapEffect.FlipDiscard,AlphaMode=AlphaMode.Ignore
             },new SwapChainFullscreenDescription {Windowed=true}));
-            factory.MakeWindowAssociation(hwnd,WindowAssociationFlags.IgnoreAltEnter);
+            // DXGI_MWA_NO_WINDOW_CHANGES (1) | DXGI_MWA_NO_ALT_ENTER (2): during live preview this
+            // HWND is a child of the foreground app window; ignoring window changes stops DXGI from
+            // coupling that window to presentation (a suspected cause of the notification-bell
+            // flicker). The swap chain is recreated on resize, so this is safe. See AethelisGpuRenderer.
+            factory.MakeWindowAssociation(hwnd,(WindowAssociationFlags)0x3);
             back=Own(swap.GetBuffer<ID3D11Texture2D>(0));target=Own(device.CreateRenderTargetView(back));
         } catch {Dispose();throw;}
     }

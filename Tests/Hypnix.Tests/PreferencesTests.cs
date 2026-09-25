@@ -66,6 +66,57 @@ public sealed class PreferencesTests : IDisposable
         Assert.Equal(microphone, restored.MicrophoneReactive);
     }
 
+    [Fact]
+    public void AudioSourceDefaultsToSystemForNewProfilesAndRoundTripsWithDevices()
+    {
+        Assert.Equal(AudioReactionSource.System, new AppSettings().AudioSource);
+        var store = new AppSettingsStore(FilePath);
+        Assert.True(store.Save(new AppSettings
+        {
+            AudioSource = AudioReactionSource.Microphone,
+            MicrophoneDeviceId = "mic-1",
+            SystemAudioDeviceId = "out-1"
+        }));
+        var restored = store.Load();
+        Assert.Equal(AudioReactionSource.Microphone, restored.AudioSource);
+        Assert.Equal("mic-1", restored.MicrophoneDeviceId);
+        Assert.Equal("out-1", restored.SystemAudioDeviceId);
+        Assert.True(restored.MicrophoneReactive); // legacy flag kept consistent with the source
+    }
+
+    [Fact]
+    public void AudioSourcePersistsAsAReadableNameAndSurvivesALegacyFlagFlip()
+    {
+        var store = new AppSettingsStore(FilePath);
+        Assert.True(store.Save(new AppSettings { AudioSource = AudioReactionSource.Microphone }));
+        Assert.Contains("\"AudioSource\": \"Microphone\"", File.ReadAllText(FilePath));
+        // An explicit choice is not re-migrated on later loads.
+        Assert.Equal(AudioReactionSource.Microphone, store.Load().AudioSource);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void LegacyMicrophoneFlagMigratesToAnAudioSourcePreservingBehavior(bool micOn)
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(FilePath, $$"""{"AudioReactive":true,"MicrophoneReactive":{{(micOn ? "true" : "false")}},"FramesPerSecond":30}""");
+        var migrated = new AppSettingsStore(FilePath).Load();
+        Assert.Equal(micOn ? AudioReactionSource.SystemAndMicrophone : AudioReactionSource.System, migrated.AudioSource);
+        Assert.True(migrated.AudioReactive);            // master state is never changed by migration
+        Assert.Equal(micOn, migrated.MicrophoneReactive);
+    }
+
+    [Fact]
+    public void LegacyFileWithMasterOffKeepsAudioReactiveOffAfterMigration()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(FilePath, """{"AudioReactive":false,"MicrophoneReactive":true,"FramesPerSecond":30}""");
+        var migrated = new AppSettingsStore(FilePath).Load();
+        Assert.False(migrated.AudioReactive);                                   // master off stays off
+        Assert.Equal(AudioReactionSource.SystemAndMicrophone, migrated.AudioSource);
+    }
+
     [Theory]
     [InlineData("{broken")]
     [InlineData("null")]

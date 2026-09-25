@@ -88,7 +88,13 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
             };
             var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
             _swapChain = Own(_factory.CreateSwapChainForHwnd(_device, hwnd, description, fullscreen));
-            _factory.MakeWindowAssociation(hwnd, WindowAssociationFlags.IgnoreAltEnter);
+            // DXGI_MWA_NO_WINDOW_CHANGES (1) | DXGI_MWA_NO_ALT_ENTER (2). During live preview this
+            // swap chain's HWND is a child of the foreground app window; leaving DXGI's default
+            // window-message hook active couples that window to swap-chain presentation and can make
+            // the shell repeatedly toggle its fullscreen/Focus-Assist state (the notification bell
+            // flicker). We recreate the swap chain on resize ourselves, so ignoring window changes is
+            // safe. Vortice mirrors the native DXGI_MWA_* bits, so the cast is exact.
+            _factory.MakeWindowAssociation(hwnd, (WindowAssociationFlags)0x3);
             _backBuffer = Own(_swapChain.GetBuffer<ID3D11Texture2D>(0));
             _renderTarget = Own(_device.CreateRenderTargetView(_backBuffer));
 

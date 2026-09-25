@@ -24,6 +24,7 @@
     <Compile Include="../../Services/FireFrequencyBands.cs" Link="Fire/FireFrequencyBands.cs" />
     <Compile Include="../../Services/FireEmitterLayout.cs" Link="Fire/FireEmitterLayout.cs" />
     <Compile Include="../../Services/VisualizerSettings.cs" Link="Fire/VisualizerSettings.cs" />
+    <Compile Include="../../Services/AudioReactionSource.cs" Link="Fire/AudioReactionSource.cs" />
     <Compile Include="../../Services/AppSettingsStore.cs" Link="Fire/AppSettingsStore.cs" />
     <Compile Include="../../Services/FrameRatePolicy.cs" Link="Fire/FrameRatePolicy.cs" />
     <Content Include="../../Shaders/LivingFire.hlsl" Link="Shaders/LivingFire.hlsl" CopyToOutputDirectory="PreserveNewest" />

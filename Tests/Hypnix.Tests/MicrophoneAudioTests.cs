@@ -173,15 +173,108 @@ public sealed class MicrophoneAudioTests
         Assert.Equal(0.6f, resumedFrames[^1][0]);
     }
 
+    [Fact]
+    public void MicrophoneOnlySourceOpensTheMicrophoneAndNeverTheSystemLoopback()
+    {
+        var fixture = new Fixture();
+        fixture.Router.SetSource(AudioReactionSource.Microphone);
+        using var subscription = fixture.Router.Subscribe(_ => { });
+
+        var stream = Assert.Single(fixture.Streams);
+        Assert.True(stream.Microphone);
+        Assert.True(fixture.Router.MicrophoneEnabled);
+        Assert.False(fixture.Router.SystemEnabled);
+    }
+
+    [Fact]
+    public void SwitchingToMicrophoneReleasesSystemAndClearsItsResidualContribution()
+    {
+        var fixture = new Fixture();
+        var frames = new List<float[]>();
+        using var subscription = fixture.Router.Subscribe(frames.Add); // default: system only
+        var system = Assert.Single(fixture.Streams);
+        system.Emit(0.8f);
+        Assert.Equal(0.8f, frames[^1][0]);
+
+        fixture.Router.SetSource(AudioReactionSource.Microphone);
+
+        Assert.Equal(1, system.Disposals);          // deselected source is released
+        Assert.Equal(0f, frames[^1][0]);            // and its residual cleared at once
+        Assert.Equal(1, fixture.Latest(true).Starts);
+        system.Emit(1f);                            // a late callback cannot re-enter the mix
+        Assert.Equal(0f, frames[^1][0]);
+    }
+
+    [Fact]
+    public void CombinedSourceRunsBothStreamsAndSystemOnlyStopsTheMicrophone()
+    {
+        var fixture = new Fixture();
+        using var subscription = fixture.Router.Subscribe(_ => { });
+        fixture.Router.SetSource(AudioReactionSource.SystemAndMicrophone);
+        Assert.True(fixture.Router.SystemEnabled);
+        Assert.True(fixture.Router.MicrophoneEnabled);
+        Assert.Contains(fixture.Streams, stream => stream.Microphone);
+        Assert.Contains(fixture.Streams, stream => !stream.Microphone);
+
+        var microphone = fixture.Latest(true);
+        fixture.Router.SetSource(AudioReactionSource.System);
+        Assert.False(fixture.Router.MicrophoneEnabled);
+        Assert.Equal(1, microphone.Disposals);
+        Assert.Equal(0, fixture.Latest(false).Disposals);
+    }
+
+    [Fact]
+    public void ChangingMicrophoneDeviceRebindsOnlyTheMicrophoneStream()
+    {
+        var fixture = new Fixture();
+        fixture.Router.SetSource(AudioReactionSource.SystemAndMicrophone);
+        using var subscription = fixture.Router.Subscribe(_ => { });
+        var system = fixture.Latest(false);
+        var firstMicrophone = fixture.Latest(true);
+        Assert.Null(firstMicrophone.DeviceId);
+
+        fixture.Router.SetMicrophoneDevice("mic-2");
+
+        Assert.Equal(1, firstMicrophone.Disposals); // old microphone released
+        Assert.Equal(0, system.Disposals);          // system stream untouched
+        var secondMicrophone = fixture.Latest(true);
+        Assert.NotSame(firstMicrophone, secondMicrophone);
+        Assert.Equal("mic-2", secondMicrophone.DeviceId);
+    }
+
+    [Fact]
+    public void SystemDeviceSelectionReachesTheSystemStreamOnStart()
+    {
+        var fixture = new Fixture();
+        fixture.Router.SetSystemDevice("out-2");
+        using var subscription = fixture.Router.Subscribe(_ => { });
+        var system = Assert.Single(fixture.Streams.Where(stream => !stream.Microphone));
+        Assert.Equal("out-2", system.DeviceId);
+    }
+
+    [Fact]
+    public void ChoosingAMicrophoneDeviceWhileItIsOffOpensNothingUntilSelected()
+    {
+        var fixture = new Fixture();
+        using var subscription = fixture.Router.Subscribe(_ => { }); // system only
+        var before = fixture.Streams.Count;
+
+        fixture.Router.SetMicrophoneDevice("mic-2");
+        Assert.Equal(before, fixture.Streams.Count); // picking a device must not open the microphone
+
+        fixture.Router.SetSource(AudioReactionSource.SystemAndMicrophone);
+        Assert.Equal("mic-2", fixture.Latest(true).DeviceId);
+    }
+
     private sealed class Fixture
     {
         public long Now { get; set; } = 1000;
         public List<FakeStream> Streams { get; } = [];
         public AudioSpectrumRouter Router { get; }
 
-        public Fixture() => Router = new(microphone =>
+        public Fixture() => Router = new((microphone, deviceId) =>
         {
-            var stream = new FakeStream(microphone);
+            var stream = new FakeStream(microphone, deviceId);
             Streams.Add(stream);
             return stream;
         }, () => Now);
@@ -189,9 +282,10 @@ public sealed class MicrophoneAudioTests
         public FakeStream Latest(bool microphone) => Streams.Last(stream => stream.Microphone == microphone);
     }
 
-    private sealed class FakeStream(bool microphone) : IAudioSpectrumStream
+    private sealed class FakeStream(bool microphone, string? deviceId = null) : IAudioSpectrumStream
     {
         public bool Microphone { get; } = microphone;
+        public string? DeviceId { get; } = deviceId;
         public int Starts { get; private set; }
         public int Disposals { get; private set; }
         public event Action<float[]>? BandsAvailable;
