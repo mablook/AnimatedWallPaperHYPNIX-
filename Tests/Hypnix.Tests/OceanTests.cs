@@ -6,6 +6,43 @@ namespace Hypnix.Tests;
 public sealed class OceanTests
 {
     [Fact]
+    public void ApparentCelestialSizeFallsSmoothlyAwayFromTheHorizon()
+    {
+        var physical=OceanLightingModel.AngularRadius;
+        Assert.Equal(physical,OceanLightingModel.ApparentRadius(0,false));
+        Assert.Equal(physical,OceanLightingModel.ApparentRadius(float.NaN,true));
+        Assert.InRange(OceanLightingModel.ApparentRadius(0,true)/physical,3.199f,3.201f);
+        var previous=OceanLightingModel.ApparentRadius(0,true);
+        for(var degrees=1;degrees<=90;degrees++)
+        {
+            var radius=OceanLightingModel.ApparentRadius(degrees*MathF.PI/180,true);
+            Assert.InRange(radius,physical,previous);
+            if(degrees>=25) Assert.Equal(physical,radius);
+            previous=radius;
+        }
+    }
+
+    [Fact]
+    public void GibbousAtmosphereGainMatchesAnIndependentDiskIntegral()
+    {
+        // Integrate the reflectance over the projected hemisphere using a uniform grid,
+        // independently of the shader's eight-point direct-light quadrature.
+        double full=0, gibbous=0;
+        const int resolution=512;
+        for(var y=0;y<resolution;y++)
+        for(var x=0;x<resolution;x++)
+        {
+            var u=2*(x+.5)/resolution-1; var v=2*(y+.5)/resolution-1;
+            if(u*u+v*v>=1) continue;
+            var z=Math.Sqrt(1-u*u-v*v);
+            var c=Math.Max(0,u*Math.Sin(.85)+z*Math.Cos(.85));
+            full+=.8+.2*z;
+            gibbous+=1.6*c/Math.Max(c+z,1e-9)+.2*c;
+        }
+        Assert.InRange(Math.Abs(gibbous/full-OceanLightingModel.GibbousEnergy),0,.0002);
+    }
+
+    [Fact]
     public void AtmosphereTransmittanceIsBoundedAndReddenedNearTheHorizon()
     {
         var high = OceanLightingModel.Transmittance(Vector3.UnitY);

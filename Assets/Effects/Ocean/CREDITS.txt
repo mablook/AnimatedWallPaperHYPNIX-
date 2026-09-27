@@ -1,0 +1,9 @@
+Lunar color map: lroc_color_2k.jpg (2048 x 1024), downloaded 2026-09-27.
+NASA's Scientific Visualization Studio. Visualization: Ernie Wright (USRA).
+Source data: Lunar Reconnaissance Orbiter Camera / Arizona State University.
+CGI Moon Kit, 2025 color map: https://svs.gsfc.nasa.gov/4720/
+Original: https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg
+NASA media guidelines: https://www.nasa.gov/nasa-brand-center/images-and-media/
+Original JPEG retained unmodified. Loaded as sRGB with linear GPU mipmaps.
+NASA describes this map as optimized for aesthetics, not scientific analysis.
+No NASA endorsement of HYPNIX is implied.

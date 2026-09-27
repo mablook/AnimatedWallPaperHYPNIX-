@@ -2,6 +2,8 @@
 
 Data: 2026-09-27. Estado: **revisão técnica e plano; sem implementação nesta etapa**. Complementa [P3](OCEAN_P3_IMPLEMENTATION.md). Prioridade: mais realismo no céu, preservando a superfície aprovada, a melhoria das cores e o consumo confortável observado pelo utilizador.
 
+**Atualização posterior:** implementação autorizada pelo utilizador e descrita em [refinamento do céu — implementação e validação](OCEAN_SKY_REFINEMENT_IMPLEMENTATION.md). O texto abaixo preserva a decisão e o plano originais; a referência anterior foi guardada no commit `5977ebe` antes das alterações.
+
 ## 1. Feedback e referência
 
 O utilizador considera a água e as cores muito melhores, e o uso de GPU/CPU satisfatório. Identifica duas lacunas: sol e lua parecem pontos, e as nuvens não parecem reais.

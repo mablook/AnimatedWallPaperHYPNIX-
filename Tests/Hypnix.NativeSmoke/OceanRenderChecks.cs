@@ -30,6 +30,8 @@ internal static class OceanRenderChecks
             var rgb = pixels.Where((_, i) => i % 4 != 3).Select(x => (double)x).ToArray();
             if (rgb.Average() < 2 || rgb.Max() - rgb.Min() < 40) throw new Exception($"Empty or flat ocean: {light}/{name}");
             Save(pixels, Path.Combine(output, $"ocean-{light.ToString().ToLowerInvariant()}-{name}.png"), width, height);
+            renderer.Render(10,settings with { Lighting=light,Agitation=strength,Horizon=false });
+            Save(renderer.Pixels(),Path.Combine(output,$"ocean-{light.ToString().ToLowerInvariant()}-{name}-close.png"),width,height);
         }
         renderer.Render(10, settings with { Horizon = false });
         Save(renderer.Pixels(), Path.Combine(output, "ocean-close.png"), width, height);
@@ -106,18 +108,18 @@ internal static class OceanRenderChecks
         }
         File.WriteAllText(Path.Combine(output, "ocean-checks.json"), JsonSerializer.Serialize(new
         {
-            stage = "P3 atmosphere and light over approved P2 surface; pending visual acceptance",
+            stage = "R1-R6 refined sky, real lunar map and cached volumetric clouds over approved P2 surface; pending visual acceptance",
             renderer.AdapterName, width, height, renderer.InternalWidth, renderer.InternalHeight,
             renderer.EstimatedTextureBytes, spectralBands = 3, spectralResolution = 256,
             spectrumValidation, lightingValidation, pauseDeterministic = true,
             animated = true, gdiMatchesGpu = true, dxgiMatchesOffscreen = true, recreationPreservesPhase = true,
-            qualityResourceResize = true, scenes = 12, portrait = true, ultrawide = true, native4kCapture = true,
+            qualityResourceResize = true, scenes = 24, portrait = true, ultrawide = true, native4kCapture = true,
             gpuSampleCount = gpuTimes.Length, gpuMedianMs = Percentile(gpuTimes, .5), gpuP95Ms = Percentile(gpuTimes, .95),
             previousLightGpuSampleCount = previousLightGpuTimes.Length,
             previousLightGpuMedianMs = Percentile(previousLightGpuTimes, .5), previousLightGpuP95Ms = Percentile(previousLightGpuTimes, .95),
             timingScope = "Short asynchronous-query probe; no presentation/readback; not the 120-second acceptance benchmark."
         }, new JsonSerializerOptions { WriteIndented = true }));
-        Console.WriteLine($"PASS: Ocean P3, unchanged wave fields, sky cache and finite HDR, GPU IFFT vs direct DFT, 12 scenes, GDI/DXGI, 4K. {renderer.AdapterName}. GPU p95 {Percentile(gpuTimes, .95):F2} ms ({gpuTimes.Length} samples, 960x540). ");
+        Console.WriteLine($"PASS: Ocean sky refinement, unchanged wave fields, sky cache and finite HDR, GPU IFFT vs direct DFT, 24 scenes, GDI/DXGI, 4K. {renderer.AdapterName}. GPU p95 {Percentile(gpuTimes, .95):F2} ms ({gpuTimes.Length} samples, 960x540). ");
     }
 
     internal static void Save(byte[] pixels, string path, int width, int height) =>
@@ -184,6 +186,86 @@ internal static class OceanRenderChecks
         finally { foreach (var sample in samples) sample.Dispose(); }
     }
     private static double Percentile(double[] sorted, double p) => sorted[(int)Math.Floor((sorted.Length - 1) * p)];
+
+    internal static void Benchmark(string output)
+    {
+        const int width=1920, height=1080;
+        var hidden=CreateWindowEx(0,"STATIC","Ocean presentation benchmark",0x80000000,0,0,width,height,
+            IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);
+        if(hidden==IntPtr.Zero) throw new Exception("Cannot create benchmark presentation target.");
+        try
+        {
+            var cold=Stopwatch.StartNew();
+            using var pacer=new OceanFramePacer();
+            using var renderer=new OceanGpuRenderer(hidden,width,height);
+            var settings=new OceanSettings();
+            renderer.Render(0,settings,true);
+            var coldMs=cold.Elapsed.TotalMilliseconds;
+            var context=renderer.Context;
+            var queries=Enumerable.Range(0,12).Select(_=>new Sample(renderer.Device)).ToArray();
+            var cached=new Dictionary<Sample,bool>();
+            var all=new List<object>();
+            try
+            {
+                var warm=Stopwatch.StartNew();
+                while(warm.Elapsed.TotalSeconds<30) { var start=Stopwatch.GetTimestamp(); renderer.Render(warm.Elapsed.TotalSeconds,settings,true); pacer.Wait(1000d/30-Stopwatch.GetElapsedTime(start).TotalMilliseconds); }
+                for(var run=0;run<3;run++)
+                {
+                    var frameMs=new List<double>(); var intervals=new List<double>();
+                    var gpu=new List<double>(); var updates=new List<double>();
+                    var process=Process.GetCurrentProcess(); var cpuStart=process.TotalProcessorTime;
+                    var stopwatch=Stopwatch.StartNew(); double previous=-1; var droppedQueries=0;
+                    void Collect()
+                    {
+                        foreach(var sample in queries.Where(q=>q.Pending))
+                        {
+                            if(!TryRead(context,sample.Clock,out ClockData clock) || !TryRead(context,sample.Begin,out ulong a) || !TryRead(context,sample.End,out ulong b)) continue;
+                            if(clock.Disjoint==0 && clock.Frequency>0)
+                            {
+                                var ms=(b-a)*1000d/clock.Frequency; gpu.Add(ms); if(cached[sample]) updates.Add(ms);
+                            }
+                            sample.Pending=false;
+                        }
+                    }
+                    while(stopwatch.Elapsed.TotalSeconds<120)
+                    {
+                        var start=stopwatch.Elapsed.TotalMilliseconds;
+                        if(previous>=0) intervals.Add(start-previous); previous=start;
+                        Collect(); var sample=queries.FirstOrDefault(q=>!q.Pending);
+                        if(sample is not null) { context.Begin(sample.Clock); context.End(sample.Begin); } else droppedQueries++;
+                        var builds=renderer.Clouds!.BuildCount;
+                        renderer.Render(30+run*120+start/1000,settings);
+                        if(sample is not null) { context.End(sample.End); context.End(sample.Clock); sample.Pending=true; cached[sample]=renderer.Clouds.BuildCount!=builds; }
+                        renderer.Present();
+                        var elapsed=stopwatch.Elapsed.TotalMilliseconds-start; frameMs.Add(elapsed);
+                        pacer.Wait(1000d/30-elapsed);
+                    }
+                    context.Flush();
+                    var drain=Stopwatch.StartNew();
+                    while(queries.Any(q=>q.Pending) && drain.Elapsed.TotalSeconds<10) { Collect(); Thread.Sleep(1); }
+                    if(queries.Any(q=>q.Pending) || gpu.Count<frameMs.Count*.99) throw new Exception("Incomplete GPU benchmark sample coverage.");
+                    frameMs.Sort(); intervals.Sort(); gpu.Sort(); updates.Sort();
+                    var duration=stopwatch.Elapsed.TotalSeconds;
+                    var cpu=(process.TotalProcessorTime-cpuStart).TotalSeconds/duration/Environment.ProcessorCount*100;
+                    var result=new { run=run+1, seconds=duration, frames=frameMs.Count, fps=frameMs.Count/duration,
+                        cpuMachinePercent=cpu, gpuSamples=gpu.Count, cloudUpdateSamples=updates.Count,droppedQueries,
+                        gpuMedianMs=Percentile(gpu.ToArray(),.5),gpuP95Ms=Percentile(gpu.ToArray(),.95),gpuP99Ms=Percentile(gpu.ToArray(),.99),gpuMaxMs=gpu.Max(),
+                        updateGpuMedianMs=Percentile(updates.ToArray(),.5),updateGpuMaxMs=updates.Max(),
+                        frameWithGdiP95Ms=Percentile(frameMs.ToArray(),.95),frameWithGdiMaxMs=frameMs.Max(),
+                        intervalP95Ms=Percentile(intervals.ToArray(),.95),intervalP99Ms=Percentile(intervals.ToArray(),.99),
+                        workingSetBytes=process.WorkingSet64,logicalTextureBytes=renderer.EstimatedTextureBytes };
+                    all.Add(result);
+                    File.WriteAllText(Path.Combine(output,"benchmark.json"),JsonSerializer.Serialize(new { renderer.AdapterName,width,height,
+                        quality="Balanced",targetFps=30,warmupSeconds=30,coldFirstPresentMs=coldMs,runs=all,
+                        scope="Offscreen native rendering plus GPU readback/GDI into one hidden HWND. No visible UI/desktop compositor cost. GPU queries cover all passes including cloud refresh. Not energy/temperature measurement." },new JsonSerializerOptions { WriteIndented=true }));
+                    Console.WriteLine($"Benchmark {run+1}/3: {result.fps:F2} FPS; GPU p95 {result.gpuP95Ms:F3} ms; cache max {result.updateGpuMaxMs:F2} ms; GDI frame p95 {result.frameWithGdiP95Ms:F2} ms.");
+                    if(result.fps<28 || result.intervalP95Ms>40) throw new Exception("Ocean balanced benchmark missed the planned frame pacing budget.");
+                }
+            }
+            finally { foreach(var q in queries) q.Dispose(); }
+        }
+        finally { DestroyWindow(hidden); }
+    }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr CreateWindowEx(uint exStyle, string className, string name, uint style,

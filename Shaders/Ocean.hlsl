@@ -1,5 +1,5 @@
 // HYPNIX Ocean P3 lighting over the approved P2 surface; metres, seconds, Y up.
-// HDR linear scene -> one tone map -> one sRGB conversion. No foam, bloom or TAA.
+// HDR linear scene -> bounded optical bloom -> one tone map -> one sRGB conversion.
 cbuffer OceanFrame : register(b0)
 {
     float4 Resolution;       // internal width/height, aspect, tan(vertical FOV / 2)
@@ -12,12 +12,18 @@ cbuffer OceanFrame : register(b0)
     float4 Grid;             // segments X/Z, lighting preset, analytic comparison flag
     float4 Waves[32];        // kx,kz,amplitude,phase evaluated in double on CPU
     float4 Bands[3];         // physical length, amplitude gain, unused
+    float4 Refinement;       // enable, cloud cache interpolation, gibbous phase, bloom strength
+    float4 ApparentBody;     // visual angular radius, lunar display contrast, unused
 };
 Texture2D Scene : register(t0);
 Texture2D<float4> Displacements[3] : register(t1);
 Texture2D<float4> SlopeA[3] : register(t4);
 Texture2D<float4> SlopeB[3] : register(t7);
 Texture2D<float4> SkyEnvironment : register(t10);
+Texture2D<float4> MoonAlbedo : register(t11);
+Texture2D<float4> CloudPrevious : register(t12);
+Texture2D<float4> CloudNext : register(t13);
+Texture2D<float4> OpticalBloom : register(t14);
 SamplerState LinearClamp : register(s0);
 SamplerState SurfaceSampler : register(s1);
 SamplerState SkySampler : register(s2);
@@ -40,14 +46,44 @@ float2 SkyUv(float3 direction)
     float angle=asin(clamp(direction.y,-1,1));
     return float2(atan2(direction.x,direction.z)/(2*PI)+.5,.5-.5*sign(angle)*sqrt(abs(angle)/(PI*.5)));
 }
-float CelestialTransmission()
+float4 CloudField(float3 direction, float lod)
 {
+    float2 uv=SkyUv(direction);
+    return lerp(CloudPrevious.SampleLevel(SkySampler,uv,lod),CloudNext.SampleLevel(SkySampler,uv,lod),Refinement.y);
+}
+float CelestialTransmission(float3 direction)
+{
+    if (Refinement.x>.5) return CloudField(direction,0).a;
     return SkyTop.w > .5 ? SkyEnvironment.SampleLevel(SkySampler,SkyUv(Light.xyz),0).a : 1;
 }
-// The distributed environment deliberately excludes the solar/lunar disk.
-float3 Environment(float3 direction)
+float3 MoonMaterial(float3 direction, float radius, bool displayDetail)
 {
-    if (SkyTop.w > .5) return SkyEnvironment.SampleLevel(SkySampler,SkyUv(direction),0).rgb;
+    float3 axisX=normalize(cross(float3(0,1,0),Light.xyz));
+    float3 axisY=cross(Light.xyz,axisX);
+    float2 q=float2(dot(direction,axisX),dot(direction,axisY))/radius;
+    q*=min(1,.9999/max(length(q),.0001));
+    float3 normal=float3(q,sqrt(max(0,1-dot(q,q))));
+    float2 uv=float2(.5+atan2(normal.x,normal.z)/(2*PI),acos(normal.y)/PI);
+    // Filter to the resolved disk diameter, including the requested perceptual enlargement.
+    float lod=max(0,log2(2048*Resolution.w/(Resolution.y*radius*PI)));
+    float3 albedo=MoonAlbedo.SampleLevel(SkySampler,uv,lod).rgb;
+    float phaseAngle=Refinement.z*.85;
+    float cosine=saturate(dot(normal,float3(sin(phaseAngle),0,cos(phaseAngle))));
+    // Lommel-Seeliger + small Lambert term: preserves maria at full moon.
+    float lighting=(.8*2*cosine/max(cosine+normal.z,.0001)+.2*cosine)/.933333;
+    float3 material=albedo/.32;
+    if (displayDetail) material=pow(max(material,.0001),ApparentBody.y);
+    return material*lighting;
+}
+// The distributed environment deliberately excludes the solar/lunar disk.
+float3 EnvironmentFiltered(float3 direction, float lod)
+{
+    if (SkyTop.w > .5)
+    {
+        float3 sky=SkyEnvironment.SampleLevel(SkySampler,SkyUv(direction),lod).rgb;
+        if (Refinement.x>.5) { float4 cloud=CloudField(direction,lod); sky=sky*cloud.a+cloud.rgb; }
+        return sky;
+    }
     float elevation = saturate(direction.y);
     float3 sky = lerp(SkyHorizon.rgb, SkyTop.rgb, pow(saturate(elevation / .28), .55));
     float haze = pow(saturate(dot(direction, Light.xyz)), 18) * exp(-elevation * 4);
@@ -55,6 +91,7 @@ float3 Environment(float3 direction)
     // A broad, dim cloud veil; no high frequency textures pretending to be waves.
     return sky * lerp(.55, 1, smoothstep(-.08, .04, direction.y));
 }
+float3 Environment(float3 direction) { return EnvironmentFiltered(direction,0); }
 
 float4 SkyPS(ScreenVertex input) : SV_Target
 {
@@ -63,9 +100,16 @@ float4 SkyPS(ScreenVertex input) : SV_Target
     float3 ray = normalize(Forward() + float3(xy.x, 0, 0) + Up() * xy.y);
     float3 color = Environment(ray);
     float angle = acos(clamp(dot(ray, Light.xyz), -1, 1));
-    float pixelAngle = max(length(fwidth(ray)), .0001);
-    float disk = 1 - smoothstep(Light.w - pixelAngle, Light.w + pixelAngle, angle);
-    color += Radiance.rgb * disk * CelestialTransmission();
+    float pixelAngle = max(length(fwidth(ray))*(Refinement.x>.5 ? .5 : 1), .0001);
+    float disk = 1 - smoothstep(ApparentBody.x - pixelAngle, ApparentBody.x + pixelAngle, angle);
+    float3 source=Radiance.rgb;
+    if(Refinement.x>.5 && Grid.z>1.5 && Grid.z<2.5)
+    {
+        // Local photographic exposure for the resolved lunar disk only. Reflection uses
+        // the original illuminant energy below. This is an explicit SDR art direction.
+        source=float3(1.35,1.38,1.42)*MoonMaterial(ray,ApparentBody.x,true);
+    }
+    color += source * disk * CelestialTransmission(ray);
     return float4(color, 1);
 }
 
@@ -180,7 +224,8 @@ float4 WaterPS(WaterVertex input) : SV_Target
     float alpha2 = .0012 + missingSlope;
     // Isotropic approximation to unresolved directional slope covariance.
     float3 reflected = reflect(-v, n);
-    float3 env = lerp(Environment(reflected), Environment(float3(0, .35, 1)), saturate(alpha2 * 2));
+    float envLod=Refinement.x>.5 ? clamp(log2(max(length(fwidth(reflected)),sqrt(alpha2)*.18)*256),0,6) : 0;
+    float3 env = lerp(EnvironmentFiltered(reflected,envLod), Environment(float3(0, .35, 1)), saturate(alpha2 * 2));
     float3 color = Fresnel(NoV) * env + Water.rgb * (1 - Fresnel(NoV));
 
     float3 axisX = normalize(cross(float3(0, 1, 0), Light.xyz));
@@ -197,9 +242,11 @@ float4 WaterPS(WaterVertex input) : SV_Target
         float NoH = saturate(dot(n, h));
         float D = Beckmann(NoH, alpha2);
         float G = SmithG1(NoV, alpha2) * SmithG1(NoL, alpha2);
-        direct += D * G * Fresnel(dot(v, h)) / (4 * NoV);
+        float3 profile=1;
+        if(Refinement.x>.5 && Grid.z>1.5 && Grid.z<2.5) profile=MoonMaterial(l,Light.w,false);
+        direct += D * G * Fresnel(dot(v, h)) / (4 * NoV) * profile * CelestialTransmission(l);
     }
-    color += Radiance.rgb * CelestialTransmission() * (PI * Light.w * Light.w / 8) * direct;
+    color += Radiance.rgb * (PI * Light.w * Light.w / 8) * direct;
     float distance = length(input.world - Camera.xyz);
     float fog = 1 - exp(-distance * .0007);
     color = lerp(color, Environment(normalize(input.world - Camera.xyz)), fog);
@@ -213,6 +260,7 @@ float3 ToSrgb(float3 value)
 float4 CompositePS(ScreenVertex input) : SV_Target
 {
     float3 color = Scene.SampleLevel(LinearClamp, input.uv, 0).rgb * Radiance.w;
+    if(Refinement.x>.5) color += OpticalBloom.SampleLevel(LinearClamp,input.uv,0).rgb * Refinement.w;
     // Luminance compression keeps the golden/silver hue instead of clipping channels.
     float luminance = dot(color, float3(.2126, .7152, .0722));
     color /= 1 + luminance;

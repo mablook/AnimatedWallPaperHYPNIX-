@@ -8,12 +8,12 @@ using Forms = System.Windows.Forms;
 // initialize audio or replace the installed HYPNIX package.
 internal static class OceanProofWindow
 {
-    public static void Show(string output, bool selfCheck = false)
+    public static void Show(string output, bool selfCheck = false, bool startMoon = false)
     {
         Directory.CreateDirectory(output);
         using var form = new Forms.Form
         {
-            Text = "HYPNIX · Oceano — estudo 03 · luz e céu",
+            Text = "HYPNIX · Oceano — lua detalhada e astros no horizonte",
             ClientSize = new Size(1200, 760), MinimumSize = new Size(820, 550),
             StartPosition = Forms.FormStartPosition.CenterScreen,
             BackColor = Color.FromArgb(18, 22, 29), ForeColor = Color.Gainsboro,
@@ -22,7 +22,8 @@ internal static class OceanProofWindow
         var toolbar = new Forms.FlowLayoutPanel
         {
             Dock = Forms.DockStyle.Top, Height = 86, Padding = new Forms.Padding(12, 10, 12, 6),
-            BackColor = Color.FromArgb(25, 30, 39), WrapContents = true
+            BackColor = Color.FromArgb(25, 30, 39), WrapContents = true,
+            AutoSize = true, AutoSizeMode = Forms.AutoSizeMode.GrowAndShrink, MinimumSize = new Size(0,86)
         };
         var status = new Forms.Label
         {
@@ -36,13 +37,18 @@ internal static class OceanProofWindow
             var combo = new Forms.ComboBox { DropDownStyle = Forms.ComboBoxStyle.DropDownList, Width = width };
             combo.Items.AddRange(labels); combo.SelectedIndex = selected; toolbar.Controls.Add(combo); return combo;
         }
-        var light = Choice(["Pôr do sol", "Dia", "Lua", "Nublado"], 0, 125);
+        var light = Choice(["Pôr do sol", "Dia", "Lua", "Nublado"], startMoon ? 2 : 0, 125);
         var sea = Choice(["Mar calmo", "Mar moderado", "Mar agitado"], 1, 145);
         var quality = Choice(["Leve", "Equilibrado", "Alto"], 1, 130);
         var view = Choice(["Com horizonte", "Perto da água"], 0, 155);
         var speed = Choice(["Velocidade 0,5×", "Velocidade 1×", "Velocidade 1,5×"], 1, 155);
         var model = Choice(["Ondas novas", "Ondas anteriores"], 0, 155);
-        var atmosphere = Choice(["Luz e céu novos", "Iluminação anterior"], 0, 175);
+        var atmosphere = Choice(["Céu refinado", "Céu estudo 03", "Iluminação anterior"], 0, 175);
+        var phase = Choice(["Lua cheia", "Lua gibosa"], 0, 120);
+        var bloom = new Forms.CheckBox { Text = "Brilho óptico", Checked = true, AutoSize = true, Margin = new Forms.Padding(6, 6, 6, 0) };
+        toolbar.Controls.Add(bloom);
+        var magnification = new Forms.CheckBox { Text = "Astros maiores no horizonte", Checked = true, AutoSize = true, Margin = new Forms.Padding(6,6,6,0) };
+        toolbar.Controls.Add(magnification);
         var pause = new Forms.Button { Text = "Pausar", Width = 90, Height = 30 };
         var capture = new Forms.Button { Text = "Guardar imagem", Width = 145, Height = 30 };
         toolbar.Controls.Add(pause); toolbar.Controls.Add(capture);
@@ -50,7 +56,7 @@ internal static class OceanProofWindow
         var gate = new object();
         var clock = new OceanFrameClock();
         var wall = Stopwatch.StartNew();
-        var settings = new OceanSettings();
+        var settings = new OceanSettings(Lighting: startMoon ? OceanLighting.Moon : OceanLighting.Sunset);
         WallpaperRenderWorker? worker = null;
         OceanGpuRenderer? renderer = null;
         var userPaused = false;
@@ -64,6 +70,7 @@ internal static class OceanProofWindow
         var lastStatusTime = wall.Elapsed.TotalSeconds;
         using var resize = new Forms.Timer { Interval = 180 };
         using var statusTimer = new Forms.Timer { Interval = 1000 };
+        using var pacer = new OceanFramePacer();
 
         void UpdatePause()
         {
@@ -79,7 +86,7 @@ internal static class OceanProofWindow
                 clock.SetSpeed(rate, wall.Elapsed.TotalSeconds);
                 settings = new((OceanLighting)light.SelectedIndex, sea.SelectedIndex switch { 0 => 0, 2 => 1, _ => .65f },
                     rate, (OceanQuality)quality.SelectedIndex, view.SelectedIndex == 0, (OceanSurface)model.SelectedIndex,
-                    atmosphere.SelectedIndex == 0);
+                    atmosphere.SelectedIndex != 2, atmosphere.SelectedIndex == 0, phase.SelectedIndex == 1, bloom.Checked, magnification.Checked);
             }
             worker?.Signal();
         }
@@ -126,7 +133,9 @@ internal static class OceanProofWindow
                     Draw();
                 }, Draw, () =>
                 {
-                    lock (gate) return clock.IsPaused ? Timeout.Infinite : Math.Max(1, (int)Math.Ceiling(1000d / 30 - frameCost));
+                    lock (gate) { if (clock.IsPaused) return Timeout.Infinite; }
+                    pacer.Wait(1000d / 30 - frameCost);
+                    return 0;
                 }, () => { renderer?.Dispose(); renderer = null; });
                 await worker.StartAsync(TimeSpan.FromSeconds(15));
                 if (closing) { await StopAsync(); return; }
@@ -142,7 +151,9 @@ internal static class OceanProofWindow
             finally { serial.Release(); }
         }
 
-        foreach (var combo in new[] { light, sea, quality, view, speed, model, atmosphere }) combo.SelectedIndexChanged += (_, _) => UpdateSettings();
+        foreach (var combo in new[] { light, sea, quality, view, speed, model, atmosphere, phase }) combo.SelectedIndexChanged += (_, _) => UpdateSettings();
+        bloom.CheckedChanged += (_, _) => UpdateSettings();
+        magnification.CheckedChanged += (_, _) => UpdateSettings();
         pause.Click += (_, _) => { userPaused = !userPaused; pause.Text = userPaused ? "Continuar" : "Pausar"; UpdatePause(); };
         capture.Click += (_, _) => { lock (gate) captureRequested = true; worker?.Signal(); };
         form.KeyDown += (_, e) => { if (e.KeyCode == Forms.Keys.Space) pause.PerformClick(); if (e.KeyCode == Forms.Keys.Escape) form.Close(); };

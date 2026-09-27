@@ -74,6 +74,12 @@ void BuildSky(uint3 id : SV_DispatchThreadID)
     float3 sky=Energy.rgb*(BR*sumR*phaseR+BM*.9*sumM*phaseM);
     // Small artistic ambient term stands in for omitted multiple scattering/airglow.
     sky+=lerp(float3(.008,.014,.024),float3(.001,.0016,.0028),Energy.w)*(1-.6*d.y);
+    if (Options.y>.5)
+    {
+        sky*=lerp(.24,1,smoothstep(-.15,.001,elevation));
+        SkyOutput[id.xy]=float4(max(sky,0),1);
+        return;
+    }
     float density=Clouds(d);
     float transmission=exp(-density*4);
     float3 cloudAmbient=Energy.rgb*.023 + sky*.35;

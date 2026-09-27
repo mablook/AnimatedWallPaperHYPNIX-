@@ -12,7 +12,11 @@ internal sealed record OceanSettings(
     OceanQuality Quality = OceanQuality.Balanced,
     bool Horizon = true,
     OceanSurface Surface = OceanSurface.Spectral,
-    bool Atmosphere = true)
+    bool Atmosphere = true,
+    bool RefinedSky = true,
+    bool GibbousMoon = false,
+    bool Bloom = true,
+    bool HorizonMagnification = true)
 {
     public OceanSettings Normalize() => this with
     {

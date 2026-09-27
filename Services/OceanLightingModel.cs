@@ -8,6 +8,17 @@ internal static class OceanLightingModel
     internal sealed record Preset(Vector3 Direction, Vector4 Radiance, Vector4 Top,
         Vector4 Horizon, Vector3 Water, Vector3 Irradiance, float CloudCover, bool Night);
     internal const float AngularRadius = .00465f;
+    // Perceptual art direction requested for low celestial bodies. The physical source
+    // radius/irradiance remain separate so the approved water lighting does not change.
+    internal static float ApparentRadius(float elevation, bool magnify)
+    {
+        if (!magnify || !float.IsFinite(elevation)) return AngularRadius;
+        var t = Math.Clamp(elevation / (25 * MathF.PI / 180), 0, 1);
+        var horizonWeight = 1 - t * t * (3 - 2 * t);
+        return AngularRadius * (1 + 2.2f * horizonWeight);
+    }
+    // Integrated disk phase response of the shader's Lommel-Seeliger/Lambert blend, alpha=.85 rad.
+    internal const float GibbousEnergy = .714779f;
     internal static readonly Vector3 Rayleigh = new(.0058f, .0135f, .0331f); // per km
     internal const float MieExtinction = .0044f;
     internal static readonly Vector3 Ozone = new(.00065f,.001881f,.000085f); // RGB approximation per km

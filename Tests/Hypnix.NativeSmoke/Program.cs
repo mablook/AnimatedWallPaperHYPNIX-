@@ -34,9 +34,12 @@ internal static class Program
                 "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
                 string.Concat(resourceXml.Nodes()) + "</ResourceDictionary>");
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (args.Contains("--ocean-refinement")) { OceanRefinementChecks.Capture(output); return 0; }
+            if (args.Contains("--ocean-benchmark")) { OceanRenderChecks.Benchmark(output); return 0; }
+            if (args.Contains("--ocean-video")) { OceanRefinementChecks.Movie(output,args[Array.IndexOf(args,"--ocean-video")+1]); return 0; }
             if (args.Contains("--ocean-only")) { OceanRenderChecks.Run(output, args.Contains("--ocean-frames")); return 0; }
             if (args.Contains("--show-ocean") || args.Contains("--ocean-window-check"))
-            { OceanProofWindow.Show(output, args.Contains("--ocean-window-check")); return 0; }
+            { OceanProofWindow.Show(output, args.Contains("--ocean-window-check"),args.Contains("--ocean-moon")); return 0; }
             if (args.Contains("--preview-presentation")) { PreviewPresentationChecks.Run(output); return 0; }
             if (args.Contains("--layered-child")) { LayeredChildWindowChecks.Run(output); return 0; }
             if (args.Contains("--gdi-present")) { GdiPresentChecks.Run(output); return 0; }

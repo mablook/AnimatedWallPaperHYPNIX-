@@ -33,6 +33,9 @@ internal sealed class OceanGpuRenderer : IDisposable
     private readonly ID3D11SamplerState _surfaceSampler;
     private OceanSpectrum? _spectrum;
     private OceanAtmosphere? _atmosphere;
+    private OceanMoonTexture? _moon;
+    private OceanClouds? _clouds;
+    private OceanBloom? _bloom;
     private readonly List<IDisposable> _sceneResources = [];
     private ID3D11Texture2D? _scene;
     private ID3D11RenderTargetView? _sceneTarget;
@@ -49,9 +52,11 @@ internal sealed class OceanGpuRenderer : IDisposable
     internal GpuPreviewSurface? PreviewSurface => _preview;
     public long EstimatedTextureBytes => (long)InternalWidth * InternalHeight * 12 + (long)Width * Height * 8
         + (_spectrum is null ? 0 : 3L * (256 * 512 * 16 + 2 * 4 * 256 * 256 * 16 + 3 * 87381 * 8))
-        + (_atmosphere is null ? 0 : 1398103L * 8);
+        + (_atmosphere is null ? 0 : 1398103L * 8)
+        + (_moon is null ? 0 : OceanMoonTexture.EstimatedBytes) + (_clouds?.EstimatedBytes ?? 0) + (_bloom?.EstimatedBytes ?? 0);
     internal OceanSpectrum? Spectrum => _spectrum;
     internal OceanAtmosphere? Atmosphere => _atmosphere;
+    internal OceanClouds? Clouds => _clouds;
 
     private T Own<T>(T resource) where T : IDisposable { _owned.Add(resource); return resource; }
     private T SceneOwn<T>(T resource) where T : IDisposable { _sceneResources.Add(resource); return resource; }
@@ -93,7 +98,7 @@ internal sealed class OceanGpuRenderer : IDisposable
             _skyPs = Own(_device.CreatePixelShader(Compiler.CompileFromFile(path, "SkyPS", "ps_5_0").Span));
             _waterPs = Own(_device.CreatePixelShader(Compiler.CompileFromFile(path, "WaterPS", "ps_5_0").Span));
             _compositePs = Own(_device.CreatePixelShader(Compiler.CompileFromFile(path, "CompositePS", "ps_5_0").Span));
-            _constants = Own(_device.CreateBuffer(43 * 16, BindFlags.ConstantBuffer, ResourceUsage.Dynamic, CpuAccessFlags.Write));
+            _constants = Own(_device.CreateBuffer(45 * 16, BindFlags.ConstantBuffer, ResourceUsage.Dynamic, CpuAccessFlags.Write));
             _indices = Own(_device.CreateBuffer(Columns * Rows * 6 * 4, BindFlags.IndexBuffer, ResourceUsage.Dynamic, CpuAccessFlags.Write));
             var indices = new int[Columns * Rows * 6];
             var index = 0;
@@ -123,7 +128,7 @@ internal sealed class OceanGpuRenderer : IDisposable
                 AddressV = TextureAddressMode.Wrap, AddressW = TextureAddressMode.Wrap,
                 MaxLOD = float.MaxValue, MaxAnisotropy = 8
             }));
-            AppLog.Write($"Ocean P2 initialized. Size={width}x{height}; Adapter={AdapterName}; " +
+            AppLog.Write($"Ocean sky refinement initialized. Size={width}x{height}; Adapter={AdapterName}; " +
                 $"Preview={preview}; Presentation={(preview ? "OffscreenGdi" : "FlipDiscard")}; WindowSwapChain={_swap is not null}");
         }
         catch { Dispose(); throw; }
@@ -155,7 +160,7 @@ internal sealed class OceanGpuRenderer : IDisposable
         var mapped = _context.Map(_constants, 0, MapMode.WriteDiscard);
         try
         {
-            var data = new Span<Vector4>((void*)mapped.DataPointer, 43);
+            var data = new Span<Vector4>((void*)mapped.DataPointer, 45);
             data[0] = new(InternalWidth, InternalHeight, (float)Width / Height, .383864f);
             data[1] = new(0, settings.Horizon ? 2.8f : 1.7f, -4, settings.Horizon ? .16f : .40f);
             var palette = OceanLightingModel.For(settings.Lighting, settings.Atmosphere);
@@ -168,6 +173,10 @@ internal sealed class OceanGpuRenderer : IDisposable
             data[40] = new(192, .50f + .60f * settings.Agitation, 0, 0);
             data[41] = new(28, .27f + .90f * settings.Agitation, 0, 0);
             data[42] = new(4.5f, .22f + .88f * settings.Agitation, 0, 0);
+            data[43] = new(settings.Atmosphere && settings.RefinedSky ? 1 : 0, _clouds?.Blend ?? 0,
+                settings.GibbousMoon ? 1 : 0, !settings.Bloom || settings.Quality == OceanQuality.Economy ? 0 : .14f);
+            data[44] = new(OceanLightingModel.ApparentRadius(MathF.Asin(palette.Direction.Y),
+                settings.Atmosphere && settings.RefinedSky && settings.HorizonMagnification), 1.18f, 0, 0);
         }
         finally { _context.Unmap(_constants, 0); }
     }
@@ -178,12 +187,26 @@ internal sealed class OceanGpuRenderer : IDisposable
         settings = settings.Normalize();
         PrepareScene(settings);
         _context.PSSetShaderResource(10, null!);
+        for (uint slot = 11; slot <= 14; slot++) _context.PSSetShaderResource(slot, null!);
         if (settings.Atmosphere)
         {
             _atmosphere ??= Own(new OceanAtmosphere(_device, _context));
-            _atmosphere.Update(settings.Lighting);
+            _atmosphere.Update(settings.Lighting, settings.RefinedSky, settings.RefinedSky && settings.Lighting == OceanLighting.Moon && settings.GibbousMoon);
             _context.PSSetShaderResource(10, _atmosphere.Read);
             _context.PSSetSampler(2, _atmosphere.Sampler);
+            if (settings.RefinedSky)
+            {
+                _moon ??= Own(new OceanMoonTexture(_device, _context));
+                if (_clouds is null || _clouds.Quality != settings.Quality)
+                {
+                    _clouds?.Dispose(); _clouds = null;
+                    _clouds = new OceanClouds(_device, _context, settings.Quality);
+                }
+                _clouds.Update(time, settings);
+                _context.PSSetShaderResource(11, _moon.Read);
+                _context.PSSetShaderResource(12, _clouds.Previous);
+                _context.PSSetShaderResource(13, _clouds.Next);
+            }
         }
         // Unbind all readers before updating their compute textures/mip chains.
         for (uint slot = 1; slot <= 9; slot++)
@@ -224,8 +247,16 @@ internal sealed class OceanGpuRenderer : IDisposable
         _context.IASetIndexBuffer(_indices, Format.R32_UInt, 0);
         _context.VSSetShader(_waterVs); _context.PSSetShader(_waterPs);
         _context.DrawIndexed(Columns * Rows * 6, 0, 0);
-        _context.OMSetRenderTargets(_target);
         _context.OMSetDepthStencilState(_depthOff);
+        _context.VSSetShader(_screenVs);
+        _context.PSSetSampler(0, _sampler);
+        if (settings.Atmosphere && settings.RefinedSky && settings.Bloom && settings.Quality != OceanQuality.Economy)
+        {
+            _bloom ??= new OceanBloom(_device, _context, InternalWidth, InternalHeight);
+            _bloom.Render(_sceneRead!, OceanLightingModel.For(settings.Lighting, true).Radiance.W);
+            _context.PSSetShaderResource(14, _bloom.Read);
+        }
+        _context.OMSetRenderTargets(_target);
         _context.RSSetViewport(new Viewport(0, 0, Width, Height));
         _context.VSSetShader(_screenVs); _context.PSSetShader(_compositePs);
         _context.PSSetSampler(0, _sampler);
@@ -266,6 +297,8 @@ internal sealed class OceanGpuRenderer : IDisposable
 
     private void ReleaseScene()
     {
+        _context?.PSSetShaderResource(14, null!);
+        _bloom?.Dispose(); _bloom = null;
         for (var i = _sceneResources.Count - 1; i >= 0; i--) _sceneResources[i].Dispose();
         _sceneResources.Clear(); InternalWidth = InternalHeight = 0;
         _scene = null; _sceneTarget = null; _sceneRead = null; _depth = null;
@@ -276,6 +309,7 @@ internal sealed class OceanGpuRenderer : IDisposable
         if (_disposed) return;
         _disposed = true;
         _context?.ClearState();
+        _clouds?.Dispose(); _clouds = null;
         ReleaseScene();
         for (var i = _owned.Count - 1; i >= 0; i--) _owned[i].Dispose();
         _owned.Clear();
