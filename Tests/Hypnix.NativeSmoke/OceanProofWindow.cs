@@ -37,7 +37,14 @@ internal static class OceanProofWindow
             var combo = new Forms.ComboBox { DropDownStyle = Forms.ComboBoxStyle.DropDownList, Width = width };
             combo.Items.AddRange(labels); combo.SelectedIndex = selected; toolbar.Controls.Add(combo); return combo;
         }
+        var showSun = new Forms.Button { Text = "Ver Sol", Width = 95, Height = 30 };
+        var showMoon = new Forms.Button { Text = "Ver Lua", Width = 95, Height = 30 };
+        toolbar.Controls.Add(showSun); toolbar.Controls.Add(showMoon);
         var light = Choice(["Pôr do sol", "Dia", "Lua", "Nublado"], startMoon ? 2 : 0, 125);
+        using var hints = new Forms.ToolTip();
+        hints.SetToolTip(showSun, "Ir ao nascer do Sol, com o astro visível sobre o horizonte.");
+        hints.SetToolTip(showMoon, "Ir ao nascer da Lua, com sua fase real na data selecionada.");
+        hints.SetToolTip(light, "Presets fixos: disponíveis quando o Ciclo do céu está desligado.");
         var sea = Choice(["Mar calmo", "Mar moderado", "Mar agitado"], 1, 145);
         var quality = Choice(["Leve", "Equilibrado", "Alto"], 1, 130);
         var view = Choice(["Com horizonte", "Perto da água"], 0, 155);
@@ -193,6 +200,20 @@ internal static class OceanProofWindow
             UpdateSettings();
         };
         nowButton.Click+=(_,_)=>date.Value=DateTime.UtcNow;
+        void ShowBody(bool moon)
+        {
+            cycleEnabled.Checked=true;
+            atmosphere.SelectedIndex=0;
+            composition.SelectedIndex=0;
+            view.SelectedIndex=0;
+            UpdateSettings();
+            eventChoice.SelectedIndex=moon ? 2 : 0;
+            var utc=OceanCelestialModel.FindEvent(settings.Celestial!,new DateTimeOffset(DateTime.SpecifyKind(date.Value,DateTimeKind.Utc)),moon,true);
+            if(utc is { } found) date.Value=found.AddMinutes(20).UtcDateTime;
+            else status.Text="Não há esse nascer nos próximos dois dias para o local selecionado.";
+        }
+        showSun.Click+=(_,_)=>ShowBody(false);
+        showMoon.Click+=(_,_)=>ShowBody(true);
         seekEvent.Click+=(_,_)=>
         {
             var config=settings.Celestial ?? OceanCelestialSettings.Default;
@@ -221,7 +242,7 @@ internal static class OceanProofWindow
             DateTimeOffset skyTime; lock(gate) skyTime=celestialClock.Utc;
             status.Text = $"{(userPaused ? "Pausado" : $"{fps:F0} FPS")}  ·  {(cycleEnabled.Checked ? skyTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")+"  ·  " : "")}{adapter}  ·  Espaço: pausar  ·  Esc: fechar";
         };
-        form.Shown += async (_, _) => { UpdateSettings(); if(startMoon) { eventChoice.SelectedIndex=2; seekEvent.PerformClick(); } resize.Stop(); await RebuildAsync(); statusTimer.Start(); };
+        form.Shown += async (_, _) => { UpdateSettings(); if(startMoon) showMoon.PerformClick(); resize.Stop(); await RebuildAsync(); statusTimer.Start(); };
         form.FormClosing += async (_, e) =>
         {
             if (closing) return;
@@ -244,8 +265,8 @@ internal static class OceanProofWindow
                 if (step == 3) { model.SelectedIndex = 0; atmosphere.SelectedIndex = 0; pause.PerformClick(); }
                 if (step == 4) { cycleSpeed.SelectedIndex=4; speed.SelectedIndex=0; composition.SelectedIndex=1; air.SelectedIndex=2; }
                 if (step == 5) { composition.SelectedIndex=0; air.SelectedIndex=1; cycleSpeed.SelectedIndex=2; capture.PerformClick(); }
-                if (step == 6) cycleEnabled.Checked=false;
-                if (step == 7) cycleEnabled.Checked=true;
+                if (step == 6) { showSun.PerformClick(); cycleEnabled.Checked=false; }
+                if (step == 7) { showMoon.PerformClick(); if(!cycleEnabled.Checked || eventChoice.SelectedIndex!=2) throw new InvalidOperationException("Moon shortcut did not enable the lunar cycle view."); }
                 if (step++ == 8) { checkTimer.Stop(); form.Close(); }
             };
             form.Shown += (_, _) => checkTimer.Start();

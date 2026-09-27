@@ -86,6 +86,14 @@ O ensaio atravessou aproximadamente 07:47–22:11 UTC da data de referência, in
 
 ## Reproduzir
 
+### Ajuste de navegação da prévia — 28/09/2026
+
+Os botões **Ver Sol** e **Ver Lua**, no início da barra, levam ao instante de 20 minutos após o próximo nascer do astro a partir da data selecionada. Ativam o ciclo, o céu refinado, a composição cinema e a vista com horizonte. A fase lunar permanece calculada para esse instante; o estado das ondas e o nível de qualidade são preservados. Em locais/datas sem o evento nos próximos dois dias, a prévia informa a ausência do nascer. Os presets fixos continuam disponíveis com o ciclo desligado.
+
+A opção de lançamento `--show-ocean --ocean-moon` usa o mesmo atalho **Ver Lua**. Compilação Release aprovada sem avisos ou erros; `--ocean-window-check` aprovado com 122 frames, incluindo ambos os botões e a reativação do ciclo pelo atalho lunar. A janela visível foi inspecionada: Lua texturizada sobre o horizonte, oceano animado e indicador de 30 FPS. O usuário aprovou visualmente esse estado.
+
+Artefatos locais desta verificação: `artifacts/ocean-preview/moon-controls/`. O executável deve ser iniciado na sessão interativa do desktop: um processo ativo no ambiente isolado de execução não comprova que a janela esteja visível ao usuário.
+
 ```powershell
 dotnet build Tests/Hypnix.NativeSmoke/Hypnix.NativeSmoke.csproj -c Release -p:OutDir=D:/desktopapp/AnimatedWallPaper/artifacts/ocean-cycle/bin/ -p:UseSharedCompilation=false
 dotnet artifacts/ocean-cycle/bin/Hypnix.NativeSmoke.dll artifacts/ocean-cycle/captures --ocean-cycle
