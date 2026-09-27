@@ -102,7 +102,12 @@ and [build, logging and manual-test workflow](docs/DEVELOPMENT_RELEASE_WORKFLOW.
 Implementation details and validation: [visual settings](docs/VISUAL_SETTINGS_DESIGN_PLAN.md),
 [Living Fire](docs/LIVING_FIRE.md), and [regression guide](docs/TESTING_AND_REGRESSION_GUIDE.md).
 
-Planned real-time ocean: [implementation plan](docs/OCEAN_WALLPAPER_PLAN.md) and
+Experimental real-time ocean: [spectral surface and comparison preview](docs/OCEAN_P2_IMPLEMENTATION.md),
+[atmosphere, sun/moon and lighting comparison](docs/OCEAN_P3_IMPLEMENTATION.md),
+[next realism plan for sun, moon and clouds](docs/OCEAN_SKY_REALISM_PLAN.md),
+[first native animation](docs/OCEAN_P1_IMPLEMENTATION.md),
+[technical review](docs/OCEAN_TECHNICAL_REVIEW.md),
+[implementation plan](docs/OCEAN_WALLPAPER_PLAN.md), and
 [rendering research and decisions](docs/OCEAN_RENDERING_RESEARCH.md).
 
 Use **Media tools…** to select an existing `ffmpeg.exe` with `ffprobe.exe` in the same folder.
