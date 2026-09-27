@@ -14,7 +14,7 @@ A build instalada é a referência do teste. Um commit, um build local e um paco
 
 Inclui todas as alterações locais de aplicação existentes: arranque com Windows e atualização manual, preparação assíncrona de wallpapers, recuperação de apresentação GDI, fontes de áudio e seleção de dispositivos. Acrescenta identificação inequívoca da build e logs por sessão.
 
-A nova mitigação do sininho usa apresentação BitBlt nas prévias GPU embutidas; o desktop mantém FlipDiscard. O utilizador fará a confirmação visual. Fundamento técnico: [modelos de apresentação DXGI](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/for-best-performance--use-dxgi-flip-model). A promoção do flip model a DirectFlip/Independent Flip é uma hipótese para o sintoma; a sua causa ainda não foi demonstrada.
+A nova mitigação do sininho usa apresentação BitBlt nas prévias GPU embutidas; o desktop mantém FlipDiscard. O teste manual posterior reproduziu o defeito na 1.2.1, como registado abaixo. Fundamento técnico: [modelos de apresentação DXGI](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/for-best-performance--use-dxgi-flip-model). A promoção do flip model a DirectFlip/Independent Flip é uma hipótese para o sintoma; a sua causa ainda não foi demonstrada.
 
 Logs locais de desenvolvimento: `D:\desktopapp\AnimatedWallPaper\artifacts\development-logs`. Cada arranque gera um ficheiro separado, sem limpeza automática durante esta fase. Não grava áudio nem chaves de licença. Estes logs devem ser revistos e arquivados após o teste.
 
@@ -30,7 +30,8 @@ Regressão: 380 testes passaram; build nativa sem avisos/erros; smoke gráfico l
 
 Evidências: `artifacts/development-1.2.2` contém os logs de teste, capturas, cópia do log instalado 1.2.1 e pacote com identidade das fontes. Os logs da aplicação continuam em `artifacts/development-logs`.
 
-Aceitação manual pendente: instalar a 1.2.2, confirmar versão/build em About & updates, manter a prévia visível na janela em primeiro plano, alternar wallpapers e redimensionar a janela; verificar o sino, animação e fluidez. Comparar com Hide preview e com a aplicação oculta. Só encerrar o bug após confirmação deste cenário pelo proprietário.
+Aceitação manual concluída em 2026-09-27: o proprietário confirmou “foi resolvida a do sino.” O defeito reportado está encerrado na 1.2.2. Para futuras regressões, manter a prévia visível na janela em primeiro plano, alternar wallpapers e redimensionar; comparar com Hide preview e com a aplicação oculta. A confirmação deste bug não representa uma matriz completa de hardware.
+
 ## Fecho e próxima entrega
 
 O inventário consolidado e os identificadores verificáveis da 1.2.2 estão no [registo da versão](DEVELOPMENT_RELEASE_1.2.2.md). O commit de fecho inclui também os desenvolvimentos anteriores que estavam locais e a pesquisa/plano do oceano; estes documentos de planeamento não significam uma funcionalidade implementada.

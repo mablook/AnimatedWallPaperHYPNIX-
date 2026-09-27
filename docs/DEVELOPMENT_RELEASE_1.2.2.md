@@ -43,7 +43,7 @@ O snapshot documenta as fontes usadas antes deste fecho documental. O `sourceCom
 
 Evidência instalada: sessão `20260927-145629-32672`, Windows build 26200, GPU NVIDIA GeForce RTX 5070 Ti. A cópia local de aceitação contém 11 inicializações da prévia com OffscreenGdi, incluindo Living Fire e diferentes shaders; não contém linhas com `Exception` ou `failed`. Isso verifica versão/caminho de execução, não o estado visual do sino.
 
-Estado da aceitação do sino: **aguarda confirmação explícita do proprietário de que ficou estável na 1.2.2 com a prévia visível**. O pedido de documentar/commit/push foi recebido; não se infere uma matriz completa de E2E dessa aprovação. A explicação exata da heurística do Windows permanece uma hipótese.
+Estado da aceitação do sino: **resolvido na 1.2.2, confirmado pelo proprietário em 27 de setembro de 2026**: “foi resolvida a do sino.” Esta confirmação encerra o defeito reportado na prévia. É aceitação do teste manual do proprietário; não implica validação de todos os cenários de hardware. A explicação exata da heurística do Windows permanece uma hipótese.
 
 Validação local já concluída para estas fontes:
 
@@ -63,7 +63,7 @@ Nenhum E2E de desktop foi executado pelo agente nesta correção. O WACK regista
 
 - Logs atuais: `artifacts/development-logs/`, um ficheiro por arranque. About & updates e Open diagnostics apontam para a mesma pasta na build entregue.
 - Pacotes, fontes exatas, hashes, assinatura, testes, capturas e cópias dos logs anteriores estão preservados em `artifacts/development-1.2.1/` e `artifacts/development-1.2.2/`.
-- `acceptance/` contém a cópia do log instalado 1.2.2; `baseline/` preserva o log 1.2.1 e as imagens do sino fornecidas pelo utilizador.
+- `acceptance/` contém a cópia do log instalado 1.2.2 e `manual-result.json` com a confirmação do proprietário; `baseline/` preserva o log 1.2.1 e as imagens do sino fornecidas pelo utilizador.
 - Estes artefactos permanecem ignorados pelo Git. O commit guarda o código, testes, documentação e este inventário verificável, sem publicar logs pessoais, pacotes grandes ou chaves privadas.
-- Confirmar a aceitação específica do sino e continuar a matriz manual de hardware quando aplicável. Publicação Store, configuração do feed Velopack e implementação do oceano continuam trabalhos distintos, registados em [RELEASE_PENDING.md](RELEASE_PENDING.md) e no [plano do oceano](OCEAN_WALLPAPER_PLAN.md).
+- O bug do sino está encerrado por confirmação manual do proprietário. Continuar a matriz manual de hardware quando aplicável. Publicação Store, configuração do feed Velopack e implementação do oceano continuam trabalhos distintos, registados em [RELEASE_PENDING.md](RELEASE_PENDING.md) e no [plano do oceano](OCEAN_WALLPAPER_PLAN.md).
 - Para a próxima versão, seguir [DEVELOPMENT_RELEASE_WORKFLOW.md](DEVELOPMENT_RELEASE_WORKFLOW.md): inventário, fonte/commit, build identificada, teste da versão instalada, retenção de evidências e fecho do Git.

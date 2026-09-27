@@ -11,8 +11,9 @@ The 1.2.2 candidate retains the startup/update and async renderer developments,
 build/source identification and per-session development logs. It renders GPU previews
 offscreen and presents their pixels with GDI, without a window DXGI swap chain.
 380 unit tests and the native graphics smoke passed, including pixel-exact animated
-GPU-to-GDI preview checks. Notification-bell acceptance remains pending the owner's
-manual test. The installed 1.2.2 session confirms OffscreenGdi is active. See the
+GPU-to-GDI preview checks. On 27 September 2026 the owner explicitly confirmed that
+the notification-bell issue is resolved in 1.2.2. The installed session confirms
+OffscreenGdi is active. See the
 [consolidated release record](DEVELOPMENT_RELEASE_1.2.2.md) and
 [development workflow](DEVELOPMENT_RELEASE_WORKFLOW.md).
 
@@ -79,8 +80,8 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
   independent monitors, pause/resume/stop and recovery. Follow the
   [testing guide](TESTING_AND_REGRESSION_GUIDE.md) for future regression runs. This is
   owner-reported acceptance, complemented by 380 automated tests and local MSIX lifecycle checks.
-- [ ] **Windows notification bell flickers while HYPNIX is in the foreground** —
-  **Open, 2026-09-27.** The owner reproduced this on installed 1.2.0 and 1.2.1;
+- [x] **Windows notification bell flickers while HYPNIX is in the foreground** —
+  **Resolved in 1.2.2, owner-confirmed on 2026-09-27.** Previously reproduced on 1.2.0 and 1.2.1;
   wallpaper playback with the configuration UI hidden is stable. This concerns the
   Windows notification/Do Not Disturb bell, not HYPNIX's tray icon. In 1.2.1,
   **Hide preview stabilizes the bell**, isolating the trigger to the live preview.
@@ -91,12 +92,12 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
   Candidate 1.2.2 removes the preview's HWND swap chain entirely: GPU offscreen
   rendering feeds a reusable staging texture and a GDI blit. Desktop FlipDiscard is
   unchanged. Logs distinguish `Presentation=OffscreenGdi; WindowSwapChain=False`.
-  Native graphics and pixel-transfer regression passed; Windows shell behavior is
-  still pending owner validation. The shell's exact trigger remains unproven.
-  Acceptance: keep HYPNIX foreground with preview visible, switch wallpapers and
-  resize; then hide the preview and hide the app. The bell must stay stable, with
-  preview animation and desktop playback working throughout. Do not close this item
-  until the owner confirms that specific scenario.
+  Native graphics and pixel-transfer regression passed. The owner subsequently
+  confirmed: “foi resolvida a do sino.” This closes the reported defect based on
+  manual acceptance of 1.2.2; the shell's exact trigger remains unproven.
+  Future regression: keep the preview visible, switch wallpapers and resize; then
+  hide the preview and hide the app. Check bell stability, animation and playback.
+  Broader hardware coverage remains separate from this specific confirmation.
   [Development evidence](DEVELOPMENT_RELEASE_WORKFLOW.md),
   [original screenshot](assets/notification-bell-flicker-20260925.png).
 - [x] **Make wallpaper settings easier to recognize and find** — manual feedback
