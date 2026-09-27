@@ -6,6 +6,8 @@ Data: 2026-09-27. Base preservada **antes de implementar**, conforme pedido: com
 
 ## Ajuste posterior aprovado — textura lunar e tamanho no horizonte
 
+Pesquisa posterior, sem alteração desta implementação: [estudo do ciclo solar/lunar](OCEAN_CELESTIAL_CYCLE_STUDY.md), com efemérides NASA/JPL, curvas de refração/extinção, tamanho físico versus ampliação artística e plano para evolução contínua de cor, brilho, aura e movimento.
+
 Após aprovar água e nuvens, o utilizador pediu uma lua reconhecível com crateras e um tamanho aparente maior junto ao horizonte, também para o sol. A prévia passa a iniciar com “Astros maiores no horizonte” ligado; desligar permite comparar a escala angular anterior.
 
 O mesmo mapa real NASA/LROC, sem edição do asset, é projetado sobre o disco lunar. A filtragem agora acompanha o diâmetro aparente maior, preservando mais detalhe em vez de ampliar uma textura já desfocada. Um contraste local discreto (expoente 1,18) melhora a leitura das manchas e crateras no disco visível. Não foram inventadas crateras procedurais nem substituído o mapa por uma esfera cinzenta. O detalhe legível continua limitado pela resolução de saída e pelo diâmetro em píxeis.

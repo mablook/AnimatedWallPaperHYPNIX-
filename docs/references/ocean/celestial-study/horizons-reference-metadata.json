@@ -1,0 +1,117 @@
+{
+  "purpose": "Public illustrative reference observer; not inferred user location. Research only; no runtime implementation.",
+  "observer": {
+    "longitude_east_deg": -9.14,
+    "latitude_geodetic_deg": 38.72,
+    "altitude_km": 0.0028,
+    "center": "coord@399",
+    "coordinate_type": "GEODETIC"
+  },
+  "date": "2026-09-27",
+  "source": "NASA/JPL Horizons public API",
+  "documentation": [
+    "https://ssd-api.jpl.nasa.gov/doc/horizons.html",
+    "https://ssd.jpl.nasa.gov/horizons/manual.html"
+  ],
+  "method": "Obtain full day at 15 min; obtain rise/transit/set events with STEP_SIZE=1m TVH; start 5 min series at returned rise marker and end 120 min later.",
+  "coordinates": "Topocentric airless APPARENT center azimuth/elevation (APPARENT=AIRLESS). Includes light-time, gravitational deflection, stellar aberration, precession and nutation as defined in response; does not include atmospheric refraction. Not instantaneous geometric direction. Topocentric parallax is already included; do not apply it again.",
+  "time": "UT as returned by Horizons, no local-time offset applied. Preserve source labels. Two-hour series starts at sampled rise marker, not an exact observed contact.",
+  "event_convention": "TVH event search includes reference-ellipsoid true visual horizon, horizon dip and yellow-light refraction. The events therefore intentionally differ from center airless elevation=0. Original returned explanations bound RTS timing accuracy at no better than twice the requested 1 min search step. Weather is not observed.",
+  "units": {
+    "azimuth": "degrees clockwise North=0 East=90",
+    "elevation": "degrees above plane perpendicular to local reference-surface zenith; airless apparent CENTER",
+    "diameter": "arcseconds, FULL disk equatorial width",
+    "distance": "km, apparent light-time corrected range to observer",
+    "illumination": "percent illuminated projected disk area, not brightness",
+    "phase_proxy": "S-T-O degrees (Sun-Target-Observer), close to but not exactly true phase angle; few arcseconds distinction in source"
+  },
+  "missing": "No measured atmosphere, RGB, aura, bloom, blur, perceived size or luminance supplied by these selected quantities. These must not be claimed as Horizons observations.",
+  "validation": [
+    "25 rows per short series",
+    "Every consecutive parsed timestamp differs by 300 seconds; total duration 7200 seconds",
+    "numeric fields parsed",
+    "increasing elevation in both rise series",
+    "original response validates geodetic site 350.86E equivalent to -9.14E and AIRLESS"
+  ],
+  "summary": {
+    "sun": {
+      "samples": 25,
+      "interval_minutes": 5,
+      "duration_minutes": 120,
+      "first": {
+        "time_ut": "2026-Sep-27 06:29",
+        "solar_presence": "*",
+        "lunar_presence_or_event": "m",
+        "azimuth_airless_apparent_deg": "91.510727923",
+        "elevation_airless_apparent_deg": "-0.772617888",
+        "illuminated_percent": "100.00000",
+        "angular_diameter_arcsec": "1913.922",
+        "distance_apparent_km": "1.4995273012E+08",
+        "sun_target_observer_deg": "0.0000"
+      },
+      "last": {
+        "time_ut": "2026-Sep-27 08:29",
+        "solar_presence": "*",
+        "lunar_presence_or_event": "",
+        "azimuth_airless_apparent_deg": "111.454401516",
+        "elevation_airless_apparent_deg": "22.058451644",
+        "illuminated_percent": "100.00000",
+        "angular_diameter_arcsec": "1913.999",
+        "distance_apparent_km": "1.4994673583E+08",
+        "sun_target_observer_deg": "0.0000"
+      },
+      "diameter_change_percent": 0.004023152458665358
+    },
+    "moon": {
+      "samples": 25,
+      "interval_minutes": 5,
+      "duration_minutes": 120,
+      "first": {
+        "time_ut": "2026-Sep-27 18:38",
+        "solar_presence": "C",
+        "lunar_presence_or_event": "m",
+        "azimuth_airless_apparent_deg": "76.283870516",
+        "elevation_airless_apparent_deg": "-0.738158232",
+        "illuminated_percent": "98.42453",
+        "angular_diameter_arcsec": "1908.105",
+        "distance_apparent_km": "3.7562478190E+05",
+        "sun_target_observer_deg": "14.4267"
+      },
+      "last": {
+        "time_ut": "2026-Sep-27 20:38",
+        "solar_presence": "",
+        "lunar_presence_or_event": "m",
+        "azimuth_airless_apparent_deg": "93.863269849",
+        "elevation_airless_apparent_deg": "22.114843386",
+        "illuminated_percent": "98.18277",
+        "angular_diameter_arcsec": "1922.135",
+        "distance_apparent_km": "3.7288299628E+05",
+        "sun_target_observer_deg": "15.5000"
+      },
+      "diameter_change_percent": 0.7352844838203421
+    }
+  },
+  "files_sha256": {
+    "horizons-moon-20260927-day-original.json": "157d3e81b4f2e818778e59998e9403ffb0c3e1b5957fc02dd6bd4498d2b6e380",
+    "horizons-moon-20260927-day-original.txt": "277df6c421d28ad2b49a359c2e3f4824f116dd39e489c117597a3b5073980c95",
+    "horizons-moon-20260927-day-query.json": "999c493efcc7b0517f932b0e778aeeb493b8ee7b9604816de1ab346b772f25f4",
+    "horizons-moon-20260927-rise-2h-original.json": "8a3c03fb04e0d8b2467dfdea856679b55199a6b72b6bfcb9343ed9a9973d02c6",
+    "horizons-moon-20260927-rise-2h-original.txt": "8dd85fc35b3487a8dd94c2204a1be8f70433cbd54b37b84fbda05074e2f5a660",
+    "horizons-moon-20260927-rise-2h-query.json": "96c79cb4b340697e6cd9e0c835a324609b994abc6e30bd1ef2aaf424e3254dcb",
+    "horizons-moon-20260927-rise-2h.csv": "92ce9f6c252c0a577e38833d82f371e0958497bf4547690a066d53970bf7400f",
+    "horizons-moon-20260927-rise-events-original.json": "10a14a73d14777eaf814a240aa933aff214bb0b397e6470dc92006da96d8875c",
+    "horizons-moon-20260927-rise-events-original.txt": "e9154e393baab5d5c1ffd6c8d87bd5b8e4b44a1153cc5e49f1de1c043073ec24",
+    "horizons-moon-20260927-rise-events-query.json": "a9e70929b11a626f0450b63cee70813c76309c6cf8bc7019254d1217bb1d835e",
+    "horizons-reference-readme.md": "7b1739b67b850e988aa35d914c5760870e03ff1d8acf614774bc3fe818cabcc4",
+    "horizons-sun-20260927-day-original.json": "28b9cd2bc6d2e99681f3437bb755809afd65e034025a93191b03a199fa31f60f",
+    "horizons-sun-20260927-day-original.txt": "5bf5bc635c826f2039317536b46ab232c17688606cc9ea57836bd83e0fc24b69",
+    "horizons-sun-20260927-day-query.json": "7dab194bc79bdf4e97b4c6df0ec41dcde53a9ad7063e100b7703a7d8fbf78997",
+    "horizons-sun-20260927-rise-2h-original.json": "64e769ffb662c0bff4ebca5fe6ce316c9cbf2dd5e2b7b4699f7ec1bce34bd82f",
+    "horizons-sun-20260927-rise-2h-original.txt": "7be593bd20c3145c34cd495581093dedee233d436213994bb163ebf5be86db6a",
+    "horizons-sun-20260927-rise-2h-query.json": "fce78ebef79f6e33afe5dc287a104f1d2557d3e5aca556ff510d73f6df1ad1dd",
+    "horizons-sun-20260927-rise-2h.csv": "e1d0418e40843d2ef9c24656ab0d1a4c059ca7adc510c0859a271c8991ad9245",
+    "horizons-sun-20260927-rise-events-original.json": "f2117a6f673583ed707a1f6e4865d173e81d1dd5303744f540c87b44e4724d1d",
+    "horizons-sun-20260927-rise-events-original.txt": "d6cd8b40643e39f73600f6aef61dc37e2abd0e709aea18f31b97817f7e6a4714",
+    "horizons-sun-20260927-rise-events-query.json": "b850b057082b12cba5770adda8f18109d6464e209b0c7720e327285346649b36"
+  }
+}
