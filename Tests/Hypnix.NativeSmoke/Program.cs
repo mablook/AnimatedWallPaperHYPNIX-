@@ -34,6 +34,7 @@ internal static class Program
                 "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
                 string.Concat(resourceXml.Nodes()) + "</ResourceDictionary>");
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (args.Contains("--preview-presentation")) { PreviewPresentationChecks.Run(output); return 0; }
             if (args.Contains("--layered-child")) { LayeredChildWindowChecks.Run(output); return 0; }
             if (args.Contains("--gdi-present")) { GdiPresentChecks.Run(output); return 0; }
             if (args.Contains("--show-product-preview"))
@@ -108,6 +109,7 @@ internal static class Program
                 }
                 if (args.Contains("--fire-ultrawide")) {FireUltrawideChecks.Run(parent,output);return 0;}
                 if (args.Contains("--fire-only")) {FireRenderChecks.Run(parent,output);return 0;}
+                PreviewPresentationChecks.Run(output);
                 FireRenderChecks.Run(parent,output);
                 FireUltrawideChecks.Run(parent,output);
                 NeonRibbonsRenderChecks.Run(parent, output);

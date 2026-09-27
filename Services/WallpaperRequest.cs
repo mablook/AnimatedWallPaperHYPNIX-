@@ -32,7 +32,7 @@ internal static class WallpaperSessionFactory
         token.ThrowIfCancellationRequested();
         return request.Kind == WallpaperKind.ExampleVideo
             ? VideoWallpaperSession.CreateAsync(request, token)
-            : Task.FromResult<IWallpaperSession>(new WallpaperSession(request));
+            : WallpaperSession.CreateAsync(request, token);
     }
 
     public static NativeRenderMode RenderMode(WallpaperKind kind) => kind switch

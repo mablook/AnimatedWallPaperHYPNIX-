@@ -16,25 +16,29 @@ Live activation, validation, encrypted persistence, restoration and deactivation
 Store distribution remains pending; see [the build record](docs/STORE_LIVE_BUILD_20260923.md).
 The publication guard still rejects Test or malformed configurations.
 See the [validation report](docs/LEMON_SQUEEZY_TEST_REPORT.md) and
-[current development handoff](docs/DEVELOPMENT_STATUS_20260921.md).
+[historical development handoff](docs/DEVELOPMENT_STATUS_20260921.md).
 
 Windows desktop app for local animated and audio-reactive wallpapers, built with WPF/.NET 8,
 Win32 desktop hosting, WASAPI and Direct3D 11.
 
 Support: [hello@mablook.com](mailto:hello@mablook.com).
 
+Current development version: **1.2.2**. See the [release record](docs/DEVELOPMENT_RELEASE_1.2.2.md)
+and [build, logging and manual-test workflow](docs/DEVELOPMENT_RELEASE_WORKFLOW.md).
+
 ## Current behavior
 
 - Thirteen built-in wallpapers in a manifest-driven gallery: ambient, classic audio visualizer, Aethelis,
   Fire Burst, Flamethrower Ring V2, Spectral Bloom, Neon Ribbons, Liquid Orbs, Event Horizon,
   Fractal Pyramid, Kaleidoscope, Lotus and Living Fire.
-- Live preview using the same renderer as the wallpaper. Desktop and preview share the audio analysis service.
+- Live preview uses the wallpaper renderer with a separate presentation path: GPU previews render offscreen
+  and copy pixels to GDI, without a window DXGI swap chain. Desktop and preview share audio analysis.
 - **Audio reactive** in the window and tray toggles audio reaction for both desktop and preview;
   the preference persists across restarts. It does not mute other applications or stop animation.
-- **React to microphone** in Sound and the tray optionally adds live microphone reaction alongside system
-  playback. It is off by default and requires **Audio reactive**. Analysis runs locally while an active
-  wallpaper or preview needs it; no audio is saved or sent. Missing or unavailable microphones are skipped
-  without interrupting system-audio reaction.
+- **Audio source** in Sound and the tray selects system audio, microphone, or both. Playback and microphone
+  devices can be selected independently or follow Windows defaults. Microphone input is optional;
+  new profiles use system audio. The settings meter and explicit microphone Test show input activity
+  without saving audio or playing it through the speakers. See the [privacy policy](docs/PRIVACY_POLICY.md).
 - Per-wallpaper intensity (0–8), audio sensitivity (0–12), glow (0–3) and four color themes.
   Every control the settings window shows actually affects its wallpaper: the color themes recolor
   every visualizer (the classic visualizer, Aethelis and all shader wallpapers), except the two
@@ -66,6 +70,10 @@ Support: [hello@mablook.com](mailto:hello@mablook.com).
   Preparation failures, including a 15-second first-frame timeout, keep the current wallpaper.
   Stop also cancels pending preparation. A slow render thread retains its resources until it exits;
   late completion cannot reveal a failed replacement or signal disposed synchronization objects.
+- Session creation and the first-frame wait run asynchronously without
+  blocking the UI thread, which also lets the shell service the swap-chain hand-off instead of stalling
+  behind a blocked owner. On the Windows 11 raised desktop, a failed GPU-composited GDI present is treated
+  as an unhealthy session and rebuilt by the recovery loop rather than silently leaving a black monitor.
 - Live 15, 30 and 60 FPS presentation caps. Native CPU modes reuse a persistent back buffer.
 - Per-monitor pause for maximized/fullscreen apps, all-display or active-display scope, and optional battery
   pause. In active-display scope each covered monitor freezes independently while clean monitors keep animating;
@@ -75,15 +83,27 @@ Support: [hello@mablook.com](mailto:hello@mablook.com).
   `%LocalAppData%\HYPNIX\settings.json`. Playback starts explicitly with Start.
 - Explorer/host failure detection, display-change recovery and resume handling recreate active sessions.
   Display identity, geometry and DPI snapshots are retained, including disconnected displays.
+- **Start with Windows** (App settings ▸ Startup, and the tray) launches HYPNIX at sign-in and restores the
+  saved wallpapers. Under MSIX it uses the packaged StartupTask (Windows lets the user override it under
+  Task Manager ▸ Startup, which the app reflects); direct/Velopack installs use a per-user `Run` key. An
+  auto-started launch comes up minimized to the notification area.
+- The tray shows the current version and a **Check for updates** entry (also under App settings ▸ About &
+  updates). On the Store build it opens the HYPNIX Store page (the Store applies updates automatically);
+  the website installer runs the in-app Velopack check and reports whether an update was downloaded.
 - Closing the window hides it to the tray. Tray Stop stops desktop playback; Quit releases the application.
 - Single instance per user session: launching HYPNIX again surfaces the running window (restoring it from the
   tray) and exits the new process, so copies never pile up in the notification area.
 - Diagnostics are kept under `%LocalAppData%\HYPNIX\logs`, with a 2 MB active log and three rotated files.
+  Development packages can additionally retain a separate log per session, with build/version identity;
+  About & updates shows the active diagnostics directory. See the development workflow above.
 
 ## Local videos
 
 Implementation details and validation: [visual settings](docs/VISUAL_SETTINGS_DESIGN_PLAN.md),
 [Living Fire](docs/LIVING_FIRE.md), and [regression guide](docs/TESTING_AND_REGRESSION_GUIDE.md).
+
+Planned real-time ocean: [implementation plan](docs/OCEAN_WALLPAPER_PLAN.md) and
+[rendering research and decisions](docs/OCEAN_RENDERING_RESEARCH.md).
 
 Use **Media tools…** to select an existing `ffmpeg.exe` with `ffprobe.exe` in the same folder.
 HYPNIX also checks `MediaTools` beside the application and absolute PATH directories. Nothing is downloaded automatically.
@@ -148,9 +168,9 @@ dotnet run --project Tests/Hypnix.NativeSmoke/Hypnix.NativeSmoke.csproj -c Relea
 Run from the repository root. The smoke check does not attach wallpapers to Explorer; it exercises hidden
 native surfaces, shell construction/layout and disposal. Its WPF layout PNGs omit the native preview surface.
 Settings and library fixtures stay under its output directory.
-The default run checks all twelve built-in hosts and gallery entries, plus image checks for Neon Ribbons,
+The default run checks all thirteen built-in hosts and gallery entries, plus image checks for Neon Ribbons,
 Liquid Orbs, Fractal Pyramid, Kaleidoscope, Lotus, Spectral Bloom, Event Horizon and Living Fire. These cover animation/audio and renderer-specific controls,
-viewport positioning, FPS exposure or independent freeze. See the [testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md)
+viewport positioning, FPS exposure or independent freeze. It also verifies animated GPU-to-GDI preview pixels. See the [testing guide](docs/TESTING_AND_REGRESSION_GUIDE.md)
 for the exact coverage and remaining desktop checks.
 
 For a full desktop end-to-end check that drives the real app through UI Automation and attaches each wallpaper
@@ -182,8 +202,11 @@ Two independent channels from one codebase (the GitHub repo is private, so it is
   ```
 
 - **Microsoft Store** — a separate MSIX package (`scripts/package-msix.ps1`, needs the Windows SDK)
-  with Store-managed updates. The in-app updater self-disables inside MSIX. The wallpaper hosting
-  needs the `runFullTrust` capability, reviewed at certification.
+  with Store-managed updates. The in-app auto-updater self-disables inside MSIX, so **Check for updates**
+  opens the Store listing instead; the Store keeps the app current and provides the Start-menu entry and
+  uninstall. The manifest declares a `windows.startupTask` (`TaskId="HypnixStartup"`, disabled until the
+  user enables **Start with Windows**). The wallpaper hosting needs the `runFullTrust` capability,
+  reviewed at certification.
 
   ```powershell
   ./scripts/package-msix.ps1 -Version 1.2.3 -SelfSign   # sideload test; unsigned for Partner Center
@@ -211,7 +234,7 @@ for extraction, shared settings, integrity checks and the remaining release vali
 - [Realistic fire study](docs/FIRE_RENDERING_STUDY.md) analyzes the three supplied Shadertoy examples and proposes a volumetric fire pipeline, GPU budgets and visual validation gates (Portuguese; design only).
 - [Standalone fire preview](Tests/Hypnix.FirePreview/README.md) exercises the shared Living Fire renderer with system-audio response, limited MacCormack transport, flow-driven embers and GPU state checks.
 - The approved FireRingV1 assets remain unchanged. The rejected volumetric prototype remains excluded from the gallery.
-- Optional microphone use requires the **React to microphone** preference. No stored raw audio, audio uploads,
+- Optional microphone reaction uses an **Audio source** that includes the microphone. No stored raw audio, audio uploads,
   telemetry or administrator requirement in normal operation.
 - Code signing for direct downloads (SmartScreen trust), final MSIX/Store certification and hardware-accelerated video decode remain pending. Independent per-display assignments are implemented; see [validation](docs/PER_MONITOR_VALIDATION.md).
 - A [macOS port study](docs/MACOS_PORT_STUDY.md) documents a future, not-yet-started plan (NSWindow desktop hosting, Metal, ScreenCaptureKit audio, notarization). It is design-only and changes no Windows behavior.

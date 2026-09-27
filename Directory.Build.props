@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <!-- Keep build outputs and vendored/research sources out of the default C# glob. Prior local
+         builds leave generated AssemblyInfo/AssemblyAttributes .cs under artifacts\**\obj and tmp\**;
+         because they sit inside the project cone, the default **/*.cs items pull them into the main
+         (and the WPF *_wpftmp markup) compile and fail with CS0579 duplicate-attribute errors. A clean
+         CI checkout does not have them, which is why this only bites local builds. Excluding these
+         non-source directories is a no-op for correct builds and does not change the produced assembly. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**;tmp/**;.research/**;Prototypes/**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

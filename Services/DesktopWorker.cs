@@ -24,6 +24,12 @@ internal static partial class DesktopWorker
     private static IntPtr _workerHandle;
     private static bool _isRaisedDesktop;
 
+    // Windows 11 composites the desktop on a "raised" Progman surface where a plain GDI blit to a
+    // child window shows black; those wallpapers must present through the DXGI swap chain instead.
+    // Reflects the most recent attach (all monitors share one desktop). Used to decide whether a
+    // failed GDI present can safely fall back to the direct blit or must trigger session recovery.
+    public static bool IsRaisedDesktop => _isRaisedDesktop;
+
     public static WallpaperTarget[] GetMonitorTargets()
     {
         const int smXVirtualScreen = 76;

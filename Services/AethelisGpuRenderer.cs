@@ -21,7 +21,9 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
     private readonly IDXGIFactory2 _factory;
     private readonly ID3D11Device _device;
     private readonly ID3D11DeviceContext _context;
-    private readonly IDXGISwapChain1 _swapChain;
+    private readonly IDXGISwapChain1? _swapChain;
+    private readonly GpuPreviewSurface? _previewSurface;
+    private readonly IntPtr _window;
     private readonly ID3D11Texture2D _backBuffer;
     private readonly ID3D11RenderTargetView _renderTarget;
     private readonly ID3D11VertexShader _vertexShader;
@@ -59,8 +61,9 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
     private readonly int _width;
     private readonly int _height;
 
-    public AethelisGpuRenderer(IntPtr hwnd, int width, int height, string shaderFileName = "Aethelis.hlsl")
+    public AethelisGpuRenderer(IntPtr hwnd, int width, int height, string shaderFileName = "Aethelis.hlsl", bool preview = false)
     {
+        _window = hwnd;
         _width = width;
         _height = height;
         try
@@ -74,28 +77,25 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
             Own(_device);
             Own(_context);
 
-            var description = new SwapChainDescription1
+            if (preview)
             {
-                Width = (uint)width,
-                Height = (uint)height,
-                Format = Format.B8G8R8A8_UNorm,
-                BufferCount = 2,
-                BufferUsage = Usage.RenderTargetOutput,
-                SampleDescription = SampleDescription.Default,
-                Scaling = Scaling.Stretch,
-                SwapEffect = SwapEffect.FlipDiscard,
-                AlphaMode = AlphaMode.Ignore
-            };
-            var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
-            _swapChain = Own(_factory.CreateSwapChainForHwnd(_device, hwnd, description, fullscreen));
-            // DXGI_MWA_NO_WINDOW_CHANGES (1) | DXGI_MWA_NO_ALT_ENTER (2). During live preview this
-            // swap chain's HWND is a child of the foreground app window; leaving DXGI's default
-            // window-message hook active couples that window to swap-chain presentation and can make
-            // the shell repeatedly toggle its fullscreen/Focus-Assist state (the notification bell
-            // flicker). We recreate the swap chain on resize ourselves, so ignoring window changes is
-            // safe. Vortice mirrors the native DXGI_MWA_* bits, so the cast is exact.
-            _factory.MakeWindowAssociation(hwnd, (WindowAssociationFlags)0x3);
-            _backBuffer = Own(_swapChain.GetBuffer<ID3D11Texture2D>(0));
+                _previewSurface = Own(new GpuPreviewSurface(_device, _context, width, height));
+                _backBuffer = _previewSurface.Target;
+            }
+            else
+            {
+                var description = new SwapChainDescription1
+                {
+                    Width = (uint)width, Height = (uint)height,
+                    Format = Format.B8G8R8A8_UNorm, BufferCount = 2,
+                    BufferUsage = Usage.RenderTargetOutput, SampleDescription = SampleDescription.Default,
+                    Scaling = Scaling.Stretch, SwapEffect = SwapEffect.FlipDiscard, AlphaMode = AlphaMode.Ignore
+                };
+                var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
+                _swapChain = Own(_factory.CreateSwapChainForHwnd(_device, hwnd, description, fullscreen));
+                _factory.MakeWindowAssociation(hwnd, (WindowAssociationFlags)0x3);
+                _backBuffer = Own(_swapChain.GetBuffer<ID3D11Texture2D>(0));
+            }
             _renderTarget = Own(_device.CreateRenderTargetView(_backBuffer));
 
             var shaderPath = Path.Combine(AppContext.BaseDirectory, "Shaders", shaderFileName);
@@ -153,7 +153,7 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
                 : Path.Combine(AppContext.BaseDirectory, "Assets", "Effects", "HypnixFireRing", "HypnixFireRing.efkefc");
 
             AppLog.Write($"Aethelis GPU renderer initialized. Shader={shaderFileName}; Size={width}x{height}; " +
-                         $"FeatureLevel={featureLevel}; Adapter={adapter.Description1.Description}");
+                         $"FeatureLevel={featureLevel}; Adapter={adapter.Description1.Description}; Preview={preview}; Presentation={(preview ? "OffscreenGdi" : "FlipDiscard")}; WindowSwapChain={_swapChain is not null}");
         }
         catch { ReleaseDeviceResources(); throw; }
     }
@@ -401,7 +401,8 @@ internal sealed partial class AethelisGpuRenderer : IDisposable
 
     public void EndFrame()
     {
-        _swapChain.Present(0, PresentFlags.None).CheckError();
+        if (_previewSurface is not null) _previewSurface.Present(_window);
+        else _swapChain!.Present(0, PresentFlags.None).CheckError();
     }
 
     private static IDXGIAdapter1 GetHardwareAdapter(IDXGIFactory2 factory)

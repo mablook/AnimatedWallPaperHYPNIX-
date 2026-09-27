@@ -44,6 +44,10 @@ public partial class MainWindow : Window
     private System.Windows.Forms.ToolStripMenuItem? _traySourceItem;
     private readonly Dictionary<AudioReactionSource, System.Windows.Forms.ToolStripMenuItem> _traySourceOptions = new();
     private System.Windows.Forms.ToolStripMenuItem? _trayUpdateItem;
+    private System.Windows.Forms.ToolStripMenuItem? _trayStartupItem;
+    private bool _syncingStartup;
+    private bool _startHidden;
+    private bool _updateCheckInFlight;
     private readonly AudioDeviceService _audioDevices = new();
     private readonly AudioLevelMeter _levelMeter = new();
     private bool _micTestActive;
@@ -85,6 +89,8 @@ public partial class MainWindow : Window
         PausePerMonitorToggle.IsChecked = _settings.PausePerMonitor;
         PauseBatteryCheckBox.IsChecked = _settings.PauseOnBattery;
         AudioReactiveCheckBox.IsChecked = _settings.AudioReactive;
+        StartWithWindowsCheckBox.IsChecked = _settings.StartWithWindows;
+        InitializeAboutUi();
         InitializeAudioUi();
         _wallpaperController.SetAudioEnabled(_settings.AudioReactive);
         LivePreview.SetAudioEnabled(_settings.AudioReactive);
@@ -290,6 +296,137 @@ public partial class MainWindow : Window
     {
         PopulateAudioDevices();
         UpdateAudioSourceUi();
+    }
+
+    private void InitializeAboutUi()
+    {
+        AboutVersionText.Text = $"HYPNIX {AppInstall.Version} · Build {AppInstall.BuildId}";
+        DiagnosticsLocationText.Text = $"Logs: {AppLog.DiagnosticsDirectory}";
+        AboutUpdateText.Text = AppInstall.IsPackaged
+            ? "Updates are delivered automatically through the Microsoft Store."
+            : "The installed HYPNIX updates itself automatically in the background.";
+    }
+
+    // "Start with Windows". Registration lives in the OS (MSIX StartupTask or the per-user Run key);
+    // we mirror the effective result back into the setting, the checkbox and the tray item. Windows can
+    // refuse the change (e.g. disabled under Task Manager), which is surfaced without desyncing the UI.
+    private async void StartWithWindowsChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_isUiInitialized || _syncingStartup) return;
+        var requested = StartWithWindowsCheckBox.IsChecked == true;
+        StartWithWindowsCheckBox.IsEnabled = false;
+        try { ApplyStartupResult(requested, await StartupManager.SetEnabledAsync(requested)); }
+        finally { StartWithWindowsCheckBox.IsEnabled = true; }
+    }
+
+    private void ApplyStartupResult(bool requested, StartupResult result)
+    {
+        var effective = result switch
+        {
+            StartupResult.Enabled => true,
+            StartupResult.Disabled => false,
+            _ => !requested // Failed/BlockedByUser: revert to the previous state.
+        };
+        _settings.StartWithWindows = effective;
+        _syncingStartup = true;
+        try
+        {
+            if ((StartWithWindowsCheckBox.IsChecked == true) != effective) StartWithWindowsCheckBox.IsChecked = effective;
+            if (_trayStartupItem is not null && _trayStartupItem.Checked != effective) _trayStartupItem.Checked = effective;
+        }
+        finally { _syncingStartup = false; }
+        var hint = result switch
+        {
+            StartupResult.BlockedByUser => "Windows is blocking HYPNIX from starting automatically. Turn it on under Task Manager \u25B8 Startup apps (or Settings \u25B8 Apps \u25B8 Startup).",
+            StartupResult.Failed => "The startup setting could not be changed. Open diagnostics for details.",
+            _ => ""
+        };
+        StartupHintText.Text = hint;
+        StartupHintText.Visibility = string.IsNullOrEmpty(hint) ? Visibility.Collapsed : Visibility.Visible;
+        QueueSave();
+    }
+
+    // Windows or Task Manager can toggle startup out of band; align the setting and UI with the real
+    // OS state on launch so the toggle always reflects what will actually happen at the next sign-in.
+    private async Task ReconcileStartupStateAsync()
+    {
+        try
+        {
+            var actual = await StartupManager.IsEnabledAsync();
+            if (_isQuitting || actual == _settings.StartWithWindows) return;
+            _settings.StartWithWindows = actual;
+            _syncingStartup = true;
+            try
+            {
+                if ((StartWithWindowsCheckBox.IsChecked == true) != actual) StartWithWindowsCheckBox.IsChecked = actual;
+                if (_trayStartupItem is not null && _trayStartupItem.Checked != actual) _trayStartupItem.Checked = actual;
+            }
+            finally { _syncingStartup = false; }
+            QueueSave();
+        }
+        catch (Exception exception) { AppLog.WriteException("Startup state reconcile failed", exception); }
+    }
+
+    // Called by App before the window is shown when HYPNIX is auto-started at sign-in, so it comes up in
+    // the tray. Showing it minimized and off the taskbar keeps Loaded firing (initialization + restore).
+    internal void ApplyStartHidden()
+    {
+        _startHidden = true;
+        WindowState = WindowState.Minimized;
+        ShowInTaskbar = false;
+    }
+
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e) => await CheckForUpdatesInteractiveAsync();
+
+    // Manual update check. Store builds update themselves, so this opens the Store listing where the
+    // user can confirm; website installs run the Velopack check and report the outcome either way.
+    private async Task CheckForUpdatesInteractiveAsync()
+    {
+        if (_updateCheckInFlight) return;
+        if (AppInstall.IsPackaged) { OpenStoreListing(); return; }
+        _updateCheckInFlight = true;
+        CheckUpdatesButton.IsEnabled = false;
+        AboutUpdateText.Text = "Checking for updates\u2026";
+        try
+        {
+            _updateService ??= new UpdateService();
+            if (!_updateService.IsInstalled)
+            {
+                AboutUpdateText.Text = "Automatic updates apply to the installed HYPNIX; this build does not update itself.";
+                return;
+            }
+            var update = await _updateService.CheckAndDownloadAsync();
+            if (_isQuitting) return;
+            if (update is null) { AboutUpdateText.Text = $"HYPNIX {AppInstall.Version} is up to date."; return; }
+            _pendingUpdate = update;
+            if (_trayUpdateItem is not null)
+            {
+                _trayUpdateItem.Text = $"Restart to update HYPNIX to {update.TargetFullRelease.Version}";
+                _trayUpdateItem.Visible = true;
+            }
+            AboutUpdateText.Text = $"Update {update.TargetFullRelease.Version} is ready. Choose \u201CRestart to update HYPNIX\u201D in the tray to install it.";
+        }
+        catch (Exception exception)
+        {
+            AppLog.WriteException("Interactive update check failed", exception);
+            AboutUpdateText.Text = "Update check failed. Open diagnostics for details.";
+        }
+        finally { _updateCheckInFlight = false; CheckUpdatesButton.IsEnabled = true; }
+    }
+
+    private void OpenStoreListing()
+    {
+        try
+        {
+            AboutUpdateText.Text = "Opening the Microsoft Store\u2026";
+            using var _ = Process.Start(new ProcessStartInfo(
+                $"ms-windows-store://pdp/?productid={MicrosoftStoreLicenseProvider.StoreId}") { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            AppLog.WriteException("Open Microsoft Store", exception);
+            AboutUpdateText.Text = "Could not open the Microsoft Store. Search for HYPNIX there to check for updates.";
+        }
     }
 
     private void AudioSourceChanged(object sender, SelectionChangedEventArgs e)
@@ -656,7 +793,7 @@ public partial class MainWindow : Window
         ErrorText.Text = "";
     }
     private void OpenLibrary_Click(object sender, RoutedEventArgs e) => OpenFolder(_wallpaperLibrary.PackagesDirectory);
-    private void OpenDiagnostics_Click(object sender, RoutedEventArgs e) => OpenFolder(AppLog.LogDirectory);
+    private void OpenDiagnostics_Click(object sender, RoutedEventArgs e) => OpenFolder(AppLog.DiagnosticsDirectory);
     private void OpenFolder(string path)
     {
         try { Directory.CreateDirectory(path); using var _ = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
@@ -720,10 +857,13 @@ public partial class MainWindow : Window
         // Guarantee a disposable, owned icon so the tray is always visible and cleanup is safe.
         _trayDrawingIcon ??= (System.Drawing.Icon)System.Drawing.SystemIcons.Application.Clone();
         var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem($"HYPNIX {AppInstall.Version}") { Enabled = false });
+        menu.Items.Add("Check for updates", null, (_, _) => Dispatcher.Invoke(() => { _ = CheckForUpdatesInteractiveAsync(); }));
         // Shown only once an update has been downloaded and is ready to apply on restart.
         _trayUpdateItem = new System.Windows.Forms.ToolStripMenuItem("Restart to update HYPNIX") { Visible = false };
         _trayUpdateItem.Click += (_, _) => Dispatcher.Invoke(ApplyUpdate);
         menu.Items.Add(_trayUpdateItem);
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Open HYPNIX", null, (_, _) => Dispatcher.Invoke(ShowMainWindow));
         menu.Items.Add("Stop all wallpapers", null, (_, _) => Dispatcher.Invoke(StopWallpaper));
         _trayAudioItem = new System.Windows.Forms.ToolStripMenuItem("Audio reactive") { Checked = _settings.AudioReactive, CheckOnClick = true };
@@ -747,6 +887,16 @@ public partial class MainWindow : Window
             _traySourceItem.DropDownItems.Add(option);
         }
         menu.Items.Add(_traySourceItem);
+        _trayStartupItem = new System.Windows.Forms.ToolStripMenuItem("Start with Windows")
+        { Checked = _settings.StartWithWindows, CheckOnClick = true };
+        _trayStartupItem.CheckedChanged += (_, _) => Dispatcher.Invoke(() =>
+        {
+            if (_syncingStartup) return;
+            if ((StartWithWindowsCheckBox.IsChecked == true) != _trayStartupItem!.Checked)
+                StartWithWindowsCheckBox.IsChecked = _trayStartupItem.Checked;
+        });
+        menu.Items.Add(_trayStartupItem);
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Quit HYPNIX", null, (_, _) => Dispatcher.Invoke(() => { _isQuitting = true; Close(); }));
         _trayIcon = new System.Windows.Forms.NotifyIcon { Icon = _trayDrawingIcon, Text = "HYPNIX", ContextMenuStrip = menu, Visible = true };
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowMainWindow);
@@ -852,6 +1002,17 @@ public partial class MainWindow : Window
         Height = Math.Min(820, work.Height - 32);
         Left = work.Left + (work.Width - Width) / 2;
         Top = work.Top + (work.Height - Height) / 2;
+        if (_startHidden)
+        {
+            // Launched at sign-in: settle into the tray instead of showing the window. The window was
+            // shown minimized and off the taskbar so Loaded still fired and initialization/restore run.
+            Hide();
+            ShowInTaskbar = true;
+            WindowState = WindowState.Normal;
+            _startHidden = false;
+            AppLog.Write("Started at Windows sign-in; running in the notification area.");
+        }
+        _ = ReconcileStartupStateAsync();
         UpdateSelection();
         if (Selected is { } selected) WallpaperGallery.ScrollIntoView(selected);
         await InitializeLicenseAsync();

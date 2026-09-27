@@ -24,6 +24,10 @@ internal sealed class AppSettings
     public string? MicrophoneDeviceId { get; set; }
     public string? SystemAudioDeviceId { get; set; }
     public bool PreviewPaneCollapsed { get; set; }
+    // Start HYPNIX automatically when the user signs in to Windows. The actual registration lives in
+    // the OS (MSIX StartupTask or the per-user Run key); this mirrors the user's choice and the last
+    // known OS state, reconciled on launch in case Windows/Task Manager changed it out of band.
+    public bool StartWithWindows { get; set; }
     public string? MediaToolsDirectory { get; set; }
     public Dictionary<string, VisualizerPreferences> Visualizers { get; set; } = [];
     public Dictionary<string, DisplayWallpaperSettings> DisplayWallpapers { get; set; } =

@@ -1,5 +1,16 @@
 # HYPNIX 1.2.0 — Microsoft Store submission record
 
+## Final local preparation — 25 September 2026
+
+- Updated English description, short description, features, release notes and private reviewer notes are ready in [STORE_COPY_1.2.0.md](STORE_COPY_1.2.0.md).
+- The [privacy policy](PRIVACY_POLICY.md) now describes the three audio sources, saved device selection and microphone meter/test lifecycle. That revision was dated 25 September 2026; the linked policy was subsequently updated on 27 September to describe development-session logs.
+- The owner confirmed completion of manual testing on 25 September 2026. This is owner-reported acceptance; no detailed per-device test matrix was supplied.
+- The exact Store candidate passed a new local installed-package lifecycle test: install 1.1.1, upgrade to 1.2.0 with LocalState preservation, launch a responsive window with the real 1.2.0 package identity, and uninstall.
+- Existing HYPNIX data was backed up and seven pre-existing files checked; non-log files remained unchanged. Test certificates and package were removed, independently verified after the run. The unsigned upload SHA-256 remains unchanged.
+- Evidence: `artifacts/store-audit-120/installed-lifecycle/result.json` and `independent-cleanup.json`. This was a signed test copy on the development PC, not Store delivery or a clean-machine test. WACK was not repeated; the existing 1.2.0 PASS report remains applicable to the unchanged payload.
+- The preceding audit reran 380 unit tests and five native checks on the packaged DLL. See `artifacts/store-audit-120/RELATORIO.md` for that audit's original scope; its privacy/manual/install findings are followed up here.
+- Partner Center was not accessed or changed. These files are prepared for the owner to apply; no submission or publication was performed.
+
 Build and validation performed on 2026-09-25 for the Sound/audio-source, device-feedback and
 wallpaper-settings feature release. Commit: `fc3726d` (`Add audio source selection, device feedback
 and clearer wallpaper settings`). Version bumped `1.1.2 -> 1.2.0` in `AnimatedWallPaper.csproj`.
@@ -36,8 +47,8 @@ pwsh ./scripts/package-msix.ps1 -Version 1.2.0
 pwsh ./scripts/package-msix.ps1 -Version 1.2.0 -SelfSign -OutputDir artifacts/msix-selfsign
 ```
 
-> Important: submit the **unsigned** package from `artifacts/msix/`. Never upload the self-signed
-> build — Partner Center signs the package itself, and a self-signed one would be rejected.
+> Use the **unsigned** package from `artifacts/msix/` for this submission. The self-signed
+> copy is a local testing artifact; Microsoft handles Store package signing.
 
 ## WACK (Windows App Certification Kit) result
 
@@ -46,7 +57,7 @@ elevation; it installed, tested and uninstalled the package automatically.
 
 - **OVERALL_RESULT: PASS**
 - Full report: `artifacts/msix-selfsign/WACK-1.2.0-report.xml` (~8 MB, git-ignored).
-- One **optional** finding (does not block certification, which is why OVERALL is PASS):
+- One **optional** finding (does not fail the local WACK overall result; Microsoft certification is separate):
   - Requirement 25 *Package sanity test* -> test **"Blocked executables"** (`OPTIONAL=TRUE`) = FAIL.
   - Cause: HYPNIX legitimately references process-launch APIs — `ffmpeg`/`ffprobe` for local video
     wallpapers and `Process.Start` to open the library/diagnostics folders and the Lemon Squeezy
@@ -115,8 +126,10 @@ certificate was left in `Cert:\LocalMachine\TrustedPeople`.
   is analyzed transiently in memory only — never recorded, saved or transmitted. A denied/missing
   microphone is non-blocking. See `docs/PRIVACY_POLICY.md` and `docs/PRODUCT_DIRECTION.md`.
 
-## Still pending (manual, needs a real desktop)
+## Manual validation follow-up
 
-- Confirm the notification-bell mitigation (#1) on a physical foreground/preview session.
-- Physical microphone hotplug, denied-access and per-device meter passes; the three audio-source
-  modes with simultaneous system + microphone input. See `docs/RELEASE_PENDING.md`.
+The owner reported that manual tests were completed on 25 September 2026, after the audit
+listed notification-bell behavior, physical microphone/device feedback and the three audio-source
+modes as outstanding. Record these as owner-reported acceptance, not independent automated
+proof of every hardware or permission scenario. No further manual test request is pending in
+this preparation task. Broader compatibility coverage remains tracked in `docs/RELEASE_PENDING.md`.

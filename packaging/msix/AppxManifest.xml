@@ -13,8 +13,9 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  IgnorableNamespaces="uap desktop rescap">
 
   <Identity Name="Mablook.HYPNIX"
             Publisher="CN=AE07AC42-52EF-4F23-BDC1-56F970CD3F72"
@@ -45,6 +46,13 @@
         Square44x44Logo="StoreAssets\Square44x44Logo.png">
         <uap:DefaultTile Wide310x150Logo="StoreAssets\Wide310x150Logo.png" />
       </uap:VisualElements>
+      <Extensions>
+        <!-- "Start with Windows": off by default; the app enables it via StartupTask.RequestEnableAsync
+             when the user turns the toggle on. TaskId must match StartupManager.StartupTaskId. -->
+        <desktop:Extension Category="windows.startupTask" Executable="HYPNIX.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="HypnixStartup" Enabled="false" DisplayName="HYPNIX" />
+        </desktop:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

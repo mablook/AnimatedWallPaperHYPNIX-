@@ -79,6 +79,8 @@ public partial class App : System.Windows.Application
         StartActivationListener();
         var window = new MainWindow();
         MainWindow = window;
+        // Auto-started at sign-in (registry Run passes --startup): come up in the tray, not on screen.
+        if (Services.StartupManager.WasLaunchedAtStartup(e.Args)) window.ApplyStartHidden();
         window.Show();
     }
 

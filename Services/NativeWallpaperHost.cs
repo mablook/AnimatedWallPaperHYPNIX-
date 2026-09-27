@@ -207,7 +207,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             throw new InvalidOperationException("Could not read the Direct3D wallpaper client size.");
         if (_renderMode==NativeRenderMode.LivingFire)
         {
-            _fireGpuRenderer=new FireGpuRenderer(Handle,client.Right-client.Left,client.Bottom-client.Top);
+            _fireGpuRenderer=new FireGpuRenderer(Handle,client.Right-client.Left,client.Bottom-client.Top,preview:!_isDesktopSurface);
             return;
         }
         var shader = _renderMode switch
@@ -225,7 +225,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             _ => "Aethelis.hlsl"
         };
         _aethelisGpuRenderer = new AethelisGpuRenderer(
-            Handle, client.Right - client.Left, client.Bottom - client.Top, shader);
+            Handle, client.Right - client.Left, client.Bottom - client.Top, shader, preview: !_isDesktopSurface);
     }
 
     public IntPtr Handle { get; private set; }
@@ -234,16 +234,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
     public void Start(int framesPerSecond, bool reveal = true)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_renderWorker is not null) throw new InvalidOperationException("Native host already started.");
-        SetFrameCap(framesPerSecond);
-        // The render thread creates the GPU device and renders the first frame; wait for it so the
-        // "complete frame before reveal" guarantee holds, then surface any init fault to the caller
-        // (WallpaperSession fails fast on GPU/shader errors exactly as it did when Start rendered inline).
-        _renderWorker = new WallpaperRenderWorker(PrepareFirstFrame, SafeRenderFrame,
-            () => _isShown && !_paused && !_failed ? Volatile.Read(ref _frameIntervalMs) : Timeout.Infinite,
-            ReleaseRenderResources);
-        try { _renderWorker.Start(TimeSpan.FromSeconds(15)); }
+        var worker = CreateRenderWorker(framesPerSecond);
+        try { worker.Start(TimeSpan.FromSeconds(15)); }
         catch
         {
             _failed = true;
@@ -251,6 +243,33 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         if (reveal) Show();
+    }
+
+    // Async counterpart of Start. The render thread still creates the GPU device and renders the first
+    // frame; the caller awaits readiness instead of blocking so the UI thread that owns this HWND stays
+    // responsive (and keeps pumping messages) while a wallpaper is applied. The "complete frame before
+    // reveal" guarantee and fail-fast on GPU/shader errors are unchanged.
+    public async Task StartAsync(int framesPerSecond, bool reveal = true, CancellationToken token = default)
+    {
+        var worker = CreateRenderWorker(framesPerSecond);
+        try { await worker.StartAsync(TimeSpan.FromSeconds(15), token); }
+        catch
+        {
+            _failed = true;
+            throw; // A timeout/cancellation is a failed preparation; the controller retains the previous session.
+        }
+
+        if (reveal) Show();
+    }
+
+    private WallpaperRenderWorker CreateRenderWorker(int framesPerSecond)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_renderWorker is not null) throw new InvalidOperationException("Native host already started.");
+        SetFrameCap(framesPerSecond);
+        return _renderWorker = new WallpaperRenderWorker(PrepareFirstFrame, SafeRenderFrame,
+            () => _isShown && !_paused && !_failed ? Volatile.Read(ref _frameIntervalMs) : Timeout.Infinite,
+            ReleaseRenderResources);
     }
 
     public void Show()
@@ -485,11 +504,21 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             }
             catch (Exception exception)
             {
-                _gdiPresentUnavailable = true;
                 _gdiSwapChain?.Dispose();
                 _gdiSwapChain = null;
                 _gdiFrameBitmap?.Dispose();
                 _gdiFrameBitmap = null;
+                // On the Windows 11 raised desktop the direct GDI blit shows black, so a swap-chain
+                // failure means this wallpaper cannot actually present. Surface it as a render fault
+                // (PrepareFirstFrame rethrows; SafeRenderFrame flips _failed) so the health check rebuilds
+                // the session instead of silently leaving a black monitor with no recovery. Older desktops
+                // composite the direct blit correctly, so there we fall back to it as before.
+                if (DesktopWorker.IsRaisedDesktop)
+                {
+                    AppLog.WriteException("GDI GPU presentation failed on the raised desktop; requesting recovery", exception);
+                    throw;
+                }
+                _gdiPresentUnavailable = true;
                 AppLog.WriteException("GDI GPU presentation unavailable; using the direct GDI blit", exception);
             }
         }

@@ -1,5 +1,36 @@
 # Release pending items
 
+## Development candidate — 1.2.2, 27 September 2026
+
+The owner installs the package and performs desktop E2E manually. The 1.2.1 manual
+pass reproduced notification-bell flicker with the configuration window open;
+**Hide preview stabilizes the bell**. Installed-build logs verified 1.2.1 and the
+Discard preview swap chain, so that mitigation did not resolve the defect.
+
+The 1.2.2 candidate retains the startup/update and async renderer developments,
+build/source identification and per-session development logs. It renders GPU previews
+offscreen and presents their pixels with GDI, without a window DXGI swap chain.
+380 unit tests and the native graphics smoke passed, including pixel-exact animated
+GPU-to-GDI preview checks. Notification-bell acceptance remains pending the owner's
+manual test. The installed 1.2.2 session confirms OffscreenGdi is active. See the
+[consolidated release record](DEVELOPMENT_RELEASE_1.2.2.md) and
+[development workflow](DEVELOPMENT_RELEASE_WORKFLOW.md).
+
+## Latest Store release preparation — 1.2.0, 25 September 2026
+
+The owner confirmed manual tests are complete. Current Store copy and the updated privacy
+policy are prepared locally in [STORE_COPY_1.2.0.md](STORE_COPY_1.2.0.md) and
+[PRIVACY_POLICY.md](PRIVACY_POLICY.md). The 1.2.0 installed-MSIX lifecycle passed:
+1.1.1 installation, upgrade preserving LocalState, responsive launch with package identity,
+and uninstall/temporary-certificate cleanup. The 380-test regression and WACK overall PASS
+are documented in [the current submission record](STORE_SUBMISSION_1.2.0.md).
+Partner Center was not accessed or changed during this preparation. Older portal observations
+below are historical, not a statement of current publication status.
+
+The owner's manual-test confirmation is accepted for this release preparation. It does not
+provide a detailed hardware matrix or establish testing on a clean machine, additional GPUs,
+Windows versions, or Store delivery.
+
 Reviewed against repository documents, configuration and code on 2026-09-21.
 Partner Center preparation and the checkout's visible Test-mode status were
 subsequently inspected; see the [submission record](PARTNER_CENTER_SUBMISSION_20260921.md).
@@ -42,33 +73,32 @@ Checkout/payment processing, receipts, taxes, refunds and chargebacks are not
 HYPNIX development tasks or app-release acceptance tests. The app consumes licence
 status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#responsibility-boundary--owner-direction-2026-09-21).
 
-- [ ] **Final application regression** — startup with a visible window/tray,
+- [x] **Final application regression (owner acceptance)** — owner confirmed manual
+  testing complete on 2026-09-25. The release checklist covers startup with a visible window/tray,
   wallpaper playback and real-time music reaction, settings persistence,
   independent monitors, pause/resume/stop and recovery. Follow the
-  [testing guide](TESTING_AND_REGRESSION_GUIDE.md) on the release candidate.
+  [testing guide](TESTING_AND_REGRESSION_GUIDE.md) for future regression runs. This is
+  owner-reported acceptance, complemented by 380 automated tests and local MSIX lifecycle checks.
 - [ ] **Windows notification bell flickers while HYPNIX is in the foreground** —
-  reported during manual testing of local 1.1.2 on 2026-09-25. The Windows notification
-  bell next to the taskbar clock repeatedly disappears and reappears while the main
-  app window is in front; the user reports that the symptom stops after applying a
-  wallpaper. This concerns the Windows bell (Focus Assist / quiet-hours indicator),
-  not HYPNIX's notification-area icon.
-  Best-effort mitigation applied (needs on-device confirmation): the live-preview GPU
-  swap chains (`AethelisGpuRenderer`, `FireGpuRenderer`) now request
-  `DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER` on window association. During
-  preview these swap chains' HWND is a child of the foreground app window; the default
-  DXGI hook couples that window to swap-chain presentation, which can make the shell
-  toggle its fullscreen/Focus-Assist state (the bell). Associating the desktop
-  wallpaper's swap chain with WorkerW instead of the app window is consistent with the
-  reporter's note that the flicker stops after Apply. We recreate swap chains on resize
-  ourselves, so ignoring window changes is safe.
-  Verification: with a GPU visualizer selected and the preview open, keep the HYPNIX
-  window in the foreground and watch the taskbar bell; then Apply and hide the app.
-  Acceptance: the bell remains visually stable across those states. If it still
-  flickers, the next suspect is DirectFlip/MPO overlay promotion of the preview swap
-  chain — switch the preview surface to the BitBlt swap model (`SwapEffect.Discard`)
-  while keeping FlipDiscard on the desktop. Status: mitigation shipped for the preview
-  swap chains; not yet independently reproduced or confirmed fixed on a real desktop.
-  [User screenshot](assets/notification-bell-flicker-20260925.png).
+  **Open, 2026-09-27.** The owner reproduced this on installed 1.2.0 and 1.2.1;
+  wallpaper playback with the configuration UI hidden is stable. This concerns the
+  Windows notification/Do Not Disturb bell, not HYPNIX's tray icon. In 1.2.1,
+  **Hide preview stabilizes the bell**, isolating the trigger to the live preview.
+  Installed logs verify build `1.2.1-20260927-153229-9f59b9e5` and the Discard path.
+  Historical mitigations (DXGI window-association flags in 1.2.0 and a BitBlt/Discard
+  preview swap chain in 1.2.1) were insufficient. Earlier general manual acceptance
+  must not be read as confirmation that this specific defect is fixed.
+  Candidate 1.2.2 removes the preview's HWND swap chain entirely: GPU offscreen
+  rendering feeds a reusable staging texture and a GDI blit. Desktop FlipDiscard is
+  unchanged. Logs distinguish `Presentation=OffscreenGdi; WindowSwapChain=False`.
+  Native graphics and pixel-transfer regression passed; Windows shell behavior is
+  still pending owner validation. The shell's exact trigger remains unproven.
+  Acceptance: keep HYPNIX foreground with preview visible, switch wallpapers and
+  resize; then hide the preview and hide the app. The bell must stay stable, with
+  preview animation and desktop playback working throughout. Do not close this item
+  until the owner confirms that specific scenario.
+  [Development evidence](DEVELOPMENT_RELEASE_WORKFLOW.md),
+  [original screenshot](assets/notification-bell-flicker-20260925.png).
 - [x] **Make wallpaper settings easier to recognize and find** — manual feedback
   on local 1.1.2, 2026-09-25: the label `Customize` did not explain what the button
   opens and its visual emphasis was too weak. Implemented: the button in the selection
@@ -79,8 +109,9 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
   accent-filled `Apply` remains the distinct primary action, and the label uses
   `TextTrimming` with a modest `MinWidth` so it degrades gracefully at compact widths
   and high DPI. The editor already shows only controls each wallpaper supports
-  (SupportsColorTheme/Layout/Glow/Background/Sparks). Status: implemented; pending the
-  on-device visual/high-DPI pass. [User screenshot](assets/wallpaper-settings-button-feedback-20260925.png).
+  (SupportsColorTheme/Layout/Glow/Background/Sparks). Status: implemented; owner confirmed manual
+  testing complete on 2026-09-25. Additional high-DPI configurations were not itemized.
+  [User screenshot](assets/wallpaper-settings-button-feedback-20260925.png).
 - [x] **Allow system audio, microphone or both as explicit reactive sources** —
   manual feedback on local 1.1.2, 2026-09-25: the old `React to microphone` mixed both
   inputs and depended on the parent toggle, so microphone-only could not be selected.
@@ -94,9 +125,9 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
   on = both; off = system; master off stays off); new profiles default to system audio.
   A missing/denied microphone keeps retrying without silently switching sources, and the
   analysis stays local (no saved/transmitted audio). Covered by unit tests for the
-  router source/device behavior and the settings migration. Status: implemented; the
-  three-mode manual matrix (simultaneous system + mic, off, source changes, restart,
-  unavailable mic) remains for on-device validation.
+  router source/device behavior and the settings migration. Status: implemented; owner confirmed
+  manual testing complete on 2026-09-25. Individual source/device scenarios were not itemized
+  separately; this acceptance is distinct from the automated source-selection checks.
   [User screenshot](assets/audio-source-selection-feedback-20260925.png).
 - [x] **List audio devices and show live microphone feedback** — manual feedback
   on local 1.1.2, 2026-09-25, with Teams as the interaction reference. Implemented via a
@@ -114,8 +145,9 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
   meter runs only while the panel is visible and either the microphone is the active
   source or the user starts an explicit `Test`, and it is released when the test ends or
   the panel closes. Analysis is transient/local — nothing recorded, replayed or sent.
-  Status: implemented; the physical device-hotplug, denied-access and per-device meter
-  passes remain for on-device validation. [User reference](assets/audio-devices-level-feedback-20260925.png).
+  Status: implemented; owner confirmed manual testing complete on 2026-09-25. Physical hotplug,
+  permission and meter scenarios were not individually logged by the agent.
+  [User reference](assets/audio-devices-level-feedback-20260925.png).
 - [x] **Verify supplied Live configuration** — `packaging/Commerce.props` now uses
   the published Live product and checkout. All identifiers were verified inside
   the final 1.1.1 MSIX assembly; the Test-mode publication guard remains active.
@@ -131,9 +163,10 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
 ## Product and distribution documentation
 
 - [ ] **Publish/adopt the English privacy and terms updates** — the Lemon Squeezy
-  data flow must be reflected in public policies. The complete [privacy policy](PRIVACY_POLICY.md)
-  is now saved as text in the Store submission's Properties section. The product
-  is still unpublished. Terms [amendments](LEMON_SQUEEZY_POLICY_UPDATES.md) remain drafts.
+  data flow must be reflected in public policies. The updated [privacy policy](PRIVACY_POLICY.md)
+  and [Store copy](STORE_COPY_1.2.0.md) are ready locally as of 2026-09-25; this task did not
+  apply them to any public channel or inspect publication status. Terms
+  [amendments](LEMON_SQUEEZY_POLICY_UPDATES.md) remain drafts.
 
 ## Both channels
 
@@ -150,10 +183,11 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
   Continue bumping for every release (SemVer). It flows to the Velopack package version and the
   MSIX `x.y.z.0` version. Confirm the next version against any existing submissions; do not reuse
   old example version numbers.
-- [ ] **Complete installed-package validation** — the exact Live 1.1.1 MSIX is built,
-  its contents and licensing classes are validated. Installed-package lifecycle,
-  broader native regression and clean-machine/Store checks remain. Historical
-  installer tests do not cover this integration.
+- [x] **Complete local installed-package lifecycle validation** — the 1.2.0 candidate
+  passed installation/upgrade from 1.1.1, LocalState preservation, responsive launch
+  with actual package identity, and uninstall on 2026-09-25. The test used signed copies
+  and left the Store upload file unchanged. Clean-machine and Store-delivery checks
+  remain distinct. See [the current submission record](STORE_SUBMISSION_1.2.0.md).
 
 ## Website installer (Velopack) — if this channel is released
 
@@ -197,8 +231,9 @@ status from the provider. See the [responsibility boundary](LEMON_SQUEEZY.md#res
   Do **not** self-sign for submission — Partner Center signs.
 - [ ] **Additional logo scales** — only base sizes are generated (44/150/50/310). Add scaled variants
   (scale-125/150/200/400 and target-size icons) for a polished Store listing.
-- [ ] **WACK and installed-MSIX validation on the final build** — rerun after
-  commerce integration and live configuration; retain evidence for that exact package.
+- [x] **WACK and local installed-MSIX validation on the final build** — 1.2.0 WACK
+  overall PASS with one optional finding, identical tested/upload payloads, and a
+  successful installed-package lifecycle. See [the evidence](STORE_SUBMISSION_1.2.0.md).
 - [ ] **`runFullTrust` justification and certification** — review/adapt the
   [existing draft rationale](STORE_READINESS.md#draft-full-trust-explanation), include
   it in the submission and complete Store certification.

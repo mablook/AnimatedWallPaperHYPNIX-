@@ -1,17 +1,25 @@
 HYPNIX Privacy Policy
-Last updated: 23 September 2026
+Last updated: 27 September 2026
 
 Mablook publishes HYPNIX. For privacy questions or requests concerning information handled by Mablook, contact hello@mablook.com.
 
 Local desktop and audio processing
-HYPNIX uses display information, wallpaper preferences, selected local media and desktop window state to render wallpapers and apply automatic pause rules. Settings can include monitor identifiers and layout, local media paths, presets and playback preferences. These are stored locally in your Windows user profile.
+HYPNIX uses display information, wallpaper preferences, selected local media and desktop window state to render wallpapers and apply automatic pause rules. Settings can include monitor identifiers and layout, local media paths, presets, playback preferences, your chosen audio source and selected audio-device identifiers. These are stored locally in your Windows user profile.
 
-When Audio reactive is enabled, HYPNIX analyzes system playback locally using Windows audio loopback to animate visuals. The separate React to microphone option is off by default. If you enable it and a microphone is available and accessible, HYPNIX also analyzes that microphone's live audio locally while an active wallpaper or preview needs audio reaction. If microphone access is unavailable or denied, system-playback reaction can continue independently.
+Audio reaction and device selection
+When Audio reactive is enabled, the Audio source setting lets you choose System audio, Microphone, or System audio + microphone. New profiles default to System audio, which analyzes playback from the selected output device through Windows audio loopback without opening a microphone. Choosing Microphone analyzes only the selected input; choosing System audio + microphone analyzes both sources. Microphone input is used only when you choose a mode that includes it and an input is available and accessible. Existing profiles retain their previous choices when upgraded.
 
-Audio samples are processed temporarily in memory. HYPNIX does not save audio recordings, send audio over the network or play microphone input through the speakers. It does not upload wallpaper content to Mablook. Turn off React to microphone to release microphone access, or turn off Audio reactive to stop both audio sources. Audio processing also stops when no active wallpaper or preview needs it. HYPNIX does not include advertising trackers or automatic analytics uploads.
+The Sound settings list available playback and microphone devices by their Windows names. You can follow the Windows default device or select a specific device. Reading the device list does not capture audio. If a specifically selected device becomes unavailable, HYPNIX does not silently substitute a different device. An unavailable or blocked microphone does not prevent using the app; in combined mode, available system playback can still drive the visuals.
+
+Live microphone feedback and controls
+While App settings is open and the app is visible and not minimized, the microphone level meter can analyze your selected microphone when Audio reactive is enabled with a microphone source selected. This meter can operate even when no wallpaper is playing. You can also start an explicit temporary microphone Test with Audio reactive turned off and a microphone source selected. The meter shows the microphone's input level and availability; it does not play your voice back.
+
+The explicit Test can continue while Audio reactive is off until you stop the test, switch to System audio, leave App settings, hide or minimize the window, or quit HYPNIX. Leaving the settings panel stops its meter/test, but microphone reaction for a running wallpaper or preview can continue if you have enabled it. Wallpaper and preview audio analysis stops when no active renderer needs it. To stop all microphone use inside HYPNIX, choose System audio or quit the app. You can also turn off Audio reactive and stop any explicit Test. Closing the main window can leave the app running in the tray; use Quit HYPNIX to exit completely.
+
+Audio samples are processed temporarily in memory. HYPNIX does not save audio recordings, send audio over the network, transcribe speech or play microphone input through the speakers. It does not upload wallpaper content to Mablook. HYPNIX does not include advertising trackers or automatic analytics uploads.
 
 Local diagnostics
-HYPNIX keeps rotating diagnostic logs in its local application-data folder. Logs can contain timestamps, application and operating-system information, file paths and technical errors. Logs are not automatically sent to Mablook. Review and remove sensitive details before choosing to send a log or screenshot for support.
+HYPNIX keeps rotating diagnostic logs in its local application-data folder. Logs can contain timestamps, application and operating-system information, file paths and technical errors. Development/test builds can additionally retain separate per-session logs in a configured local folder, without automatic rotation. About & updates shows the diagnostics location. Logs are not automatically sent to Mablook. Review and remove sensitive details before choosing to send a log or screenshot for support.
 
 Licensing
 HYPNIX includes a 15-day local trial. Paid activation, validation and deactivation communicate with Lemon Squeezy over HTTPS. Requests send your licence key and, when applicable, an activation instance identifier. Activation uses a randomly generated installation identifier, not your Windows username, computer name or hardware serial number. Lemon Squeezy also receives connection information such as your IP address.

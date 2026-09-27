@@ -82,6 +82,10 @@ PublisherDisplayName match `packaging/msix/AppxManifest.xml`.
 
 ## English listing copy
 
+> Historical copy. For version 1.2.0 use [STORE_COPY_1.2.0.md](STORE_COPY_1.2.0.md)
+> and the current [privacy policy](PRIVACY_POLICY.md). The old no-microphone statements
+> below no longer describe the product. This dated record is retained for traceability.
+
 ### Short description
 
 Relax. Have fun. Be cool. Bring your desktop to life with visuals that react to your music.

@@ -47,7 +47,7 @@ internal sealed class VideoWallpaperSession : IWallpaperSession
             session._readerTask = Task.Run(() => session.ReadFramesAsync(width, height, session._cancellation.Token), session._cancellation.Token);
             await session._firstFrame.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
             token.ThrowIfCancellationRequested();
-            session._host.Start(request.FramesPerSecond, reveal: false);
+            await session._host.StartAsync(request.FramesPerSecond, reveal: false, token);
             return session;
         }
         catch { session.Dispose(); throw; }

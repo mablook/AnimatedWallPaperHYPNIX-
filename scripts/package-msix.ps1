@@ -14,7 +14,9 @@ param(
     [Parameter(Mandatory)][string]$Version,
     [switch]$SelfSign,
     [string]$CertSubject,
-    [string]$OutputDir = 'artifacts/msix'
+    [string]$OutputDir = 'artifacts/msix',
+    [string]$DevelopmentLogDirectory,
+    [string]$RestoreSources
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
@@ -34,12 +36,40 @@ try {
     $makeappx = Join-Path $sdkBin 'makeappx.exe'
     $signtool = Join-Path $sdkBin 'signtool.exe'
 
+    $output = [IO.Path]::GetFullPath($OutputDir, $projectRoot)
+    New-Item -ItemType Directory -Path $output -Force | Out-Null
+    if ($DevelopmentLogDirectory) {
+        $DevelopmentLogDirectory = [IO.Path]::GetFullPath($DevelopmentLogDirectory, $projectRoot)
+        New-Item -ItemType Directory -Path $DevelopmentLogDirectory -Force | Out-Null
+    }
+    # Record the actual working tree, including uncommitted/untracked developments.
+    # Version alone cannot distinguish two builds with different local changes.
+    $sourceFiles = @(git ls-files --cached --others --exclude-standard | Sort-Object -Unique |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | ForEach-Object {
+            [ordered]@{ path = $_; sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }
+        })
+    $sourceJson = ConvertTo-Json -InputObject $sourceFiles -Depth 4 -Compress
+    $sourceHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($sourceJson)))
+    $buildId = "$Version-$(Get-Date -Format 'yyyyMMdd-HHmmss')-$($sourceHash.Substring(0,8).ToLowerInvariant())"
+    $buildInfo = [ordered]@{
+        version = $Version; buildId = $buildId; createdUtc = [DateTime]::UtcNow.ToString('o')
+        sourceCommit = (git rev-parse HEAD).Trim(); sourceWorkingTreeDirty = [bool](git status --porcelain)
+        sourceSha256 = $sourceHash; sdk = (dotnet --version).Trim()
+        developmentLogDirectory = $DevelopmentLogDirectory; sourceFiles = $sourceFiles
+    }
+    $buildInfo | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $output 'build-info.json') -Encoding utf8
+    git diff HEAD --binary | Set-Content (Join-Path $output 'source-changes.patch') -Encoding utf8
+    $publishOptions = @("-p:HypnixBuildId=$buildId")
+    if ($DevelopmentLogDirectory) { $publishOptions += "-p:HypnixDevelopmentLogDirectory=$DevelopmentLogDirectory" }
+    if ($RestoreSources) { $publishOptions += @("-p:RestoreSources=$RestoreSources", '-p:NuGetAudit=false') }
     # Self-contained publish into a clean layout (MSIX ships the runtime; full-trust keeps real paths).
     $staging = Join-Path $projectRoot ('artifacts/package-work/msix-' + [Guid]::NewGuid().ToString('N'))
     dotnet publish AnimatedWallPaper.csproj -c Release -p:PublishProfile=win-x64-self-contained `
-        "-p:PublishDir=$staging/" "-p:Version=$Version"
+        "-p:PublishDir=$staging/" "-p:Version=$Version" @publishOptions
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
     & (Join-Path $PSScriptRoot 'copy-distribution-notices.ps1') -PublishedDirectory $staging | Out-Null
+
+    Copy-Item -LiteralPath (Join-Path $output 'build-info.json') -Destination (Join-Path $staging 'build-info.json')
 
     # Lay out the manifest (with the version substituted) and the Store visual assets.
     (Get-Content -Raw packaging/msix/AppxManifest.xml).Replace('{VERSION}', $msixVersion) |

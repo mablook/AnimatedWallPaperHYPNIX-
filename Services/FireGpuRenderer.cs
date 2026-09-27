@@ -14,7 +14,9 @@ internal sealed class FireGpuRenderer : IDisposable
     readonly List<IDisposable> owned=[];
     readonly ID3D11Device device;
     readonly ID3D11DeviceContext context;
-    readonly IDXGISwapChain1 swap;
+    readonly IDXGISwapChain1? swap;
+    readonly GpuPreviewSurface? previewSurface;
+    readonly IntPtr window;
     readonly ID3D11Texture2D back;
     readonly ID3D11RenderTargetView target;
     readonly Dictionary<(int,int,int,int),Surface> surfaces=[];
@@ -44,25 +46,28 @@ internal sealed class FireGpuRenderer : IDisposable
         }
         public void Dispose(){Read?.Dispose();Target?.Dispose();Image?.Dispose();Simulation?.Dispose();Background?.Dispose();}
     }
-    public FireGpuRenderer(IntPtr hwnd,int width,int height) {
-        this.width=width;this.height=height;
+    public FireGpuRenderer(IntPtr hwnd,int width,int height,bool preview=false) {
+        this.width=width;this.height=height;window=hwnd;
         try {
             var factory=Own(CreateDXGIFactory1<IDXGIFactory2>());
             D3D11CreateDevice(null,DriverType.Hardware,DeviceCreationFlags.BgraSupport,new[]{FeatureLevel.Level_11_0},out device,out _,out context).CheckError();
             Own(device);Own(context);
             using(var dxgi=device.QueryInterface<IDXGIDevice>())
             using(var adapter=dxgi.GetAdapter())AdapterName=adapter.Description.Description;
-            swap=Own(factory.CreateSwapChainForHwnd(device,hwnd,new SwapChainDescription1 {
-                Width=(uint)width,Height=(uint)height,Format=Format.B8G8R8A8_UNorm,BufferCount=2,
-                BufferUsage=Usage.RenderTargetOutput,SampleDescription=SampleDescription.Default,
-                Scaling=Scaling.Stretch,SwapEffect=SwapEffect.FlipDiscard,AlphaMode=AlphaMode.Ignore
-            },new SwapChainFullscreenDescription {Windowed=true}));
-            // DXGI_MWA_NO_WINDOW_CHANGES (1) | DXGI_MWA_NO_ALT_ENTER (2): during live preview this
-            // HWND is a child of the foreground app window; ignoring window changes stops DXGI from
-            // coupling that window to presentation (a suspected cause of the notification-bell
-            // flicker). The swap chain is recreated on resize, so this is safe. See AethelisGpuRenderer.
-            factory.MakeWindowAssociation(hwnd,(WindowAssociationFlags)0x3);
-            back=Own(swap.GetBuffer<ID3D11Texture2D>(0));target=Own(device.CreateRenderTargetView(back));
+            if(preview) {
+                previewSurface=Own(new GpuPreviewSurface(device,context,width,height));
+                back=previewSurface.Target;
+            } else {
+                swap=Own(factory.CreateSwapChainForHwnd(device,hwnd,new SwapChainDescription1 {
+                    Width=(uint)width,Height=(uint)height,Format=Format.B8G8R8A8_UNorm,BufferCount=2,
+                    BufferUsage=Usage.RenderTargetOutput,SampleDescription=SampleDescription.Default,
+                    Scaling=Scaling.Stretch,SwapEffect=SwapEffect.FlipDiscard,AlphaMode=AlphaMode.Ignore
+                },new SwapChainFullscreenDescription {Windowed=true}));
+                factory.MakeWindowAssociation(hwnd,(WindowAssociationFlags)0x3);
+                back=Own(swap.GetBuffer<ID3D11Texture2D>(0));
+            }
+            target=Own(device.CreateRenderTargetView(back));
+            AppLog.Write($"Living Fire GPU renderer initialized. Size={width}x{height}; Adapter={AdapterName}; Preview={preview}; Presentation={(preview?"OffscreenGdi":"FlipDiscard")}; WindowSwapChain={swap is not null}");
         } catch {Dispose();throw;}
     }
     Surface Get(int x,int y,int w,int h) {
@@ -103,7 +108,10 @@ internal sealed class FireGpuRenderer : IDisposable
         BeginFrame();var surface=Get(0,0,width,height);RenderSurface(surface,new Viewport(0,0,width,height));
         if(present)EndFrame();
     }
-    public void EndFrame()=>swap.Present(0,PresentFlags.None).CheckError();
+    public void EndFrame() {
+        if(previewSurface is not null)previewSurface.Present(window);
+        else swap!.Present(0,PresentFlags.None).CheckError();
+    }
     public byte[] Pixels() {
         var desc=back.Description;desc.Usage=ResourceUsage.Staging;desc.BindFlags=BindFlags.None;desc.CPUAccessFlags=CpuAccessFlags.Read;desc.MiscFlags=ResourceOptionFlags.None;
         using var staging=device.CreateTexture2D(desc);context.CopyResource(staging,back);

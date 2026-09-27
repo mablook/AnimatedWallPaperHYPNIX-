@@ -28,18 +28,38 @@ internal sealed class WallpaperRenderWorker : IDisposable
 
     public void Start(TimeSpan timeout)
     {
+        StartThread();
+        try { _ready.Task.WaitAsync(timeout).GetAwaiter().GetResult(); }
+        catch
+        {
+            RequestStop();
+            throw;
+        }
+    }
+
+    // Async counterpart of Start: the caller (the WPF UI thread when a wallpaper is applied) awaits
+    // readiness instead of blocking, so the message loop keeps pumping while the render thread creates
+    // the GPU device and prepares the first frame. Keeping the owner thread responsive also prevents a
+    // DXGI/GDI cross-thread SendMessage to the wallpaper HWND from deadlocking against a blocked owner.
+    public async Task StartAsync(TimeSpan timeout, CancellationToken token = default)
+    {
+        StartThread();
+        try { await _ready.Task.WaitAsync(timeout, token); }
+        catch
+        {
+            RequestStop();
+            throw;
+        }
+    }
+
+    private void StartThread()
+    {
         lock (_sync)
         {
             ObjectDisposedException.ThrowIf(_finished, this);
             if (_started) throw new InvalidOperationException("Render worker already started.");
             _thread.Start();
             _started = true;
-        }
-        try { _ready.Task.WaitAsync(timeout).GetAwaiter().GetResult(); }
-        catch
-        {
-            RequestStop();
-            throw;
         }
     }
 
