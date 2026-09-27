@@ -55,6 +55,7 @@
   <ItemGroup>
     <Compile Remove="Tests\**\*.cs" />
     <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="CosineKitty.AstronomyEngine" Version="2.1.19" />
     <PackageReference Include="Velopack" Version="1.2.0" />
     <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />

@@ -34,6 +34,8 @@ internal static class Program
                 "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
                 string.Concat(resourceXml.Nodes()) + "</ResourceDictionary>");
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (args.Contains("--ocean-cycle")) { OceanCycleChecks.Run(output); return 0; }
+            if (args.Contains("--ocean-cycle-benchmark")) { OceanRenderChecks.Benchmark(output,new OceanSettings(Celestial:OceanCelestialSettings.Default with {TimeScale=144})); return 0; }
             if (args.Contains("--ocean-refinement")) { OceanRefinementChecks.Capture(output); return 0; }
             if (args.Contains("--ocean-benchmark")) { OceanRenderChecks.Benchmark(output); return 0; }
             if (args.Contains("--ocean-video")) { OceanRefinementChecks.Movie(output,args[Array.IndexOf(args,"--ocean-video")+1]); return 0; }

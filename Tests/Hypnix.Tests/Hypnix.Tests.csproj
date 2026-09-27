@@ -22,5 +22,6 @@
   <ItemGroup>
     <Using Include="System.IO" />
     <ProjectReference Include="..\..\AnimatedWallPaper.csproj" />
+    <None Include="../../docs/references/ocean/celestial-study/horizons-*-rise-2h.csv" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

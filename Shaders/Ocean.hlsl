@@ -1,3 +1,4 @@
+#include "OceanOptics.hlsl"
 // HYPNIX Ocean P3 lighting over the approved P2 surface; metres, seconds, Y up.
 // HDR linear scene -> bounded optical bloom -> one tone map -> one sRGB conversion.
 cbuffer OceanFrame : register(b0)
@@ -14,6 +15,16 @@ cbuffer OceanFrame : register(b0)
     float4 Bands[3];         // physical length, amplitude gain, unused
     float4 Refinement;       // enable, cloud cache interpolation, gibbous phase, bloom strength
     float4 ApparentBody;     // visual angular radius, lunar display contrast, unused
+    float4 Cycle;            // enabled, sky blend, aerosol, daylight
+    float4 SolarDisk;        // visual radius, refracted elevation, vertical compression
+    float4 LunarBody;        // airless direction, physical radius
+    float4 LunarRadiance;    // source radiance BEFORE atmosphere, phase normalization already applied
+    float4 LunarDisk;        // visual radius, refracted elevation, vertical compression, phase
+    float4 LunarLight;       // incident solar direction in the visible Moon basis
+    float4 LunarPrime;
+    float4 LunarEast;
+    float4 LunarNorth;
+    float4 CycleReserved;
 };
 Texture2D Scene : register(t0);
 Texture2D<float4> Displacements[3] : register(t1);
@@ -24,6 +35,7 @@ Texture2D<float4> MoonAlbedo : register(t11);
 Texture2D<float4> CloudPrevious : register(t12);
 Texture2D<float4> CloudNext : register(t13);
 Texture2D<float4> OpticalBloom : register(t14);
+Texture2D<float4> SkyNext : register(t15);
 SamplerState LinearClamp : register(s0);
 SamplerState SurfaceSampler : register(s1);
 SamplerState SkySampler : register(s2);
@@ -81,6 +93,7 @@ float3 EnvironmentFiltered(float3 direction, float lod)
     if (SkyTop.w > .5)
     {
         float3 sky=SkyEnvironment.SampleLevel(SkySampler,SkyUv(direction),lod).rgb;
+        if(Cycle.x>.5) sky=lerp(sky,SkyNext.SampleLevel(SkySampler,SkyUv(direction),lod).rgb,Cycle.y);
         if (Refinement.x>.5) { float4 cloud=CloudField(direction,lod); sky=sky*cloud.a+cloud.rgb; }
         return sky;
     }
@@ -93,12 +106,52 @@ float3 EnvironmentFiltered(float3 direction, float lod)
 }
 float3 Environment(float3 direction) { return EnvironmentFiltered(direction,0); }
 
+float3 BodyRight(float3 d) { return normalize(cross(abs(d.y)>.9999 ? float3(0,0,1) : float3(0,1,0),d)); }
+float3 ApparentDirection(float3 direction,float elevation)
+{
+    float2 horizontal=normalize(direction.xz+float2(0,.0000001));
+    return float3(horizontal.x*cos(elevation),sin(elevation),horizontal.y*cos(elevation));
+}
+float3 CycleMoonMaterial(float2 q,float radius,bool displayDetail)
+{
+    q*=min(1,.9999/max(length(q),.0001));
+    float3 normal=float3(q,sqrt(max(0,1-dot(q,q))));
+    float3 fixedNormal=float3(dot(normal,LunarPrime.xyz),dot(normal,LunarEast.xyz),dot(normal,LunarNorth.xyz));
+    float2 uv=float2(.5+atan2(fixedNormal.y,fixedNormal.x)/(2*PI),acos(clamp(fixedNormal.z,-1,1))/PI);
+    float lod=max(0,log2(2048*Resolution.w/(Resolution.y*radius*PI)));
+    float3 albedo=MoonAlbedo.SampleLevel(SkySampler,uv,lod).rgb/.32;
+    if(displayDetail) albedo=pow(max(albedo,.0001),ApparentBody.y);
+    float cosine=saturate(dot(normal,LunarLight.xyz));
+    float lighting=(1.6*cosine/max(cosine+normal.z,.00001)+.2*cosine)/.933333;
+    return albedo*lighting;
+}
+float3 CycleDisk(float3 ray,float3 direction,float4 disk,float3 radiance,bool moon)
+{
+    float3 centre=ApparentDirection(direction,disk.y), right=BodyRight(centre);
+    float2 q=float2(dot(ray,right),asin(clamp(ray.y,-1,1))-disk.y)/float2(disk.x,disk.x*disk.z);
+    float coverage=1-smoothstep(1-length(fwidth(q))*.5,1+length(fwidth(q))*.5,length(q));
+    // Only the visual disk is enlarged; its source energy and physical reflection radius stay independent.
+    coverage*=smoothstep(-.0001,.0001,ray.y)*step(0,dot(ray,centre));
+    if(coverage<=0) return 0;
+    float3 material=moon ? CycleMoonMaterial(q,disk.x,true) : (.4+.6*sqrt(saturate(1-dot(q,q))))/.8;
+    // Photographic highlight compression for resolved disks, never fed back into world lighting.
+    float target=moon ? 2.8 : 36;
+    float displayGain=min(1,target/max(max(radiance.r,max(radiance.g,radiance.b))*Radiance.w,.00001));
+    return radiance*displayGain*material*GroundTransmission(asin(clamp(ray.y,-1,1)),Cycle.z)*coverage*CelestialTransmission(ray);
+}
+
 float4 SkyPS(ScreenVertex input) : SV_Target
 {
     float2 xy = (input.uv * float2(2, -2) + float2(-1, 1)) * Resolution.w;
     xy.x *= Resolution.z;
     float3 ray = normalize(Forward() + float3(xy.x, 0, 0) + Up() * xy.y);
     float3 color = Environment(ray);
+    if(Cycle.x>.5)
+    {
+        color+=CycleDisk(ray,Light.xyz,SolarDisk,Radiance.rgb,false);
+        color+=CycleDisk(ray,LunarBody.xyz,LunarDisk,LunarRadiance.rgb,true);
+        return float4(color,1);
+    }
     float angle = acos(clamp(dot(ray, Light.xyz), -1, 1));
     float pixelAngle = max(length(fwidth(ray))*(Refinement.x>.5 ? .5 : 1), .0001);
     float disk = 1 - smoothstep(ApparentBody.x - pixelAngle, ApparentBody.x + pixelAngle, angle);
@@ -182,6 +235,25 @@ float SmithG1(float NoV, float alpha2)
 }
 float Fresnel(float cosine) { return .02037 + .97963 * pow(1 - saturate(cosine), 5); }
 
+float3 CycleDirect(float3 n,float3 v,float NoV,float alpha2,float4 body,float4 disk,float3 radiance,bool moon)
+{
+    if(disk.y+body.w*disk.z<=0) return 0;
+    float3 centre=ApparentDirection(body.xyz,disk.y), axisX=BodyRight(centre), axisY=cross(centre,axisX);
+    float3 direct=0;
+    [unroll] for(int j=0;j<8;j++)
+    {
+        float radius=sqrt((j+.5)/8), angle=j*2.39996323;
+        float2 q=radius*float2(cos(angle),sin(angle));
+        float3 l=normalize(centre+body.w*(axisX*q.x+axisY*q.y*disk.z));
+        float3 h=normalize(l+v);
+        float NoL=saturate(dot(n,l)), NoH=saturate(dot(n,h));
+        float3 profile=moon ? CycleMoonMaterial(q,body.w,false) : (.4+.6*sqrt(1-dot(q,q)))/.8;
+        direct+=Beckmann(NoH,alpha2)*SmithG1(NoV,alpha2)*SmithG1(NoL,alpha2)*Fresnel(dot(v,h))/(4*NoV)*profile*
+            CelestialTransmission(l)*GroundTransmission(asin(clamp(l.y,-1,1)),Cycle.z)*step(0,l.y);
+    }
+    return radiance*(PI*body.w*body.w*disk.z/8)*direct;
+}
+
 float4 WaterPS(WaterVertex input) : SV_Target
 {
     float2 dx = ddx(input.parameter), dy = ddy(input.parameter);
@@ -228,6 +300,13 @@ float4 WaterPS(WaterVertex input) : SV_Target
     float3 env = lerp(EnvironmentFiltered(reflected,envLod), Environment(float3(0, .35, 1)), saturate(alpha2 * 2));
     float3 color = Fresnel(NoV) * env + Water.rgb * (1 - Fresnel(NoV));
 
+    if(Cycle.x>.5)
+    {
+        color+=CycleDirect(n,v,NoV,alpha2,Light,SolarDisk,Radiance.rgb,false);
+        color+=CycleDirect(n,v,NoV,alpha2,LunarBody,LunarDisk,LunarRadiance.rgb,true);
+    }
+    else
+    {
     float3 axisX = normalize(cross(float3(0, 1, 0), Light.xyz));
     float3 axisY = cross(Light.xyz, axisX);
     float3 direct = 0;
@@ -247,6 +326,7 @@ float4 WaterPS(WaterVertex input) : SV_Target
         direct += D * G * Fresnel(dot(v, h)) / (4 * NoV) * profile * CelestialTransmission(l);
     }
     color += Radiance.rgb * (PI * Light.w * Light.w / 8) * direct;
+    }
     float distance = length(input.world - Camera.xyz);
     float fog = 1 - exp(-distance * .0007);
     color = lerp(color, Environment(normalize(input.world - Camera.xyz)), fog);

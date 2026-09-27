@@ -1,3 +1,4 @@
+#include "OceanOptics.hlsl"
 // Distant cloud shell, kilometres. Volume radiance + Beer-Lambert transmittance.
 // The angular cache deliberately omits positional parallax and local water shadows.
 cbuffer CloudFrame : register(b0)
@@ -7,6 +8,9 @@ cbuffer CloudFrame : register(b0)
     float4 Budget;
     float4 Wind;
     float4 AmbientEnergy;
+    float4 MoonDirection;
+    float4 MoonIrradiance;
+    float4 CycleAtmosphere;
 };
 RWTexture2D<float4> CloudOutput : register(u0);
 static const float PI = 3.14159265359;
@@ -75,6 +79,27 @@ void BuildClouds(uint3 id : SV_DispatchThreadID)
             float height=saturate((p.y+dot(p.xz,p.xz)/(2*6360.0)-1.2)/2);
             float3 ambient=AmbientEnergy.rgb * (.015+.040*height) * lerp(float3(.70,.82,1),float3(1,1,1),Wind.z);
             float3 sunlight=DirectEnergy.rgb * (.055+.07*phase) * (exp(-shadow*2.4)+.18*exp(-shadow*.4));
+            if(CycleAtmosphere.x>.5)
+            {
+                float3 position=p+float3(0,6360.0028,0);
+                float3 sunT=OpticalTransmission(position,Sun.xyz,CycleAtmosphere.y);
+                float3 moonT=OpticalTransmission(position,MoonDirection.xyz,CycleAtmosphere.y);
+                float moonShadow=0;
+                if(dot(moonT,MoonIrradiance.rgb)>.00000001)
+                {
+                    [loop] for(int s=0;s<(int)Budget.w;s++)
+                    {
+                        float a=.12*pow(2.0,s), b=.12*pow(2.0,s+1);
+                        moonShadow+=Density(p+MoonDirection.xyz*((a+b)*.5))*(b-a);
+                    }
+                }
+                float moonMu=dot(d,MoonDirection.xyz);
+                float moonPhase=(1-g*g)/pow(max(.03,1+g*g-2*g*moonMu),1.5);
+                sunlight*=sunT;
+                sunlight+=MoonIrradiance.rgb*moonT*(.055+.07*moonPhase)*(exp(-moonShadow*2.4)+.18*exp(-moonShadow*.4));
+                ambient=(AmbientEnergy.rgb*sunT+MoonIrradiance.rgb*moonT)*(.012+.035*height)*float3(.70,.82,1);
+                ambient+=AmbientEnergy.rgb*float3(.00015,.00025,.00045)*smoothstep(-.21,.025,Sun.y);
+            }
             float extinction=exp(-density*step*2.4);
             float haze=exp(-distance*.04);
             light+=T*(1-extinction)*(ambient+sunlight)*haze;

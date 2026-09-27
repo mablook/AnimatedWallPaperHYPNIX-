@@ -4,6 +4,8 @@ Data: **27/09/2026**. Base de código examinada: **`9d270a6`**, com água, mapa 
 
 Objetivo: tornar convincentes o nascer, a subida, a descida e o pôr dos astros, sobretudo nas primeiras duas horas, preservando o equilíbrio entre qualidade e consumo. O próximo ganho deve vir da relação entre **posição, atmosfera, textura, exposição e reflexo**, mantendo o campo de ondas aprovado.
 
+Implementação posterior autorizada pelo utilizador: [ciclo celeste — implementação e validação](OCEAN_CELESTIAL_CYCLE_IMPLEMENTATION.md). Este documento conserva a distinção entre proposta e evidência da pesquisa original; o registro posterior identifica o que foi implementado e seus limites.
+
 Os resultados abaixo distinguem **dados de fontes primárias**, **cálculos reproduzíveis**, **diagnóstico do código** e **propostas ainda não implementadas**. Nenhuma tabela de cor deste estudo é uma medição meteorológica do local do utilizador.
 
 ## 1. Decisões que a pesquisa sustenta

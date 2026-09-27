@@ -26,6 +26,9 @@ internal sealed class OceanClouds : IDisposable
     internal ID3D11Texture2D[] Textures { get; } = new ID3D11Texture2D[2];
     private readonly long[] _ticks = [long.MinValue, long.MinValue];
     private (OceanLighting, bool)? _key;
+    private OceanCelestialSettings? _cycleKey;
+    private DateTimeOffset? _cycleOrigin;
+    private float _cycleWaveSpeed;
     private int _first;
     public OceanQuality Quality { get; }
     public Profile Budget { get; }
@@ -40,8 +43,8 @@ internal sealed class OceanClouds : IDisposable
         _context = context; Quality = quality; Budget = For(quality);
         try
         {
-            _shader = Own(device.CreateComputeShader(Compiler.CompileFromFile(Path.Combine(AppContext.BaseDirectory, "Shaders", "OceanClouds.hlsl"), "BuildClouds", "cs_5_0").Span));
-            _constants = Own(device.CreateBuffer(80, BindFlags.ConstantBuffer, ResourceUsage.Dynamic, CpuAccessFlags.Write));
+            _shader = Own(device.CreateComputeShader(OceanShader.Compile(Path.Combine(AppContext.BaseDirectory, "Shaders", "OceanClouds.hlsl"), "BuildClouds", "cs_5_0").Span));
+            _constants = Own(device.CreateBuffer(128, BindFlags.ConstantBuffer, ResourceUsage.Dynamic, CpuAccessFlags.Write));
             for (var i = 0; i < 2; i++)
             {
                 Textures[i] = Own(device.CreateTexture2D(new Texture2DDescription(Format.R16G16B16A16_Float,
@@ -53,10 +56,14 @@ internal sealed class OceanClouds : IDisposable
         }
         catch { Dispose(); throw; }
     }
-    public void Update(double time, OceanSettings settings)
+    public void Update(double time, OceanSettings settings, OceanCelestialFrame? celestial = null)
     {
         var key = (settings.Lighting, settings.Lighting == OceanLighting.Moon && settings.GibbousMoon);
         if (_key != key) { _ticks[0] = _ticks[1] = long.MinValue; _key = key; }
+        var origin=celestial?.Utc.AddSeconds(-time*celestial.Settings.TimeScale/settings.Speed);
+        if(_cycleKey!=celestial?.Settings || (celestial is not null && _cycleWaveSpeed!=settings.Speed) ||
+            (origin.HasValue && (!_cycleOrigin.HasValue || Math.Abs((origin.Value-_cycleOrigin.Value).TotalSeconds)>.05)))
+        { _ticks[0]=_ticks[1]=long.MinValue; _cycleKey=celestial?.Settings; _cycleOrigin=origin; _cycleWaveSpeed=settings.Speed; }
         var frame = Math.Max(0, double.IsFinite(time) ? time : 0) * Budget.Hz;
         var tick = (long)Math.Floor(frame);
         Blend = (float)(frame - tick);
@@ -71,16 +78,27 @@ internal sealed class OceanClouds : IDisposable
         var energy = preset.Irradiance * phase;
         var transmission = OceanLightingModel.Transmittance(preset.Direction);
         var time = tick / Budget.Hz;
+        var celestial=_cycleKey is { } cycle && _cycleOrigin is { } epoch ?
+            OceanCelestialModel.Evaluate(epoch.AddSeconds(time*cycle.TimeScale/settings.Speed),cycle) : null;
         var mapped = _context.Map(_constants, 0, MapMode.WriteDiscard);
         try
         {
-            var data = new Span<Vector4>((void*)mapped.DataPointer, 5);
+            var data = new Span<Vector4>((void*)mapped.DataPointer, 8);
+            data.Slice(5).Clear();
             data[0] = new(preset.Direction, preset.CloudCover);
             data[1] = new(energy * transmission, preset.Night ? 1 : 0);
             data[2] = new(Budget.Width, Budget.Height, Budget.Steps, Budget.ShadowSteps);
             // Periodic noise lattice avoids precision loss and has no discontinuity at wrapping.
             data[3] = new((float)(time * .009 % 10240), (float)(time * .003 % 10240), settings.Lighting == OceanLighting.Overcast ? 1 : 0, 0);
             data[4] = new(energy, 0);
+            if(celestial is { } frame)
+            {
+                data[0]=new(frame.Sun.Direction,frame.CloudCover);
+                data[1]=new(frame.Sun.Irradiance,0); data[4]=new(frame.Sun.Irradiance,0);
+                data[5]=new(frame.Moon.Direction,0); data[6]=new(frame.Moon.Irradiance,0);
+                data[7]=new(1,OceanOpticalDepth.Aerosol(frame.Settings.Air),frame.Daylight,0);
+                data[3].Z=0;
+            }
         }
         finally { _context.Unmap(_constants, 0); }
         _context.CSSetShader(_shader); _context.CSSetConstantBuffer(0, _constants);

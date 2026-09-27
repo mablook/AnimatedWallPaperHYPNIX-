@@ -187,7 +187,7 @@ internal static class OceanRenderChecks
     }
     private static double Percentile(double[] sorted, double p) => sorted[(int)Math.Floor((sorted.Length - 1) * p)];
 
-    internal static void Benchmark(string output)
+    internal static void Benchmark(string output, OceanSettings? requestedSettings = null)
     {
         const int width=1920, height=1080;
         var hidden=CreateWindowEx(0,"STATIC","Ocean presentation benchmark",0x80000000,0,0,width,height,
@@ -198,7 +198,7 @@ internal static class OceanRenderChecks
             var cold=Stopwatch.StartNew();
             using var pacer=new OceanFramePacer();
             using var renderer=new OceanGpuRenderer(hidden,width,height);
-            var settings=new OceanSettings();
+            var settings=requestedSettings ?? new OceanSettings();
             renderer.Render(0,settings,true);
             var coldMs=cold.Elapsed.TotalMilliseconds;
             var context=renderer.Context;
@@ -233,9 +233,9 @@ internal static class OceanRenderChecks
                         if(previous>=0) intervals.Add(start-previous); previous=start;
                         Collect(); var sample=queries.FirstOrDefault(q=>!q.Pending);
                         if(sample is not null) { context.Begin(sample.Clock); context.End(sample.Begin); } else droppedQueries++;
-                        var builds=renderer.Clouds!.BuildCount;
+                        var builds=renderer.Clouds!.BuildCount+(renderer.CycleSky?.BuildCount ?? 0);
                         renderer.Render(30+run*120+start/1000,settings);
-                        if(sample is not null) { context.End(sample.End); context.End(sample.Clock); sample.Pending=true; cached[sample]=renderer.Clouds.BuildCount!=builds; }
+                        if(sample is not null) { context.End(sample.End); context.End(sample.Clock); sample.Pending=true; cached[sample]=renderer.Clouds.BuildCount+(renderer.CycleSky?.BuildCount ?? 0)!=builds; }
                         renderer.Present();
                         var elapsed=stopwatch.Elapsed.TotalMilliseconds-start; frameMs.Add(elapsed);
                         pacer.Wait(1000d/30-elapsed);
@@ -256,7 +256,7 @@ internal static class OceanRenderChecks
                         workingSetBytes=process.WorkingSet64,logicalTextureBytes=renderer.EstimatedTextureBytes };
                     all.Add(result);
                     File.WriteAllText(Path.Combine(output,"benchmark.json"),JsonSerializer.Serialize(new { renderer.AdapterName,width,height,
-                        quality="Balanced",targetFps=30,warmupSeconds=30,coldFirstPresentMs=coldMs,runs=all,
+                        quality="Balanced",settings.Celestial,targetFps=30,warmupSeconds=30,coldFirstPresentMs=coldMs,runs=all,
                         scope="Offscreen native rendering plus GPU readback/GDI into one hidden HWND. No visible UI/desktop compositor cost. GPU queries cover all passes including cloud refresh. Not energy/temperature measurement." },new JsonSerializerOptions { WriteIndented=true }));
                     Console.WriteLine($"Benchmark {run+1}/3: {result.fps:F2} FPS; GPU p95 {result.gpuP95Ms:F3} ms; cache max {result.updateGpuMaxMs:F2} ms; GDI frame p95 {result.frameWithGdiP95Ms:F2} ms.");
                     if(result.fps<28 || result.intervalP95Ms>40) throw new Exception("Ocean balanced benchmark missed the planned frame pacing budget.");
