@@ -5,6 +5,8 @@ Referência: [estudo de transporte, nuvens e neblina](OCEAN_VOLUMETRIC_ENVIRONME
 
 Revisão posterior: [correção da resposta rasante e acompanhamento dos reflexos solar/lunar](OCEAN_REFLECTION_TRACKING_FIX.md), com energia refletida compatível com a rugosidade e testes de projeção do reflexo ao longo do ciclo.
 
+Próximo plano, ainda não implementado: [movimento e evolução apenas das nuvens](OCEAN_CLOUD_MOTION_PLAN.md), preservando os controles existentes e os demais componentes do ambiente.
+
 ## Entrega
 
 A prévia nativa tem um novo caminho para atmosfera, nuvens, névoa e iluminação da água. O controle **Ambiente volumétrico** permite alternar com o renderer aprovado. A geometria, os espectros de ondas, os deslocamentos e o cálculo das normais continuam iguais. A aparência da água muda pela iluminação incidente, pelas sombras e pelo ar entre superfície e câmera.
