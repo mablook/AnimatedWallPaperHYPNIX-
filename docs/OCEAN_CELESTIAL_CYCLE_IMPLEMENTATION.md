@@ -2,6 +2,8 @@
 
 Implementação iniciada em 27/09/2026, validação concluída em 28/09/2026. Estudo preservado antes da implementação em **`8786419`**; renderer anteriormente aprovado em **`9d270a6`**. Referência: [estudo e dados astronômicos](OCEAN_CELESTIAL_CYCLE_STUDY.md).
 
+Próxima evolução pesquisada em 28/09/2026: [estudo e plano de nuvens, neblina e integração volumétrica](OCEAN_VOLUMETRIC_ENVIRONMENT_STUDY.md). O estudo não altera este renderer aprovado.
+
 ## Resultado
 
 A prévia nativa agora pode animar Sol e Lua simultaneamente, com trajetórias calculadas offline, tamanho por distância, refração, cor por transmissão atmosférica e transição contínua da iluminação. O campo de ondas, deslocamentos e normais aprovados continua igual para o mesmo instante da água.

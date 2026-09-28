@@ -4,6 +4,8 @@ Data: 2026-09-27. Revisão B, com atualizações após as prévias. **Água P2 a
 
 Prioridade confirmada pelo utilizador: **equilibrar realismo e consumo, com níveis de qualidade**.
 
+Atualização de 28/09/2026: ciclo solar/lunar e controles aprovados e salvos em `ed376a5`. A próxima proposta está no [estudo de nuvens, neblina e integração volumétrica](OCEAN_VOLUMETRIC_ENVIRONMENT_STUDY.md), com auditoria do estado atual, fontes, alternativas e critérios de validação. Trata-se de planejamento, ainda sem implementação.
+
 Este documento organiza o trabalho em curso e as etapas futuras. A [revisão técnica](OCEAN_TECHNICAL_REVIEW.md) especifica os requisitos de superfície, luz e estabilidade; a [pesquisa e o registo de decisões](OCEAN_RENDERING_RESEARCH.md) explicam as alternativas e fontes. Resoluções e orçamentos são hipóteses para medir, não benchmarks. DLSS 5 não é requisito; reconstrução de resolução é uma opção futura separada.
 
 ## 1. Resultado pretendido
