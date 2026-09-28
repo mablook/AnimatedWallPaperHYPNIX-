@@ -310,7 +310,7 @@ O último comando só incluirá Ocean depois de o integrar no runner. Se houver 
 
 ## 10. Próximo passo concreto
 
-**Atualização de 28/09/2026:** a apresentação e os controles públicos passam a seguir o [plano de experiência Oceano vivo](OCEAN_USER_EXPERIENCE_PLAN.md). O renderer já possui ciclo celestial e nuvens em movimento; a integração à biblioteca, sessão e página própria do HYPNIX continua como trabalho futuro. A seção histórica abaixo registra o estágio anterior da pesquisa.
+**Atualização de 28/09/2026:** a apresentação e os controles públicos passam a seguir o [plano de experiência Oceano vivo](OCEAN_USER_EXPERIENCE_PLAN.md). O renderer já possui ciclo celestial e nuvens em movimento; a integração à biblioteca, sessão e página própria foi implementada; ver [implementação e validação](OCEAN_USER_EXPERIENCE_IMPLEMENTATION.md). A seção histórica abaixo registra o estágio anterior da pesquisa.
 
 A animação atual pode ser aberta com `scripts/show-ocean-preview.ps1`. O feedback da [primeira revisão P3](OCEAN_P3_IMPLEMENTATION.md) orienta o [plano de realismo do céu](OCEAN_SKY_REALISM_PLAN.md): começar por exposição/brilho solar e material lunar, depois volume/iluminação das nuvens e movimento. A água, a melhoria das cores e o consumo confortável são referências a preservar. Esta última revisão é documental, sem nova implementação.
 

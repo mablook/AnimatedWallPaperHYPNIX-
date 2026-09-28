@@ -16,5 +16,6 @@ internal enum WallpaperKind
     FractalPyramid,
     Kaleidoscope,
     Lotus,
-    LivingFire
+    LivingFire,
+    Ocean
 }

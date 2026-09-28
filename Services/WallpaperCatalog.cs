@@ -7,7 +7,8 @@ internal sealed record WallpaperEntry(string Id, string Title, WallpaperKind Kin
     string? BackgroundPath = null, string? VideoPath = null, string? PackageDirectory = null,
     VisualizerPreferences? Defaults = null)
 {
-    public bool IsVisualizer => Kind is not (WallpaperKind.BuiltIn or WallpaperKind.ExampleVideo);
+    public bool IsEnvironment => Kind == WallpaperKind.Ocean;
+    public bool IsVisualizer => Kind is not (WallpaperKind.BuiltIn or WallpaperKind.ExampleVideo or WallpaperKind.Ocean);
     // A solid-color/image background composites behind every visualizer that renders emission over
     // black (the shader effects, screen-blended) and the classic GDI visualizer. The two Effekseer
     // fire effects and video (which is itself the background) opt out.
@@ -32,7 +33,7 @@ internal sealed record WallpaperEntry(string Id, string Title, WallpaperKind Kin
     // control effective.
     public bool SupportsGlow => IsVisualizer
         && Kind is not (WallpaperKind.AethelisFlameBurst or WallpaperKind.FlamethrowerRingV2);
-    public string Description => Kind == WallpaperKind.ExampleVideo ? "Local video · muted · fit per display" :
+    public string Description => IsEnvironment ? OceanText.T("3D environment · ocean, sky and day cycle") : Kind == WallpaperKind.ExampleVideo ? "Local video · muted · fit per display" :
         IsVisualizer ? "Audio reactive · system output" : "Native procedural wallpaper";
 }
 
@@ -57,7 +58,7 @@ internal static class WallpaperCatalog
                     !Enum.IsDefined(kind) || kind == WallpaperKind.VolumetricFire) continue;
                 if (json.TryGetProperty("hidden", out var hidden) && hidden.GetBoolean()) continue;
                 var folder = Path.GetDirectoryName(path)!;
-                entries.Add(new(json.GetProperty("id").GetString()!, json.GetProperty("title").GetString()!, kind,
+                entries.Add(new(json.GetProperty("id").GetString()!, kind == WallpaperKind.Ocean ? OceanText.T("Ocean alive") : json.GetProperty("title").GetString()!, kind,
                     Path.GetFullPath(Path.Combine(folder, json.GetProperty("preview").GetString()!)),
                     json.TryGetProperty("background", out var background) ? Path.Combine(folder, background.GetString()!) : null,
                     // Fire wallpapers default to the warm palette so palette tinting keeps the
@@ -92,6 +93,7 @@ internal static class WallpaperCatalog
             entry = FromPackage(WallpaperPackageValidator.Validate(entry.PackageDirectory));
         var preferences = settings.Visualizers.GetValueOrDefault(entry.Id) ?? entry.Defaults ?? new();
         return new(entry.Id, entry.Kind, settings.FramesPerSecond, entry.VideoPath,
-            settings.MediaToolsDirectory, entry.BackgroundPath, preferences.ToSettings());
+            settings.MediaToolsDirectory, entry.BackgroundPath, entry.IsEnvironment ? null : preferences.ToSettings(),
+            OceanPreferences:entry.IsEnvironment ? new OceanPreferences().Normalize() : null);
     }
 }

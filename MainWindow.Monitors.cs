@@ -24,7 +24,11 @@ public partial class MainWindow
             ?? _settings.Visualizers.GetValueOrDefault(entry.Id) ?? entry.Defaults ?? new();
 
     private WallpaperRequest RequestForDisplay(WallpaperEntry entry, string? deviceId)
-        => WallpaperCatalog.Request(entry, _settings) with { Settings = PreferencesForDisplay(entry, deviceId).ToSettings() };
+        => WallpaperCatalog.Request(entry, _settings) with
+        {
+            Settings = entry.IsEnvironment ? null : PreferencesForDisplay(entry, deviceId).ToSettings(),
+            OceanPreferences = entry.IsEnvironment ? OceanPreferencesFor(entry,deviceId) : null
+        };
 
     private void UpdateDisplaySelection()
     {
@@ -41,10 +45,14 @@ public partial class MainWindow
                 WallpaperGallery.SelectedItem = entry;
         }
         UpdateSelection(); UpdateStatus(); DrawMonitorMap();
+        BindOceanEditor();
     }
 
     private async void ApplyAll_Click(object sender, RoutedEventArgs e)
-        => await ApplyToDisplaysAsync(_getMonitorTargets(), copySelectedPreferences: true);
+    {
+        if(Selected?.IsEnvironment==true) await ApplyOceanAsync(true);
+        else await ApplyToDisplaysAsync(_getMonitorTargets(), copySelectedPreferences: true);
+    }
 
     private async Task ApplyToDisplaysAsync(IReadOnlyList<DesktopWorker.WallpaperTarget> targets, bool copySelectedPreferences = false)
     {

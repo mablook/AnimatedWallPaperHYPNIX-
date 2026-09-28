@@ -47,6 +47,7 @@
     </Grid>
    </Border>
    <Grid x:Name="WorkspacePages" Grid.Row="1">
+   <local:OceanEditorControl x:Name="OceanEditor" Visibility="Collapsed"/>
    <Grid x:Name="LibraryWorkspace">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid x:Name="DisplayTargetBar" Margin="0,0,0,20">

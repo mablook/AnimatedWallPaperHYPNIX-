@@ -23,12 +23,12 @@ internal sealed class WallpaperSession : IWallpaperSession
             _framesPerSecond = request.FramesPerSecond;
             _host = new NativeWallpaperHost(mode,
                 request.Preview is null && request.Target is null ? DesktopWorker.GetMonitorTargets() : null,
-                mode == NativeRenderMode.VisualizerDemo ? request.BackgroundPath : null, request.Preview, request.Target);
-            _usesAudio = mode != NativeRenderMode.Ambient;
+                mode == NativeRenderMode.VisualizerDemo ? request.BackgroundPath : null, request.Preview, request.Target, request.Ocean ?? (request.Kind == WallpaperKind.Ocean ? new OceanRuntime(request.OceanPreferences) : null));
+            _usesAudio = mode is not (NativeRenderMode.Ambient or NativeRenderMode.Ocean);
             if (_usesAudio) _audioSubscription = AudioSpectrumSource.Subscribe(_host.SubmitAudioBands);
             if (request.Preview is null)
                 DesktopWorker.AttachWallpaperWindow(_host.Handle, request.Target,
-                    useLayeredWindow: mode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire));
+                    useLayeredWindow: mode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire or NativeRenderMode.Ocean));
             _host.UpdateVisualizerSettings(request.Settings??VisualizerSettings.Default);
         }
         catch { Dispose(); throw; }
@@ -54,6 +54,7 @@ internal sealed class WallpaperSession : IWallpaperSession
     }
 
     public void Show() => _host.Show();
+    public void RefreshOcean() => _host.RefreshOcean();
     public void SetFrameCap(int framesPerSecond) => _host.SetFrameCap(framesPerSecond);
     public void Resume()
     {

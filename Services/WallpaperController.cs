@@ -22,6 +22,8 @@ internal sealed class WallpaperController : IDisposable
 
     public async Task StartAsync(WallpaperRequest request)
     {
+        if (request.Kind == WallpaperKind.Ocean && request.Ocean is null)
+            request = request with { Ocean = new OceanRuntime(request.OceanPreferences) };
         ObjectDisposedException.ThrowIf(_disposed, this);
         _pending?.Cancel();
         using var pending = new CancellationTokenSource();
@@ -100,6 +102,8 @@ internal sealed class WallpaperController : IDisposable
     {
         _session?.SetPausedMonitors(monitorIndices);
     }
+
+    public void RefreshOcean() => _session?.RefreshOcean();
 
     public void UpdateVisualizerSettings(VisualizerSettings settings)
     {

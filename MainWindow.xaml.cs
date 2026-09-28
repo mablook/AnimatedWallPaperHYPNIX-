@@ -83,6 +83,7 @@ public partial class MainWindow : Window
         AudioSpectrumSource.SetMicrophoneDevice(_settings.MicrophoneDeviceId);
         AudioSpectrumSource.SetSource(_settings.AudioSource);
         InitializeComponent();
+        InitializeOceanEditor();
         InitializeMonitorPreviews();
         InitializeTrayIcon();
         AppPauseModeComboBox.SelectedIndex = _settings.AppPauseMode;
@@ -174,7 +175,10 @@ public partial class MainWindow : Window
         _settings.SelectedWallpaperId = entry.Id;
         ActivePreviewTitle.Text = entry.Title;
         ActivePreviewSubtitle.Text = entry.Description;
-        VisualizerSettingsButton.Visibility = entry.IsVisualizer ? Visibility.Visible : Visibility.Collapsed;
+        VisualizerSettingsButton.Visibility = entry.IsVisualizer || entry.IsEnvironment ? Visibility.Visible : Visibility.Collapsed;
+        VisualizerSettingsButton.Content = entry.IsEnvironment ? OceanText.T("Customize ocean") : "Wallpaper settings";
+        System.Windows.Automation.AutomationProperties.SetName(VisualizerSettingsButton, entry.IsEnvironment ? OceanText.T("Customize ocean") : "Wallpaper settings");
+        VisualizerSettingsButton.ToolTip = entry.IsEnvironment ? OceanText.T("Customize ocean") : "Adjust sensitivity, intensity and appearance";
         if (_settingsWindow is not null)
         {
             if (entry.IsVisualizer)
@@ -209,6 +213,7 @@ public partial class MainWindow : Window
 
     private async Task StartSelectedAsync()
     {
+        if(Selected?.IsEnvironment==true){await ApplyOceanAsync(false);return;}
         if (SelectedDisplay is { } display) await ApplyToDisplaysAsync([display.Target]);
     }
 
@@ -625,6 +630,7 @@ public partial class MainWindow : Window
         LivePreview.SetFrameCap(_settings.FramesPerSecond);
         MultiPreview.SetFrameCap(_settings.FramesPerSecond);
         _settingsWindow?.SetFrameCap(_settings.FramesPerSecond);
+        OceanEditor.SetFrameCap(_settings.FramesPerSecond);
         QueueSave();
     }
     private int GetSelectedFps() => FpsComboBox.SelectedItem is ComboBoxItem item &&
@@ -668,14 +674,17 @@ public partial class MainWindow : Window
     }
     private void UpdatePreviewSuspension()
     {
-        var suspended = !_license.CanPlay || !IsVisible || WindowState == WindowState.Minimized || _environment.SessionLocked ||
+        var suspended = _changingWallpaper || !_license.CanPlay || !IsVisible || WindowState == WindowState.Minimized || _environment.SessionLocked ||
             PauseBatteryCheckBox.IsChecked == true && _foregroundMonitor.IsOnBattery;
         var editorVisible = _settingsWindow is { IsVisible: true, WindowState: not WindowState.Minimized };
-        var previewSuspended = suspended || _appSettingsOpen || PreviewPanel.Visibility != Visibility.Visible || editorVisible;
+        var previewSuspended = suspended || _appSettingsOpen || _oceanOpen || PreviewPanel.Visibility != Visibility.Visible || editorVisible;
         LivePreview.SetSuspended(previewSuspended || IsMultiPreview);
         MultiPreview.SetSuspended(previewSuspended || !IsMultiPreview);
         if (editorVisible) PreviewStatusText.Text = "Preview open in Customize";
         _settingsWindow?.SetPreviewSuspended(suspended);
+        OceanEditor.SetSuspended(suspended || !_oceanOpen || _appSettingsOpen || LicenseGateVisible,
+            _environment.SessionLocked ? OceanText.T("Preview paused while the session is locked.") :
+            PauseBatteryCheckBox.IsChecked == true && _foregroundMonitor.IsOnBattery ? OceanText.T("Preview paused while on battery.") : null);
     }
     private void UpdateStatus()
     {
@@ -692,13 +701,16 @@ public partial class MainWindow : Window
         ApplyAllButton.IsEnabled = StartButton.IsEnabled;
         ApplyAllButton.Visibility = TargetDisplayCombo.Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         StopDisplayButton.IsEnabled = active is not null && !_changingWallpaper && !_recovering && !_restoringDisplays;
-        StartButton.Content = SelectedDisplay is { } selectedDisplay ? $"Apply to display {selectedDisplay.Number}" : "Apply wallpaper";
+        StartButton.Content = _changingWallpaper && Selected?.IsEnvironment==true ? OceanText.T("Preparing ocean…") :
+            SelectedDisplay is { } selectedDisplay ? $"Apply to display {selectedDisplay.Number}" : "Apply wallpaper";
         ApplyTargetText.Text = SelectedDisplay is { } target ? $"Only display {target.Number} will change" : "Connect a display to apply";
+        OceanEditor.SetApplyState(_license.CanPlay&&SelectedDisplay is not null&&!_recovering&&!_restoringDisplays,_changingWallpaper);
         UpdatePreviewActions();
         UpdateMonitorPreviews();
     }
 
-    private void VisualizerSettingsButton_Click(object sender, RoutedEventArgs e) => OpenVisualizerSettingsWindow();
+    private void VisualizerSettingsButton_Click(object sender, RoutedEventArgs e)
+    { if(Selected?.IsEnvironment==true) OpenOceanEditor(); else OpenVisualizerSettingsWindow(); }
 
     private void OpenVisualizerSettingsWindow()
     {
@@ -839,6 +851,7 @@ public partial class MainWindow : Window
     private void SavePreferences()
     {
         _saveTimer.Stop();
+        CheckpointOceans();
         if (!_settingsStore.Save(_settings)) ErrorText.Text = "Preferences could not be saved. Open diagnostics for details.";
     }
 
@@ -980,6 +993,7 @@ public partial class MainWindow : Window
         _levelMeter.Dispose();
         _audioDevices.Dispose();
         LivePreview.Dispose();
+        OceanEditor.Dispose();
         MultiPreview.Dispose();
         _foregroundMonitor.Dispose();
         _wallpaperLibrary.Dispose();
@@ -1031,7 +1045,8 @@ public partial class MainWindow : Window
         LicenseBanner.Visibility = !_appSettingsOpen && _license.Snapshot.Kind is AppLicenseKind.Trial or AppLicenseKind.Checking
             ? Visibility.Visible : Visibility.Collapsed;
         if (IsMultiPreview && _previewRequested) mode = LibraryPreviewMode.Preview;
-        LibraryWorkspace.Visibility = _appSettingsOpen || LicenseGateVisible ? Visibility.Collapsed : Visibility.Visible;
+        LibraryWorkspace.Visibility = _appSettingsOpen || _oceanOpen || LicenseGateVisible ? Visibility.Collapsed : Visibility.Visible;
+        OceanEditor.Visibility = _oceanOpen && !_appSettingsOpen && !LicenseGateVisible ? Visibility.Visible : Visibility.Collapsed;
         AppSettingsPage.Visibility = _appSettingsOpen && !LicenseGateVisible ? Visibility.Visible : Visibility.Collapsed;
         LicenseGatePage.Visibility = LicenseGateVisible ? Visibility.Visible : Visibility.Collapsed;
         LibraryPanel.Visibility = mode == LibraryPreviewMode.Preview ? Visibility.Collapsed : Visibility.Visible;
@@ -1048,6 +1063,7 @@ public partial class MainWindow : Window
     }
     private void Preview_Click(object sender, RoutedEventArgs e)
     {
+        if(Selected?.IsEnvironment==true && !IsMultiPreview){OpenOceanEditor();return;}
         _previewRequested = true; _settings.PreviewPaneCollapsed = false; QueueSave(); UpdateLayoutMode();
     }
     private void ClosePreview_Click(object sender, RoutedEventArgs e)
@@ -1058,7 +1074,7 @@ public partial class MainWindow : Window
         _previewRequested = false; QueueSave(); UpdateLayoutMode();
     }
     private void AppSettings_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = true; UpdateLayoutMode(); UpdateMicrophoneMeter(); }
-    private void BackToLibrary_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = false; if (IsMultiPreview) PreviewModeCombo.SelectedIndex = 0; _previewRequested = false; UpdateLayoutMode(); UpdateMicrophoneMeter(); }
+    private void BackToLibrary_Click(object sender, RoutedEventArgs e) { _appSettingsOpen = false; _oceanOpen=false; if (IsMultiPreview) PreviewModeCombo.SelectedIndex = 0; _previewRequested = false; UpdateLayoutMode(); UpdateMicrophoneMeter(); }
     private void PreviewDisplay_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isUiInitialized || _syncingDisplaySelection) return;

@@ -42,6 +42,7 @@ internal sealed class DisplayWallpaperSettings
     public string WallpaperId { get; set; } = "built-in-ambient";
     public bool Enabled { get; set; }
     public Dictionary<string, VisualizerPreferences> Visualizers { get; set; } = [];
+    public Dictionary<string, OceanPreferences> Oceans { get; set; } = [];
 }
 
 internal sealed record LocalVideo(string Id, string Path, string Title);
@@ -123,6 +124,9 @@ internal sealed class AppSettingsStore(string? filePath = null)
                 if (string.IsNullOrWhiteSpace(displaySettings.WallpaperId))
                     displaySettings.WallpaperId = "built-in-ambient";
                 displaySettings.Visualizers = NormalizeVisualizers(displaySettings.Visualizers);
+                displaySettings.Oceans = (displaySettings.Oceans ?? [])
+                    .Where(item => !string.IsNullOrWhiteSpace(item.Key) && item.Value is not null)
+                    .ToDictionary(item => item.Key, item => item.Value.Normalize(), StringComparer.Ordinal);
                 // Device IDs survive reconnects and may differ only in casing. Keep saved
                 // assignments even when that display is absent from the current desktop.
                 displayWallpapers[deviceId] = displaySettings;

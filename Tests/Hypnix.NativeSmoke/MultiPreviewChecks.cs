@@ -342,7 +342,7 @@ internal static class MultiPreviewChecks
         using var file = File.Create(Path.Combine(output, name + ".png")); encoder.Save(file);
     }
     private static WallpaperController PreviewController(WallpaperPreviewControl preview)
-        => (WallpaperController)typeof(WallpaperPreviewControl).GetField("_controller", PrivateInstance)!.GetValue(preview)!;
+        => preview.NativeController!;
     private static uint PresentCount(NativeWallpaperHost host)
     {
         var renderer = typeof(NativeWallpaperHost).GetField("_aethelisGpuRenderer", PrivateInstance)!.GetValue(host);

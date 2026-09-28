@@ -24,7 +24,8 @@ internal enum NativeRenderMode
     FractalPyramid,
     Kaleidoscope,
     Lotus,
-    LivingFire
+    LivingFire,
+    Ocean
 }
 
 internal sealed partial class NativeWallpaperHost : IDisposable
@@ -103,6 +104,9 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private volatile bool _paused;
     private AethelisGpuRenderer? _aethelisGpuRenderer;
     private FireGpuRenderer? _fireGpuRenderer;
+    private OceanGpuRenderer? _oceanRenderer;
+    private readonly OceanRuntime? _ocean;
+    private int _oceanRenderMs;
     private long _fireAudioReceived;
     private volatile bool _isShown;
     private int _repaintRequested;
@@ -120,9 +124,10 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     private static bool _windowClassRegistered;
 
     public NativeWallpaperHost(NativeRenderMode renderMode, DesktopWorker.WallpaperTarget[]? renderTargets = null,
-        string? customBackground = null, PreviewTarget? preview = null, DesktopWorker.WallpaperTarget? target = null)
+        string? customBackground = null, PreviewTarget? preview = null, DesktopWorker.WallpaperTarget? target = null, OceanRuntime? ocean = null)
     {
         _renderMode = renderMode;
+        _ocean = renderMode == NativeRenderMode.Ocean ? ocean ?? new OceanRuntime() : null;
         _isDesktopSurface = preview is null;
         var geometry = WallpaperRenderGeometry.Resolve(renderTargets, preview, target);
         _renderTargets = geometry.RenderTargets;
@@ -142,7 +147,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
         EnsureWindowClassRegistered();
         var extendedStyle = WsExNoActivate | WsExToolWindow | WsExTransparent;
-        if (preview is null && renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire)) extendedStyle |= WsExLayered;
+        if (preview is null && renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire or NativeRenderMode.Ocean)) extendedStyle |= WsExLayered;
         Handle = CreateWindowEx(
             extendedStyle,
             WindowClassName,
@@ -163,7 +168,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         }
 
         Marshal.SetLastPInvokeError(0);
-        var alphaResult = preview is not null || renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire ||
+        var alphaResult = preview is not null || renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire or NativeRenderMode.Ocean ||
                           SetLayeredWindowAttributes(Handle, 0, 255, LwaAlpha);
         AppLog.Write($"Native host created. Handle=0x{Handle.ToInt64():X}; alphaResult={alphaResult}; " +
                      $"error={Marshal.GetLastPInvokeError()}");
@@ -180,6 +185,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         catch (Exception exception)
         {
             _failed = true;
+            _ocean?.SetPaused(this, true);
             AppLog.WriteException("Wallpaper renderer failed", exception);
         }
     }
@@ -201,13 +207,18 @@ internal sealed partial class NativeWallpaperHost : IDisposable
 
     private void InitializeGpuRenderer()
     {
-        if (_renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire))
+        if (_renderMode is not (NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire or NativeRenderMode.Ocean))
             return;
         if (!GetClientRect(Handle, out var client))
             throw new InvalidOperationException("Could not read the Direct3D wallpaper client size.");
         if (_renderMode==NativeRenderMode.LivingFire)
         {
             _fireGpuRenderer=new FireGpuRenderer(Handle,client.Right-client.Left,client.Bottom-client.Top,preview:!_isDesktopSurface);
+            return;
+        }
+        if (_renderMode == NativeRenderMode.Ocean)
+        {
+            _oceanRenderer = new OceanGpuRenderer(Handle,client.Right-client.Left,client.Bottom-client.Top,preview:!_isDesktopSurface);
             return;
         }
         var shader = _renderMode switch
@@ -235,7 +246,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     public void Start(int framesPerSecond, bool reveal = true)
     {
         var worker = CreateRenderWorker(framesPerSecond);
-        try { worker.Start(TimeSpan.FromSeconds(15)); }
+        try { worker.Start(TimeSpan.FromSeconds(_renderMode == NativeRenderMode.Ocean ? 45 : 15)); }
         catch
         {
             _failed = true;
@@ -252,7 +263,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     public async Task StartAsync(int framesPerSecond, bool reveal = true, CancellationToken token = default)
     {
         var worker = CreateRenderWorker(framesPerSecond);
-        try { await worker.StartAsync(TimeSpan.FromSeconds(15), token); }
+        try { await worker.StartAsync(TimeSpan.FromSeconds(_renderMode == NativeRenderMode.Ocean ? 45 : 15), token); }
         catch
         {
             _failed = true;
@@ -268,7 +279,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         if (_renderWorker is not null) throw new InvalidOperationException("Native host already started.");
         SetFrameCap(framesPerSecond);
         return _renderWorker = new WallpaperRenderWorker(PrepareFirstFrame, SafeRenderFrame,
-            () => _isShown && !_paused && !_failed ? Volatile.Read(ref _frameIntervalMs) : Timeout.Infinite,
+            () => _isShown && !_paused && !_failed
+                ? Math.Max(1, Volatile.Read(ref _frameIntervalMs) - (_ocean is null ? 0 : _oceanRenderMs)) : Timeout.Infinite,
             ReleaseRenderResources);
     }
 
@@ -279,6 +291,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
             const int showNoActivate = 8;
             ShowWindow(Handle, showNoActivate);
             _isShown = true;
+            _ocean?.Activate(this, _paused);
             AppLog.Write("Native host revealed after first frame was ready");
         }
 
@@ -291,6 +304,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     public void Pause()
     {
         _paused = true;
+        _ocean?.SetPaused(this, true);
         _clock.Stop();
         _renderWorker?.Signal(); // let the loop observe the state change and park
     }
@@ -298,6 +312,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
     public void Resume()
     {
         _paused = false;
+        _ocean?.SetPaused(this, false);
         _clock.Start();
         _renderWorker?.Signal(); // resume the loop and render immediately
     }
@@ -375,6 +390,12 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         _renderWorker?.Signal(); // render the updated settings on the render thread
     }
 
+    public void RefreshOcean()
+    {
+        Interlocked.Exchange(ref _repaintRequested, 1);
+        _renderWorker?.Signal();
+    }
+
     private void RenderFrame()
     {
         var repaintRequested = Interlocked.Exchange(ref _repaintRequested, 0) != 0;
@@ -390,6 +411,16 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         {
             return;
         }
+        if (_oceanRenderer is not null)
+        {
+            var started = Stopwatch.GetTimestamp();
+            var (oceanFrame, settings) = _ocean!.Frame();
+            _oceanRenderer.Render(oceanFrame.WaterTime, settings, present:true, celestialUtc:oceanFrame.SkyUtc,
+                weatherTime:oceanFrame.WeatherTime, cloudTrajectory:oceanFrame.Clouds);
+            _oceanRenderMs = (int)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            Interlocked.Increment(ref _presentedFrameCount);
+            return;
+        }
         if (_fireGpuRenderer is not null)
         {
             RenderFireGpuFrame(width,height,paused);
@@ -400,7 +431,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         // Direct3D owns the complete frame for both Aethelis modes. Rendering it
         // here avoids the old nested monitor loop (GDI monitor -> all GPU monitors),
         // which updated active effects on displays that were meant to stay frozen.
-        if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire) &&
+        if ((_renderMode is NativeRenderMode.AethelisVisualizer or NativeRenderMode.AethelisFlameBurst or NativeRenderMode.FlamethrowerRingV2 or NativeRenderMode.VolumetricFire or NativeRenderMode.SpectralBloom or NativeRenderMode.NeonRibbons or NativeRenderMode.LiquidOrbs or NativeRenderMode.EventHorizon or NativeRenderMode.FractalPyramid or NativeRenderMode.Kaleidoscope or NativeRenderMode.Lotus or NativeRenderMode.LivingFire or NativeRenderMode.Ocean) &&
             _aethelisGpuRenderer is not null)
         {
             RenderAethelisGpuFrame(width, height, paused);
@@ -1036,7 +1067,8 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         GC.SuppressFinalize(this);
         if (_disposed) return;
         _disposed = true;
-        var joined = _renderWorker is null || _renderWorker.Stop(TimeSpan.FromSeconds(5));
+        _ocean?.Release(this);
+        var joined = _renderWorker is null || _renderWorker.Stop(TimeSpan.FromSeconds(_ocean is null ? 5 : 0));
         var handle = Handle;
         if (_renderWorker is null) ReleaseRenderResources();
         if (joined) DestroyHostWindow(handle);
@@ -1059,6 +1091,7 @@ internal sealed partial class NativeWallpaperHost : IDisposable
         _visualizerBackground?.Dispose();
         _aethelisGpuRenderer?.Dispose();
         _fireGpuRenderer?.Dispose();
+        _oceanRenderer?.Dispose();
         ReleaseVideoBitmaps();
         ReleaseGdiCache();
     }

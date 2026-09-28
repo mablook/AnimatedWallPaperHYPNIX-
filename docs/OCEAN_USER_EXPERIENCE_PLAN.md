@@ -1,6 +1,8 @@
 # Oceano vivo — experiência e controles no HYPNIX
 
-28/09/2026 · Proposta de produto, ainda não implementada. Base técnica inspecionada: `56db826`, branch `codex/ocean-and-day-cycle`.
+28/09/2026 · Plano original de produto; implementação registrada na atualização abaixo. Base técnica inspecionada: `56db826`, branch `codex/ocean-and-day-cycle`.
+
+**Atualização de 28/09/2026:** integração implementada; ver [arquitetura, correções de prévia e validação](OCEAN_USER_EXPERIENCE_IMPLEMENTATION.md). A aceitação visual é manual. A implementação atual compõe a prévia Ocean no WPF, sem HWND, substituindo a recomendação inicial de prévia nativa.
 
 ## 1. Decisão recomendada
 

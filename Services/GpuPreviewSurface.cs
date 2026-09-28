@@ -71,6 +71,22 @@ internal sealed partial class GpuPreviewSurface : IDisposable
         finally { _context.Unmap(_staging, 0); }
     }
 
+    // WPF owns presentation and clipping. Reuse staging and the caller's buffer on every frame.
+    internal void CopyPixels(byte[] destination)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (destination.Length != checked(_width * _height * 4))
+            throw new ArgumentException("Incorrect preview buffer size.", nameof(destination));
+        _context.CopyResource(_staging, Target);
+        var mapped = _context.Map(_staging, 0, MapMode.Read);
+        try
+        {
+            for (var y = 0; y < _height; y++)
+                Marshal.Copy(mapped.DataPointer + y * (int)mapped.RowPitch, destination, y * _width * 4, _width * 4);
+        }
+        finally { _context.Unmap(_staging, 0); }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

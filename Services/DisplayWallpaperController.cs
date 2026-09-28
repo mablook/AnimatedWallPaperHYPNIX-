@@ -83,6 +83,8 @@ internal sealed class DisplayWallpaperController : IDisposable
             if (topologyVersion.HasValue && display.Pending is not null) return;
             previousPending = display.Pending;
             display.Pending = pending;
+            if (request.Kind == WallpaperKind.Ocean && request.Ocean is null)
+                request = request with { Ocean = new OceanRuntime(request.OceanPreferences) };
             request = request with { Target = target, FramesPerSecond = _frameCap ?? request.FramesPerSecond };
             display.PendingRequest = request;
         }

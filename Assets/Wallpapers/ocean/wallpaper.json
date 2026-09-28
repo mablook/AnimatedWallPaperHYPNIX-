@@ -1,0 +1,15 @@
+{
+  "id": "ocean",
+  "title": "Ocean alive",
+  "type": "native-environment",
+  "renderer": "ocean-direct3d11",
+  "preview": "preview.png",
+  "previewKind": "captured-preview",
+  "audio": "none",
+  "multiMonitor": "independent",
+  "kind": "Ocean",
+  "author": "Marcelo Bossle",
+  "copyright": "Copyright (c) 2026 Marcelo Bossle. Todos os direitos reservados.",
+  "license": "LicenseRef-HYPNIX-Proprietary",
+  "previewCapture": { "width": 960, "height": 540, "source": "OceanGpuRenderer, curated product moments" }
+}

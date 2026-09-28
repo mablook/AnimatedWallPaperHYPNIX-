@@ -1,0 +1,270 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <data name="1 hour" xml:space="preserve">
+    <value>1 hour</value>
+  </data>
+  <data name="10 minutes" xml:space="preserve">
+    <value>10 minutes</value>
+  </data>
+  <data name="2 hours" xml:space="preserve">
+    <value>2 hours</value>
+  </data>
+  <data name="20 minutes" xml:space="preserve">
+    <value>20 minutes</value>
+  </data>
+  <data name="3D environment · ocean, sky and day cycle" xml:space="preserve">
+    <value>3D environment · ocean, sky and day cycle</value>
+  </data>
+  <data name="A day lasts" xml:space="preserve">
+    <value>A day lasts</value>
+  </data>
+  <data name="Apply to all displays" xml:space="preserve">
+    <value>Apply to all displays</value>
+  </data>
+  <data name="Apply to {0}" xml:space="preserve">
+    <value>Apply to {0}</value>
+  </data>
+  <data name="Applying…" xml:space="preserve">
+    <value>Applying…</value>
+  </data>
+  <data name="Back to library" xml:space="preserve">
+    <value>Back to library</value>
+  </data>
+  <data name="Balance between detail and consumption." xml:space="preserve">
+    <value>Balance between detail and consumption.</value>
+  </data>
+  <data name="Balanced — recommended" xml:space="preserve">
+    <value>Balanced — recommended</value>
+  </data>
+  <data name="Calm" xml:space="preserve">
+    <value>Calm</value>
+  </data>
+  <data name="Changes are in the preview only. Apply when ready." xml:space="preserve">
+    <value>Changes are in the preview only. Apply when ready.</value>
+  </data>
+  <data name="Changes only the motion of the water." xml:space="preserve">
+    <value>Changes only the motion of the water.</value>
+  </data>
+  <data name="Cloud amount" xml:space="preserve">
+    <value>Cloud amount</value>
+  </data>
+  <data name="Cloud shape" xml:space="preserve">
+    <value>Cloud shape</value>
+  </data>
+  <data name="Clouds" xml:space="preserve">
+    <value>Clouds</value>
+  </data>
+  <data name="Connect a display to apply." xml:space="preserve">
+    <value>Connect a display to apply.</value>
+  </data>
+  <data name="Current moment" xml:space="preserve">
+    <value>Current moment</value>
+  </data>
+  <data name="Customize ocean" xml:space="preserve">
+    <value>Customize ocean</value>
+  </data>
+  <data name="Dawn" xml:space="preserve">
+    <value>Dawn</value>
+  </data>
+  <data name="Day" xml:space="preserve">
+    <value>Day</value>
+  </data>
+  <data name="Day cycle" xml:space="preserve">
+    <value>Day cycle</value>
+  </data>
+  <data name="Discard changes" xml:space="preserve">
+    <value>Discard changes</value>
+  </data>
+  <data name="Display {0}" xml:space="preserve">
+    <value>Display {0}</value>
+  </data>
+  <data name="Economy" xml:space="preserve">
+    <value>Economy</value>
+  </data>
+  <data name="Emphasize horizon sun and moon" xml:space="preserve">
+    <value>Emphasize horizon sun and moon</value>
+  </data>
+  <data name="Fast" xml:space="preserve">
+    <value>Fast</value>
+  </data>
+  <data name="HYPNIX limit: {0} FPS" xml:space="preserve">
+    <value>HYPNIX limit: {0} FPS</value>
+  </data>
+  <data name="High" xml:space="preserve">
+    <value>High</value>
+  </data>
+  <data name="In groups" xml:space="preserve">
+    <value>In groups</value>
+  </data>
+  <data name="In layers" xml:space="preserve">
+    <value>In layers</value>
+  </data>
+  <data name="Increase the amount to see clouds." xml:space="preserve">
+    <value>Increase the amount to see clouds.</value>
+  </data>
+  <data name="Keep this moment" xml:space="preserve">
+    <value>Keep this moment</value>
+  </data>
+  <data name="Live preview" xml:space="preserve">
+    <value>Live preview</value>
+  </data>
+  <data name="Low mist" xml:space="preserve">
+    <value>Low mist</value>
+  </data>
+  <data name="Lower consumption, with less detail." xml:space="preserve">
+    <value>Lower consumption, with less detail.</value>
+  </data>
+  <data name="Many" xml:space="preserve">
+    <value>Many</value>
+  </data>
+  <data name="Mist" xml:space="preserve">
+    <value>Mist</value>
+  </data>
+  <data name="Mist banks" xml:space="preserve">
+    <value>Mist banks</value>
+  </data>
+  <data name="Moderate" xml:space="preserve">
+    <value>Moderate</value>
+  </data>
+  <data name="Moment" xml:space="preserve">
+    <value>Moment</value>
+  </data>
+  <data name="Moonlight" xml:space="preserve">
+    <value>Moonlight</value>
+  </data>
+  <data name="More adjustments" xml:space="preserve">
+    <value>More adjustments</value>
+  </data>
+  <data name="More detail; requires more GPU power." xml:space="preserve">
+    <value>More detail; requires more GPU power.</value>
+  </data>
+  <data name="Natural" xml:space="preserve">
+    <value>Natural</value>
+  </data>
+  <data name="No mist" xml:space="preserve">
+    <value>No mist</value>
+  </data>
+  <data name="No wind" xml:space="preserve">
+    <value>No wind</value>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="Ocean alive" xml:space="preserve">
+    <value>Ocean alive</value>
+  </data>
+  <data name="Ocean applied." xml:space="preserve">
+    <value>Ocean applied.</value>
+  </data>
+  <data name="Ocean could not be applied. Your previous wallpaper was kept." xml:space="preserve">
+    <value>Ocean could not be applied. Your previous wallpaper was kept.</value>
+  </data>
+  <data name="Pause preview" xml:space="preserve">
+    <value>Pause preview</value>
+  </data>
+  <data name="Playback and power settings" xml:space="preserve">
+    <value>Playback and power settings</value>
+  </data>
+  <data name="Preparing ocean…" xml:space="preserve">
+    <value>Preparing ocean…</value>
+  </data>
+  <data name="Preparing the ocean. Your current wallpaper is kept until it is ready." xml:space="preserve">
+    <value>Preparing the ocean. Your current wallpaper is kept until it is ready.</value>
+  </data>
+  <data name="Preview only · your desktop changes when you apply." xml:space="preserve">
+    <value>Preview only · your desktop changes when you apply.</value>
+  </data>
+  <data name="Preview paused" xml:space="preserve">
+    <value>Preview paused</value>
+  </data>
+  <data name="Preview paused while on battery." xml:space="preserve">
+    <value>Preview paused while on battery.</value>
+  </data>
+  <data name="Preview paused while the session is locked." xml:space="preserve">
+    <value>Preview paused while the session is locked.</value>
+  </data>
+  <data name="Preview unavailable. Reopen the ocean to retry." xml:space="preserve">
+    <value>Preview unavailable. Reopen the ocean to retry.</value>
+  </data>
+  <data name="Puffy" xml:space="preserve">
+    <value>Puffy</value>
+  </data>
+  <data name="Quality" xml:space="preserve">
+    <value>Quality</value>
+  </data>
+  <data name="Resume preview" xml:space="preserve">
+    <value>Resume preview</value>
+  </data>
+  <data name="Rough" xml:space="preserve">
+    <value>Rough</value>
+  </data>
+  <data name="Sea" xml:space="preserve">
+    <value>Sea</value>
+  </data>
+  <data name="Sea haze" xml:space="preserve">
+    <value>Sea haze</value>
+  </data>
+  <data name="Sea only" xml:space="preserve">
+    <value>Sea only</value>
+  </data>
+  <data name="Slow" xml:space="preserve">
+    <value>Slow</value>
+  </data>
+  <data name="Soft light glow" xml:space="preserve">
+    <value>Soft light glow</value>
+  </data>
+  <data name="Start with" xml:space="preserve">
+    <value>Start with</value>
+  </data>
+  <data name="Strong" xml:space="preserve">
+    <value>Strong</value>
+  </data>
+  <data name="Sun and moon follow their paths. Water and clouds keep their own pace." xml:space="preserve">
+    <value>Sun and moon follow their paths. Water and clouds keep their own pace.</value>
+  </data>
+  <data name="Sunset" xml:space="preserve">
+    <value>Sunset</value>
+  </data>
+  <data name="The sky stays at this moment. Water and clouds keep moving." xml:space="preserve">
+    <value>The sky stays at this moment. Water and clouds keep moving.</value>
+  </data>
+  <data name="Time" xml:space="preserve">
+    <value>Time</value>
+  </data>
+  <data name="View" xml:space="preserve">
+    <value>View</value>
+  </data>
+  <data name="Visible coverage also depends on the shape and view." xml:space="preserve">
+    <value>Visible coverage also depends on the shape and view.</value>
+  </data>
+  <data name="Wave motion" xml:space="preserve">
+    <value>Wave motion</value>
+  </data>
+  <data name="Wind" xml:space="preserve">
+    <value>Wind</value>
+  </data>
+  <data name="Wind changes gradually. Clouds slowly change shape even without wind." xml:space="preserve">
+    <value>Wind changes gradually. Clouds slowly change shape even without wind.</value>
+  </data>
+  <data name="With horizon" xml:space="preserve">
+    <value>With horizon</value>
+  </data>
+  <data name="Your ocean" xml:space="preserve">
+    <value>Your ocean</value>
+  </data>
+  <data name="display" xml:space="preserve">
+    <value>display</value>
+  </data>
+  <data name="Try again" xml:space="preserve">
+    <value>Try again</value>
+  </data>
+  <data name="Some displays could not be updated. Successful displays kept the new ocean." xml:space="preserve">
+    <value>Some displays could not be updated. Successful displays kept the new ocean.</value>
+  </data>
+</root>

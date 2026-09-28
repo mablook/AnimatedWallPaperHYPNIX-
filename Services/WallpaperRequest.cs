@@ -3,7 +3,8 @@ namespace AnimatedWallPaper.Services;
 internal sealed record WallpaperRequest(string Id, WallpaperKind Kind, int FramesPerSecond = 30,
     string? VideoPath = null, string? MediaToolsDirectory = null, string? BackgroundPath = null,
     VisualizerSettings? Settings = null, PreviewTarget? Preview = null,
-    DesktopWorker.WallpaperTarget? Target = null);
+    DesktopWorker.WallpaperTarget? Target = null, OceanPreferences? OceanPreferences = null,
+    OceanRuntime? Ocean = null);
 
 internal sealed record PreviewTarget(IntPtr Parent, int Width, int Height);
 
@@ -37,6 +38,7 @@ internal static class WallpaperSessionFactory
 
     public static NativeRenderMode RenderMode(WallpaperKind kind) => kind switch
     {
+        WallpaperKind.Ocean => NativeRenderMode.Ocean,
         WallpaperKind.VisualizerDemo => NativeRenderMode.VisualizerDemo,
         WallpaperKind.AethelisVisualizer => NativeRenderMode.AethelisVisualizer,
         WallpaperKind.AethelisFlameBurst => NativeRenderMode.AethelisFlameBurst,

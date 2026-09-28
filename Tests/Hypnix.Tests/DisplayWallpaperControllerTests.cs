@@ -13,6 +13,20 @@ public sealed class DisplayWallpaperControllerTests
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     [Fact]
+    public async Task FirstOceanApplyRevealsOnReadinessWithoutASecondSelection()
+    {
+        var ready=Pending();var session=new FakeSession();var calls=0;
+        using var controller=new DisplayWallpaperController((request,_)=>
+        {
+            calls++;Assert.Equal(WallpaperKind.Ocean,request.Kind);Assert.NotNull(request.Ocean);return ready.Task;
+        });
+        var application=controller.StartAsync(new("ocean",WallpaperKind.Ocean),Left);
+        Assert.False(application.IsCompleted);Assert.Empty(controller.ActiveRequests);Assert.False(session.Shown);
+        ready.SetResult(session);await application;
+        Assert.Equal(1,calls);Assert.True(session.Shown);Assert.Equal("ocean",controller.ActiveRequests[Left.DeviceId].Id);
+    }
+
+    [Fact]
     public async Task ApplyingAndReplacingOneDisplayPreservesOtherDisplay()
     {
         var made = new List<FakeSession>();

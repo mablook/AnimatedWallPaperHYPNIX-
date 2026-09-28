@@ -11,4 +11,5 @@ internal interface IWallpaperSession : IDisposable
     void SetPausedMonitors(IReadOnlyList<int> monitorIndices);
     void UpdateVisualizerSettings(VisualizerSettings settings);
     void SetAudioEnabled(bool enabled);
+    void RefreshOcean() { }
 }

@@ -127,8 +127,7 @@ internal static class DisplayDesktopChecks
         void CheckLivePreview(string wallpaper)
         {
             var preview = Control<WallpaperPreviewControl>(window!, "LivePreview");
-            var previewController = (WallpaperController)typeof(WallpaperPreviewControl)
-                .GetField("_controller", PrivateInstance)!.GetValue(preview)!;
+            var previewController = preview.NativeController!;
             WaitUntil(() => preview.IsVisible && previewController.IsHealthy &&
                 previewController.ActiveRequest?.Id == wallpaper, window!, wallpaper + " live preview");
             var session = (IWallpaperSession)typeof(WallpaperController).GetField("_session", PrivateInstance)!
@@ -243,8 +242,7 @@ internal static class DisplayDesktopChecks
 
             Control<ComboBox>(window, "PreviewModeCombo").SelectedIndex = 1;
             var previews = Control<AnimatedWallPaper.Controls.MonitorPreviewGrid>(window, "MultiPreview");
-            WallpaperController PreviewController(WallpaperPreviewControl preview) => (WallpaperController)typeof(WallpaperPreviewControl)
-                .GetField("_controller", PrivateInstance)!.GetValue(preview)!;
+            WallpaperController PreviewController(WallpaperPreviewControl preview) => preview.NativeController!;
             WaitUntil(() => previews.Previews.Count == 2 && previews.Previews.All(preview =>
                 preview.IsVisible && PreviewController(preview).IsHealthy), window, "Both connected monitor previews");
             var previewHosts = previews.Previews.Select(preview =>

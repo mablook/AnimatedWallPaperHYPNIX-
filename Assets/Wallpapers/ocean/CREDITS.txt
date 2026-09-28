@@ -1,0 +1,9 @@
+HYPNIX Ocean alive
+Native procedural ocean, sky, atmosphere and cloud rendering.
+Copyright (c) 2026 Marcelo Bossle. All rights reserved.
+Application code and original rendering: LicenseRef-HYPNIX-Proprietary.
+
+The real lunar albedo asset and its source attribution are distributed separately
+under Assets/Effects/Ocean; see that directory's credits and source records.
+Astronomy calculations use Astronomy Engine (CosineKitty), distributed under MIT.
+Product thumbnails are captured from OceanGpuRenderer; no stock photographs.
