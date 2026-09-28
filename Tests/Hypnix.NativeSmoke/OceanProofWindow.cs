@@ -61,6 +61,14 @@ internal static class OceanProofWindow
         var cycleSpeed = Choice(["Céu em tempo real", "Dia em 2 horas", "Dia em 1 hora", "Dia em 20 min", "Dia em 10 min"],2,155);
         var composition = Choice(["Enquadramento cinema", "Vista geográfica"],0,175);
         var air = Choice(["Ar limpo", "Ar marítimo", "Névoa"],1,125);
+        var volumetric = new Forms.CheckBox { Text="Ambiente volumétrico",Checked=true,AutoSize=true,Margin=new Forms.Padding(6,6,6,0) };
+        toolbar.Controls.Add(volumetric);
+        var cloudType=Choice(["Estratocúmulos", "Cúmulos", "Estratos"],0,145);
+        var fogType=Choice(["Sem neblina", "Bruma marítima", "Névoa baixa", "Bancos de neblina"],1,160);
+        var coverage=Choice(["Sem nuvens", "Nuvens 25%", "Nuvens 48%", "Nuvens 75%", "Nuvens 95%"],1,140);
+        var wind=Choice(["Vento parado", "Vento 9 m/s", "Vento 18 m/s"],1,140);
+        hints.SetToolTip(volumetric,"Novo transporte do ar, nuvens e sombras. Desligue para comparar com a versão aprovada. Requer Ciclo do céu e Céu refinado.");
+        hints.SetToolTip(coverage,"Parâmetro de cobertura do campo de nuvens; não é previsão meteorológica nem porcentagem medida da imagem.");
         var date = new Forms.DateTimePicker { Format = Forms.DateTimePickerFormat.Custom, CustomFormat = "yyyy-MM-dd HH:mm 'UTC'", Width=185,
             MinDate = new DateTime(1900,1,1), MaxDate = new DateTime(2100,12,31), Value = OceanCelestialSettings.Default.EpochUtc.UtcDateTime };
         toolbar.Controls.Add(date);
@@ -84,6 +92,7 @@ internal static class OceanProofWindow
 
         var gate = new object();
         var clock = new OceanFrameClock();
+        var weatherClock = new OceanFrameClock();
         var celestialClock = new OceanCelestialClock(OceanCelestialSettings.Default.EpochUtc);
         var wall = Stopwatch.StartNew();
         var settings = new OceanSettings(Lighting: startMoon ? OceanLighting.Moon : OceanLighting.Sunset, Celestial: OceanCelestialSettings.Default);
@@ -108,7 +117,7 @@ internal static class OceanProofWindow
             {
                 var now=wall.Elapsed.TotalSeconds;
                 var paused=userPaused || rebuilding || form.WindowState==Forms.FormWindowState.Minimized;
-                clock.SetPaused(paused,now); celestialClock.SetPaused(paused,now);
+                clock.SetPaused(paused,now); celestialClock.SetPaused(paused,now); weatherClock.SetPaused(paused,now);
             }
             worker?.Signal();
         }
@@ -124,8 +133,12 @@ internal static class OceanProofWindow
                     rate, (OceanQuality)quality.SelectedIndex, view.SelectedIndex == 0, (OceanSurface)model.SelectedIndex,
                     atmosphere.SelectedIndex != 2, atmosphere.SelectedIndex == 0, phase.SelectedIndex == 1, bloom.Checked, magnification.Checked,
                     cycleEnabled.Checked ? new OceanCelestialSettings(new DateTimeOffset(DateTime.SpecifyKind(date.Value,DateTimeKind.Utc)),skyRate,
-                        (double)latitude.Value,(double)longitude.Value,(double)heading.Value,composition.SelectedIndex==0 ? OceanSkyComposition.Cinematic : OceanSkyComposition.Geographic,(OceanAir)air.SelectedIndex) : null);
+                        (double)latitude.Value,(double)longitude.Value,(double)heading.Value,composition.SelectedIndex==0 ? OceanSkyComposition.Cinematic : OceanSkyComposition.Geographic,(OceanAir)air.SelectedIndex) : null,
+                    volumetric.Checked && cycleEnabled.Checked && atmosphere.SelectedIndex==0 ? new OceanWeatherSettings(
+                        (OceanCloudType)cloudType.SelectedIndex,(OceanFog)fogType.SelectedIndex,
+                        coverage.SelectedIndex switch {0=>0,1=>.25f,3=>.75f,4=>.95f,_=>.48f},wind.SelectedIndex*9) : null);
                 light.Enabled=phase.Enabled=!cycleEnabled.Checked;
+                cloudType.Enabled=fogType.Enabled=coverage.Enabled=wind.Enabled=settings.Weather is not null;
             }
             worker?.Signal();
         }
@@ -152,15 +165,15 @@ internal static class OceanProofWindow
                 void Draw()
                 {
                     var started = Stopwatch.GetTimestamp();
-                    double time; DateTimeOffset celestialUtc; OceanSettings snapshot; bool save;
+                    double time,weatherTime; DateTimeOffset celestialUtc; OceanSettings snapshot; bool save;
                     lock (gate)
                     {
                         var now=wall.Elapsed.TotalSeconds;
-                        time = clock.Advance(now); celestialUtc=celestialClock.Advance(now);
+                        time = clock.Advance(now); celestialUtc=celestialClock.Advance(now); weatherTime=weatherClock.Advance(now);
                         snapshot = settings;
                         save = captureRequested; captureRequested = false;
                     }
-                    renderer!.Render(time, snapshot, present: true, celestialUtc: celestialUtc);
+                    renderer!.Render(time, snapshot, present: true, celestialUtc: celestialUtc,weatherTime:weatherTime);
                     if (save) OceanRenderChecks.Save(renderer.Pixels(),
                         Path.Combine(output, $"ocean-{DateTime.Now:yyyyMMdd-HHmmss-fff}.png"), width, height);
                     Interlocked.Increment(ref frameCount);
@@ -177,7 +190,7 @@ internal static class OceanProofWindow
                     pacer.Wait(1000d / 30 - frameCost);
                     return 0;
                 }, () => { renderer?.Dispose(); renderer = null; });
-                await worker.StartAsync(TimeSpan.FromSeconds(15));
+                await worker.StartAsync(TimeSpan.FromSeconds(45));
                 if (closing) { await StopAsync(); return; }
                 rebuilding = false; failure = ""; UpdatePause();
             }
@@ -191,7 +204,8 @@ internal static class OceanProofWindow
             finally { serial.Release(); }
         }
 
-        foreach (var combo in new[] { light, sea, quality, view, speed, model, atmosphere, phase, cycleSpeed, composition, air }) combo.SelectedIndexChanged += (_, _) => UpdateSettings();
+        foreach (var combo in new[] { light, sea, quality, view, speed, model, atmosphere, phase, cycleSpeed, composition, air,cloudType,fogType,coverage,wind }) combo.SelectedIndexChanged += (_, _) => UpdateSettings();
+        volumetric.CheckedChanged+=(_,_)=>UpdateSettings();
         foreach(var input in new[] { latitude,longitude,heading }) input.ValueChanged+=(_,_)=>UpdateSettings();
         cycleEnabled.CheckedChanged+=(_,_)=>UpdateSettings();
         date.ValueChanged+=(_,_)=>
@@ -267,7 +281,10 @@ internal static class OceanProofWindow
                 if (step == 5) { composition.SelectedIndex=0; air.SelectedIndex=1; cycleSpeed.SelectedIndex=2; capture.PerformClick(); }
                 if (step == 6) { showSun.PerformClick(); cycleEnabled.Checked=false; }
                 if (step == 7) { showMoon.PerformClick(); if(!cycleEnabled.Checked || eventChoice.SelectedIndex!=2) throw new InvalidOperationException("Moon shortcut did not enable the lunar cycle view."); }
-                if (step++ == 8) { checkTimer.Stop(); form.Close(); }
+                if (step == 8) { volumetric.Checked=false; }
+                if (step == 9) { volumetric.Checked=true; fogType.SelectedIndex=3; cloudType.SelectedIndex=1; }
+                if (step == 10) { fogType.SelectedIndex=1; cloudType.SelectedIndex=0; capture.PerformClick(); }
+                if (step++ == 11) { checkTimer.Stop(); form.Close(); }
             };
             form.Shown += (_, _) => checkTimer.Start();
         }

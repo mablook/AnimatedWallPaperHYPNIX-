@@ -4,6 +4,8 @@ Implementação iniciada em 27/09/2026, validação concluída em 28/09/2026. Es
 
 Próxima evolução pesquisada em 28/09/2026: [estudo e plano de nuvens, neblina e integração volumétrica](OCEAN_VOLUMETRIC_ENVIRONMENT_STUDY.md). O estudo não altera este renderer aprovado.
 
+Implementação posterior: [ambiente volumétrico com comparação A/B](OCEAN_VOLUMETRIC_ENVIRONMENT_IMPLEMENTATION.md).
+
 ## Resultado
 
 A prévia nativa agora pode animar Sol e Lua simultaneamente, com trajetórias calculadas offline, tamanho por distância, refração, cor por transmissão atmosférica e transição contínua da iluminação. O campo de ondas, deslocamentos e normais aprovados continua igual para o mesmo instante da água.

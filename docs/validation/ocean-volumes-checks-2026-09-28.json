@@ -1,0 +1,35 @@
+{
+  "AdapterName": "NVIDIA GeForce RTX 5070 Ti",
+  "gpuAnalyticTransport": true,
+  "preservedWater": true,
+  "pause": true,
+  "seek": true,
+  "recreation": true,
+  "stagedCacheDeterministic": true,
+  "independentWind": true,
+  "finiteHdr": true,
+  "transmissionBounds": true,
+  "formats": [
+    {
+      "width": 1080,
+      "height": 1920,
+      "InternalWidth": 1080,
+      "InternalHeight": 1920,
+      "EstimatedTextureBytes": 155456112
+    },
+    {
+      "width": 3440,
+      "height": 1440,
+      "InternalWidth": 2225,
+      "InternalHeight": 931,
+      "EstimatedTextureBytes": 178473508
+    },
+    {
+      "width": 3840,
+      "height": 2160,
+      "InternalWidth": 1920,
+      "InternalHeight": 1080,
+      "EstimatedTextureBytes": 205222512
+    }
+  ]
+}

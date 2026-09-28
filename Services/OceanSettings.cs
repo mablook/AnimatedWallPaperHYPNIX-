@@ -17,7 +17,8 @@ internal sealed record OceanSettings(
     bool GibbousMoon = false,
     bool Bloom = true,
     bool HorizonMagnification = true,
-    OceanCelestialSettings? Celestial = null)
+    OceanCelestialSettings? Celestial = null,
+    OceanWeatherSettings? Weather = null)
 {
     public OceanSettings Normalize() => this with
     {
@@ -26,7 +27,8 @@ internal sealed record OceanSettings(
         Surface = Enum.IsDefined(Surface) ? Surface : OceanSurface.Spectral,
         Agitation = float.IsFinite(Agitation) ? Math.Clamp(Agitation, 0, 1) : 0.65f,
         Speed = float.IsFinite(Speed) ? Math.Clamp(Speed, 0.25f, 1.5f) : 1,
-        Celestial = Celestial?.Normalize()
+        Celestial = Celestial?.Normalize(),
+        Weather = Weather?.Normalize()
     };
 
     public (int Width, int Height) InternalSize(int width, int height)

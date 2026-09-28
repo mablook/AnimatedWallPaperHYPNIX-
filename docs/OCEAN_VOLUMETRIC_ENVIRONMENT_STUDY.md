@@ -2,6 +2,8 @@
 
 Data: **28/09/2026**. Base auditada: **`ed376a5`**, branch `codex/ocean-and-day-cycle`. Escopo desta entrega: **pesquisa, auditoria e plano; nenhuma alteração ao renderizador**. Preferência mantida: equilibrar realismo e consumo, com níveis de qualidade.
 
+Seguimento após autorização: [primeira implementação, validação e limites](OCEAN_VOLUMETRIC_ENVIRONMENT_IMPLEMENTATION.md). Este estudo permanece como registro das hipóteses e metas anteriores à implementação.
+
 ## 1. Decisão recomendada
 
 O próximo ganho de realismo deve vir da **coerência da luz entre céu, nuvens, ar e água**, seguido da morfologia e iluminação das nuvens. A base já possui densidade volumétrica 3D; aumentar resolução ou passos isoladamente não resolve as aproximações de composição.

@@ -187,7 +187,7 @@ internal static class OceanRenderChecks
     }
     private static double Percentile(double[] sorted, double p) => sorted[(int)Math.Floor((sorted.Length - 1) * p)];
 
-    internal static void Benchmark(string output, OceanSettings? requestedSettings = null)
+    internal static void Benchmark(string output, OceanSettings? requestedSettings = null, bool quick = false)
     {
         const int width=1920, height=1080;
         var hidden=CreateWindowEx(0,"STATIC","Ocean presentation benchmark",0x80000000,0,0,width,height,
@@ -208,8 +208,11 @@ internal static class OceanRenderChecks
             try
             {
                 var warm=Stopwatch.StartNew();
-                while(warm.Elapsed.TotalSeconds<30) { var start=Stopwatch.GetTimestamp(); renderer.Render(warm.Elapsed.TotalSeconds,settings,true); pacer.Wait(1000d/30-Stopwatch.GetElapsedTime(start).TotalMilliseconds); }
-                for(var run=0;run<3;run++)
+                var warmupSeconds=quick ? 2 : 30;
+                var runSeconds=quick ? 8 : 120;
+                var runCount=quick ? 1 : 3;
+                while(warm.Elapsed.TotalSeconds<warmupSeconds) { var start=Stopwatch.GetTimestamp(); renderer.Render(warm.Elapsed.TotalSeconds,settings,true); pacer.Wait(1000d/30-Stopwatch.GetElapsedTime(start).TotalMilliseconds); }
+                for(var run=0;run<runCount;run++)
                 {
                     var frameMs=new List<double>(); var intervals=new List<double>();
                     var gpu=new List<double>(); var updates=new List<double>();
@@ -227,15 +230,15 @@ internal static class OceanRenderChecks
                             sample.Pending=false;
                         }
                     }
-                    while(stopwatch.Elapsed.TotalSeconds<120)
+                    while(stopwatch.Elapsed.TotalSeconds<runSeconds)
                     {
                         var start=stopwatch.Elapsed.TotalMilliseconds;
                         if(previous>=0) intervals.Add(start-previous); previous=start;
                         Collect(); var sample=queries.FirstOrDefault(q=>!q.Pending);
                         if(sample is not null) { context.Begin(sample.Clock); context.End(sample.Begin); } else droppedQueries++;
-                        var builds=renderer.Clouds!.BuildCount+(renderer.CycleSky?.BuildCount ?? 0);
-                        renderer.Render(30+run*120+start/1000,settings);
-                        if(sample is not null) { context.End(sample.End); context.End(sample.Clock); sample.Pending=true; cached[sample]=renderer.Clouds.BuildCount+(renderer.CycleSky?.BuildCount ?? 0)!=builds; }
+                        var builds=(renderer.Clouds?.BuildCount ?? 0)+(renderer.CycleSky?.BuildCount ?? 0)+(renderer.Volumes?.WorkCount ?? 0);
+                        renderer.Render(warmupSeconds+run*runSeconds+start/1000,settings);
+                        if(sample is not null) { context.End(sample.End); context.End(sample.Clock); sample.Pending=true; cached[sample]=(renderer.Clouds?.BuildCount ?? 0)+(renderer.CycleSky?.BuildCount ?? 0)+(renderer.Volumes?.WorkCount ?? 0)!=builds; }
                         renderer.Present();
                         var elapsed=stopwatch.Elapsed.TotalMilliseconds-start; frameMs.Add(elapsed);
                         pacer.Wait(1000d/30-elapsed);
@@ -256,9 +259,9 @@ internal static class OceanRenderChecks
                         workingSetBytes=process.WorkingSet64,logicalTextureBytes=renderer.EstimatedTextureBytes };
                     all.Add(result);
                     File.WriteAllText(Path.Combine(output,"benchmark.json"),JsonSerializer.Serialize(new { renderer.AdapterName,width,height,
-                        quality="Balanced",settings.Celestial,targetFps=30,warmupSeconds=30,coldFirstPresentMs=coldMs,runs=all,
+                        quality="Balanced",settings.Celestial,settings.Weather,targetFps=30,warmupSeconds,coldFirstPresentMs=coldMs,runs=all,
                         scope="Offscreen native rendering plus GPU readback/GDI into one hidden HWND. No visible UI/desktop compositor cost. GPU queries cover all passes including cloud refresh. Not energy/temperature measurement." },new JsonSerializerOptions { WriteIndented=true }));
-                    Console.WriteLine($"Benchmark {run+1}/3: {result.fps:F2} FPS; GPU p95 {result.gpuP95Ms:F3} ms; cache max {result.updateGpuMaxMs:F2} ms; GDI frame p95 {result.frameWithGdiP95Ms:F2} ms.");
+                    Console.WriteLine($"Benchmark {run+1}/{runCount}: {result.fps:F2} FPS; GPU p95 {result.gpuP95Ms:F3} ms; cache max {result.updateGpuMaxMs:F2} ms; GDI frame p95 {result.frameWithGdiP95Ms:F2} ms.");
                     if(result.fps<28 || result.intervalP95Ms>40) throw new Exception("Ocean balanced benchmark missed the planned frame pacing budget.");
                 }
             }

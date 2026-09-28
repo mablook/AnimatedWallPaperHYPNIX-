@@ -25,6 +25,8 @@ cbuffer OceanFrame : register(b0)
     float4 LunarEast;
     float4 LunarNorth;
     float4 CycleReserved;
+    float4 VolumeState;      // enabled, snapshot blend, unused
+    float4 VolumeGrid;       // aerial extent km, shadow half extent km, shadow height km, shadow grid size
 };
 Texture2D Scene : register(t0);
 Texture2D<float4> Displacements[3] : register(t1);
@@ -58,6 +60,7 @@ float2 SkyUv(float3 direction)
     float angle=asin(clamp(direction.y,-1,1));
     return float2(atan2(direction.x,direction.z)/(2*PI)+.5,.5-.5*sign(angle)*sqrt(abs(angle)/(PI*.5)));
 }
+#include "OceanVolumeSampling.hlsl"
 float4 CloudField(float3 direction, float lod)
 {
     float2 uv=SkyUv(direction);
@@ -65,6 +68,7 @@ float4 CloudField(float3 direction, float lod)
 }
 float CelestialTransmission(float3 direction)
 {
+    if (VolumeState.x>.5) return VolumeEnvironment(direction,0).a;
     if (Refinement.x>.5) return CloudField(direction,0).a;
     return SkyTop.w > .5 ? SkyEnvironment.SampleLevel(SkySampler,SkyUv(Light.xyz),0).a : 1;
 }
@@ -90,6 +94,7 @@ float3 MoonMaterial(float3 direction, float radius, bool displayDetail)
 // The distributed environment deliberately excludes the solar/lunar disk.
 float3 EnvironmentFiltered(float3 direction, float lod)
 {
+    if (VolumeState.x>.5) return VolumeEnvironment(direction,lod).rgb;
     if (SkyTop.w > .5)
     {
         float3 sky=SkyEnvironment.SampleLevel(SkySampler,SkyUv(direction),lod).rgb;
@@ -235,7 +240,7 @@ float SmithG1(float NoV, float alpha2)
 }
 float Fresnel(float cosine) { return .02037 + .97963 * pow(1 - saturate(cosine), 5); }
 
-float3 CycleDirect(float3 n,float3 v,float NoV,float alpha2,float4 body,float4 disk,float3 radiance,bool moon)
+float3 CycleDirect(float3 n,float3 v,float NoV,float alpha2,float4 body,float4 disk,float3 radiance,bool moon,float spatialTransmission)
 {
     if(disk.y+body.w*disk.z<=0) return 0;
     float3 centre=ApparentDirection(body.xyz,disk.y), axisX=BodyRight(centre), axisY=cross(centre,axisX);
@@ -249,7 +254,7 @@ float3 CycleDirect(float3 n,float3 v,float NoV,float alpha2,float4 body,float4 d
         float NoL=saturate(dot(n,l)), NoH=saturate(dot(n,h));
         float3 profile=moon ? CycleMoonMaterial(q,body.w,false) : (.4+.6*sqrt(1-dot(q,q)))/.8;
         direct+=Beckmann(NoH,alpha2)*SmithG1(NoV,alpha2)*SmithG1(NoL,alpha2)*Fresnel(dot(v,h))/(4*NoV)*profile*
-            CelestialTransmission(l)*GroundTransmission(asin(clamp(l.y,-1,1)),Cycle.z)*step(0,l.y);
+            (VolumeState.x>.5 ? spatialTransmission : CelestialTransmission(l))*GroundTransmission(asin(clamp(l.y,-1,1)),Cycle.z)*step(0,l.y);
     }
     return radiance*(PI*body.w*body.w*disk.z/8)*direct;
 }
@@ -298,12 +303,14 @@ float4 WaterPS(WaterVertex input) : SV_Target
     float3 reflected = reflect(-v, n);
     float envLod=Refinement.x>.5 ? clamp(log2(max(length(fwidth(reflected)),sqrt(alpha2)*.18)*256),0,6) : 0;
     float3 env = lerp(EnvironmentFiltered(reflected,envLod), Environment(float3(0, .35, 1)), saturate(alpha2 * 2));
+    if(VolumeState.x>.5) env=lerp(VolumeIncident(reflected,input.world,envLod),VolumeIncident(float3(0,.35,1),input.world,2),saturate(alpha2*2));
     float3 color = Fresnel(NoV) * env + Water.rgb * (1 - Fresnel(NoV));
 
     if(Cycle.x>.5)
     {
-        color+=CycleDirect(n,v,NoV,alpha2,Light,SolarDisk,Radiance.rgb,false);
-        color+=CycleDirect(n,v,NoV,alpha2,LunarBody,LunarDisk,LunarRadiance.rgb,true);
+        float2 shadow=VolumeState.x>.5 ? VolumeLightAt(input.world) : 1;
+        color+=CycleDirect(n,v,NoV,alpha2,Light,SolarDisk,Radiance.rgb,false,shadow.x);
+        color+=CycleDirect(n,v,NoV,alpha2,LunarBody,LunarDisk,LunarRadiance.rgb,true,shadow.y);
     }
     else
     {
@@ -327,9 +334,13 @@ float4 WaterPS(WaterVertex input) : SV_Target
     }
     color += Radiance.rgb * (PI * Light.w * Light.w / 8) * direct;
     }
-    float distance = length(input.world - Camera.xyz);
-    float fog = 1 - exp(-distance * .0007);
-    color = lerp(color, Environment(normalize(input.world - Camera.xyz)), fog);
+    if(VolumeState.x>.5) color=VolumeAerial(color,input.world);
+    else
+    {
+        float distance = length(input.world - Camera.xyz);
+        float fog = 1 - exp(-distance * .0007);
+        color = lerp(color, Environment(normalize(input.world - Camera.xyz)), fog);
+    }
     return float4(max(color, 0), 1);
 }
 

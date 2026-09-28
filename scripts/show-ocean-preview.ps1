@@ -11,6 +11,8 @@ try {
     if ($Validate) {
         dotnet $oceanRunner $oceanOutput --ocean-only
         if ($LASTEXITCODE -ne 0) { throw 'Ocean native validation failed.' }
+        dotnet $oceanRunner (Join-Path $oceanOutput 'volumes') --ocean-volumes
+        if ($LASTEXITCODE -ne 0) { throw 'Ocean volumetric validation failed.' }
     }
     # A WinExe preview has no console to hide. It is an explicitly interactive window.
     Start-Process -FilePath (Join-Path $oceanBin 'Hypnix.NativeSmoke.exe') -ArgumentList @(('"{0}"' -f $oceanOutput), '--show-ocean') -WorkingDirectory $oceanRoot -WindowStyle Normal

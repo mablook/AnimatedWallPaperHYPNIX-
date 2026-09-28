@@ -103,6 +103,7 @@ Implementation details and validation: [visual settings](docs/VISUAL_SETTINGS_DE
 [Living Fire](docs/LIVING_FIRE.md), and [regression guide](docs/TESTING_AND_REGRESSION_GUIDE.md).
 
 Experimental real-time ocean: [spectral surface and comparison preview](docs/OCEAN_P2_IMPLEMENTATION.md),
+[volumetric clouds, fog and spatial lighting](docs/OCEAN_VOLUMETRIC_ENVIRONMENT_IMPLEMENTATION.md),
 [atmosphere, sun/moon and lighting comparison](docs/OCEAN_P3_IMPLEMENTATION.md),
 [next realism plan for sun, moon and clouds](docs/OCEAN_SKY_REALISM_PLAN.md),
 [first native animation](docs/OCEAN_P1_IMPLEMENTATION.md),
