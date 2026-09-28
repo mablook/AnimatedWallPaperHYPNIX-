@@ -40,10 +40,13 @@ internal static class OceanProofWindow
         var showSun = new Forms.Button { Text = "Ver Sol", Width = 95, Height = 30 };
         var showMoon = new Forms.Button { Text = "Ver Lua", Width = 95, Height = 30 };
         toolbar.Controls.Add(showSun); toolbar.Controls.Add(showMoon);
+        var advanceHour = new Forms.Button { Text = "Avançar 1 h", Width = 115, Height = 30 };
+        toolbar.Controls.Add(advanceHour);
         var light = Choice(["Pôr do sol", "Dia", "Lua", "Nublado"], startMoon ? 2 : 0, 125);
         using var hints = new Forms.ToolTip();
         hints.SetToolTip(showSun, "Ir ao nascer do Sol, com o astro visível sobre o horizonte.");
         hints.SetToolTip(showMoon, "Ir ao nascer da Lua, com sua fase real na data selecionada.");
+        hints.SetToolTip(advanceHour,"Avançar uma hora no céu para comparar a posição dos astros e dos reflexos.");
         hints.SetToolTip(light, "Presets fixos: disponíveis quando o Ciclo do céu está desligado.");
         var sea = Choice(["Mar calmo", "Mar moderado", "Mar agitado"], 1, 145);
         var quality = Choice(["Leve", "Equilibrado", "Alto"], 1, 130);
@@ -138,6 +141,7 @@ internal static class OceanProofWindow
                         (OceanCloudType)cloudType.SelectedIndex,(OceanFog)fogType.SelectedIndex,
                         coverage.SelectedIndex switch {0=>0,1=>.25f,3=>.75f,4=>.95f,_=>.48f},wind.SelectedIndex*9) : null);
                 light.Enabled=phase.Enabled=!cycleEnabled.Checked;
+                advanceHour.Enabled=cycleEnabled.Checked;
                 cloudType.Enabled=fogType.Enabled=coverage.Enabled=wind.Enabled=settings.Weather is not null;
             }
             worker?.Signal();
@@ -214,6 +218,12 @@ internal static class OceanProofWindow
             UpdateSettings();
         };
         nowButton.Click+=(_,_)=>date.Value=DateTime.UtcNow;
+        advanceHour.Click+=(_,_)=>
+        {
+            DateTimeOffset instant; lock(gate) instant=celestialClock.Advance(wall.Elapsed.TotalSeconds);
+            var next=instant.AddHours(1).UtcDateTime;
+            date.Value=next>date.MaxDate ? date.MaxDate : next<date.MinDate ? date.MinDate : next;
+        };
         void ShowBody(bool moon)
         {
             cycleEnabled.Checked=true;
@@ -283,7 +293,7 @@ internal static class OceanProofWindow
                 if (step == 7) { showMoon.PerformClick(); if(!cycleEnabled.Checked || eventChoice.SelectedIndex!=2) throw new InvalidOperationException("Moon shortcut did not enable the lunar cycle view."); }
                 if (step == 8) { volumetric.Checked=false; }
                 if (step == 9) { volumetric.Checked=true; fogType.SelectedIndex=3; cloudType.SelectedIndex=1; }
-                if (step == 10) { fogType.SelectedIndex=1; cloudType.SelectedIndex=0; capture.PerformClick(); }
+                if (step == 10) { fogType.SelectedIndex=1; cloudType.SelectedIndex=0; advanceHour.PerformClick(); capture.PerformClick(); }
                 if (step++ == 11) { checkTimer.Stop(); form.Close(); }
             };
             form.Shown += (_, _) => checkTimer.Start();

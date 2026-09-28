@@ -1,0 +1,52 @@
+{
+  "AdapterName": "NVIDIA GeForce RTX 5070 Ti",
+  "width": 1920,
+  "height": 1080,
+  "quality": "Balanced",
+  "Celestial": {
+    "EpochUtc": "2026-09-27T06:35:00+00:00",
+    "TimeScale": 144,
+    "Latitude": 38.72,
+    "Longitude": -9.14,
+    "CameraAzimuth": 90,
+    "Composition": 1,
+    "Air": 1
+  },
+  "Weather": {
+    "Clouds": 0,
+    "Fog": 1,
+    "Coverage": 0.25,
+    "WindMetresPerSecond": 9,
+    "Seed": 27,
+    "Layer": {},
+    "FogProfile": {}
+  },
+  "targetFps": 30,
+  "warmupSeconds": 2,
+  "coldFirstPresentMs": 15532.9472,
+  "runs": [
+    {
+      "run": 1,
+      "seconds": 8.0137286,
+      "frames": 238,
+      "fps": 29.699034229834037,
+      "cpuMachinePercent": 0.6174300270995785,
+      "gpuSamples": 238,
+      "cloudUpdateSamples": 64,
+      "droppedQueries": 0,
+      "gpuMedianMs": 2.016032,
+      "gpuP95Ms": 7.248096,
+      "gpuP99Ms": 8.822784,
+      "gpuMaxMs": 10.48832,
+      "updateGpuMedianMs": 4.923264,
+      "updateGpuMaxMs": 10.48832,
+      "frameWithGdiP95Ms": 10.020500000000538,
+      "frameWithGdiMaxMs": 12.382700000000114,
+      "intervalP95Ms": 33.9316000000008,
+      "intervalP99Ms": 34.01340000000073,
+      "workingSetBytes": 171474944,
+      "logicalTextureBytes": 155521648
+    }
+  ],
+  "scope": "Offscreen native rendering plus GPU readback/GDI into one hidden HWND. No visible UI/desktop compositor cost. GPU queries cover all passes including cloud refresh. Not energy/temperature measurement."
+}

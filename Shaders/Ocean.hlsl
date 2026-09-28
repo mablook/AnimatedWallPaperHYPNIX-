@@ -38,6 +38,7 @@ Texture2D<float4> CloudPrevious : register(t12);
 Texture2D<float4> CloudNext : register(t13);
 Texture2D<float4> OpticalBloom : register(t14);
 Texture2D<float4> SkyNext : register(t15);
+Texture2D<float2> ReflectionAlbedo : register(t16);
 SamplerState LinearClamp : register(s0);
 SamplerState SurfaceSampler : register(s1);
 SamplerState SkySampler : register(s2);
@@ -147,6 +148,7 @@ float3 CycleDisk(float3 ray,float3 direction,float4 disk,float3 radiance,bool mo
 
 float4 SkyPS(ScreenVertex input) : SV_Target
 {
+    if(CycleReserved.x>.5) return float4(0,0,0,1);
     float2 xy = (input.uv * float2(2, -2) + float2(-1, 1)) * Resolution.w;
     xy.x *= Resolution.z;
     float3 ray = normalize(Forward() + float3(xy.x, 0, 0) + Up() * xy.y);
@@ -238,7 +240,22 @@ float SmithG1(float NoV, float alpha2)
     if (a >= 1.6) return 1;
     return (3.535 * a + 2.181 * a * a) / (1 + 2.276 * a + 2.577 * a * a);
 }
+float SmithG1OverCosine(float cosine,float alpha2)
+{
+    // Analytical grazing limit of G1(cosine)/cosine: no artificial angular floor.
+    float s=sqrt(max(alpha2*(1-cosine*cosine),1e-12));
+    float a=cosine/s;
+    if(a>=1.6) return 1/cosine;
+    return (3.535+2.181*a)/(s*(1+2.276*a+2.577*a*a));
+}
 float Fresnel(float cosine) { return .02037 + .97963 * pow(1 - saturate(cosine), 5); }
+float EnvironmentReflectance(float NoV,float alpha2)
+{
+    // Keep the integrated grazing endpoint continuous for normal-mapped geometry.
+    float2 uv=(sqrt(saturate(float2(NoV,alpha2)))*127+.5)/128;
+    float2 ab=ReflectionAlbedo.SampleLevel(LinearClamp,uv,0);
+    return saturate(.02037*ab.x+.97963*ab.y);
+}
 
 float3 CycleDirect(float3 n,float3 v,float NoV,float alpha2,float4 body,float4 disk,float3 radiance,bool moon,float spatialTransmission)
 {
@@ -253,7 +270,7 @@ float3 CycleDirect(float3 n,float3 v,float NoV,float alpha2,float4 body,float4 d
         float3 h=normalize(l+v);
         float NoL=saturate(dot(n,l)), NoH=saturate(dot(n,h));
         float3 profile=moon ? CycleMoonMaterial(q,body.w,false) : (.4+.6*sqrt(1-dot(q,q)))/.8;
-        direct+=Beckmann(NoH,alpha2)*SmithG1(NoV,alpha2)*SmithG1(NoL,alpha2)*Fresnel(dot(v,h))/(4*NoV)*profile*
+        direct+=Beckmann(NoH,alpha2)*SmithG1OverCosine(NoV,alpha2)*SmithG1(NoL,alpha2)*Fresnel(dot(v,h))*.25*profile*
             (VolumeState.x>.5 ? spatialTransmission : CelestialTransmission(l))*GroundTransmission(asin(clamp(l.y,-1,1)),Cycle.z)*step(0,l.y);
     }
     return radiance*(PI*body.w*body.w*disk.z/8)*direct;
@@ -297,20 +314,28 @@ float4 WaterPS(WaterVertex input) : SV_Target
     }
     float3 n = normalize(cross(tangentZ, tangentX));
     float3 v = normalize(Camera.xyz - input.world);
-    float NoV = max(dot(n, v), .015);
-    float alpha2 = .0012 + missingSlope;
+    // The rasterized surface is visible, but its independently filtered shading
+    // normal can cross the view tangent near the horizon. Use the continuous
+    // grazing limit there; a hard rejection draws rows of black normal-map pixels.
+    float NoV = saturate(dot(n, v));
+    float alpha2 = CycleReserved.y>.5 ? .000025 : .0012 + missingSlope;
     // Isotropic approximation to unresolved directional slope covariance.
     float3 reflected = reflect(-v, n);
     float envLod=Refinement.x>.5 ? clamp(log2(max(length(fwidth(reflected)),sqrt(alpha2)*.18)*256),0,6) : 0;
-    float3 env = lerp(EnvironmentFiltered(reflected,envLod), Environment(float3(0, .35, 1)), saturate(alpha2 * 2));
-    if(VolumeState.x>.5) env=lerp(VolumeIncident(reflected,input.world,envLod),VolumeIncident(float3(0,.35,1),input.world,2),saturate(alpha2*2));
-    float3 color = Fresnel(NoV) * env + Water.rgb * (1 - Fresnel(NoV));
+    float3 env = VolumeState.x>.5 ? VolumeIncident(reflected,input.world,envLod) : EnvironmentFiltered(reflected,envLod);
+    float reflectance=EnvironmentReflectance(NoV,alpha2);
+    float3 color = reflectance * env + Water.rgb * (1 - reflectance);
 
     if(Cycle.x>.5)
     {
         float2 shadow=VolumeState.x>.5 ? VolumeLightAt(input.world) : 1;
-        color+=CycleDirect(n,v,NoV,alpha2,Light,SolarDisk,Radiance.rgb,false,shadow.x);
-        color+=CycleDirect(n,v,NoV,alpha2,LunarBody,LunarDisk,LunarRadiance.rgb,true,shadow.y);
+        float3 sunDirect=CycleDirect(n,v,NoV,alpha2,Light,SolarDisk,Radiance.rgb,false,shadow.x);
+        float3 moonDirect=CycleDirect(n,v,NoV,alpha2,LunarBody,LunarDisk,LunarRadiance.rgb,true,shadow.y);
+        if(CycleReserved.x>.5 && CycleReserved.x<1.5) return float4(sunDirect,1);
+        if(CycleReserved.x>1.5 && CycleReserved.x<2.5) return float4(moonDirect,1);
+        if(CycleReserved.x>2.5 && CycleReserved.x<3.5) return float4(reflectance*env,1);
+        if(CycleReserved.x>3.5) return float4(VolumeState.x>.5 ? VolumeAerial(0,input.world) : 0,1);
+        color+=sunDirect+moonDirect;
     }
     else
     {
@@ -327,10 +352,10 @@ float4 WaterPS(WaterVertex input) : SV_Target
         float NoL = saturate(dot(n, l));
         float NoH = saturate(dot(n, h));
         float D = Beckmann(NoH, alpha2);
-        float G = SmithG1(NoV, alpha2) * SmithG1(NoL, alpha2);
+        float G = SmithG1OverCosine(NoV, alpha2) * SmithG1(NoL, alpha2);
         float3 profile=1;
         if(Refinement.x>.5 && Grid.z>1.5 && Grid.z<2.5) profile=MoonMaterial(l,Light.w,false);
-        direct += D * G * Fresnel(dot(v, h)) / (4 * NoV) * profile * CelestialTransmission(l);
+        direct += D * G * Fresnel(dot(v, h)) * .25 * profile * CelestialTransmission(l);
     }
     color += Radiance.rgb * (PI * Light.w * Light.w / 8) * direct;
     }

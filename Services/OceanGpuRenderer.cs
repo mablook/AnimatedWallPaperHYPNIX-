@@ -11,6 +11,8 @@ using static Vortice.DXGI.DXGI;
 
 namespace AnimatedWallPaper.Services;
 
+internal enum OceanRenderDiagnostic { None, SunDirect, MoonDirect, ReflectedEnvironment, AerialScatter }
+
 // One ocean surface per logical output. Its owner supplies active time, including after
 // recreation. Preview uses the existing offscreen/GDI path; desktop uses DXGI.
 internal sealed class OceanGpuRenderer : IDisposable
@@ -39,8 +41,13 @@ internal sealed class OceanGpuRenderer : IDisposable
     private OceanOpticalDepth? _opticalDepth;
     private OceanCycleSky? _cycleSky;
     private OceanVolumetrics? _volumes;
+    private OceanReflectionLut? _reflectionLut;
+    internal OceanReflectionLut? ReflectionLut => _reflectionLut;
     internal OceanVolumetrics? Volumes => _volumes;
     internal OceanCelestialFrame? CelestialFrame { get; private set; }
+    internal OceanRenderDiagnostic Diagnostic { get; set; }
+    internal bool FlatDiagnosticSurface { get; set; }
+    internal ID3D11Texture2D HdrScene => _scene!;
     internal OceanCycleSky? CycleSky => _cycleSky;
     private readonly List<IDisposable> _sceneResources = [];
     private ID3D11Texture2D? _scene;
@@ -60,7 +67,8 @@ internal sealed class OceanGpuRenderer : IDisposable
         + (_spectrum is null ? 0 : 3L * (256 * 512 * 16 + 2 * 4 * 256 * 256 * 16 + 3 * 87381 * 8))
         + (_atmosphere is null ? 0 : 1398103L * 8)
         + (_moon is null ? 0 : OceanMoonTexture.EstimatedBytes) + (_clouds?.EstimatedBytes ?? 0) + (_bloom?.EstimatedBytes ?? 0)
-        + (_cycleSky?.EstimatedBytes ?? 0) + (_volumes?.EstimatedBytes ?? 0) + (_opticalDepth is null ? 0 : OceanOpticalDepth.Width*OceanOpticalDepth.Height*16);
+        + (_cycleSky?.EstimatedBytes ?? 0) + (_volumes?.EstimatedBytes ?? 0) + (_reflectionLut is null ? 0 : OceanReflectionLut.EstimatedBytes)
+        + (_opticalDepth is null ? 0 : OceanOpticalDepth.Width*OceanOpticalDepth.Height*16);
     internal OceanSpectrum? Spectrum => _spectrum;
     internal OceanAtmosphere? Atmosphere => _atmosphere;
     internal OceanClouds? Clouds => _clouds;
@@ -181,6 +189,11 @@ internal sealed class OceanGpuRenderer : IDisposable
             data[40] = new(192, .50f + .60f * settings.Agitation, 0, 0);
             data[41] = new(28, .27f + .90f * settings.Agitation, 0, 0);
             data[42] = new(4.5f, .22f + .88f * settings.Agitation, 0, 0);
+            if(FlatDiagnosticSurface)
+            {
+                for(var i=8;i<40;i++) data[i].Z=0;
+                for(var i=40;i<43;i++) data[i].Y=0;
+            }
             data[43] = new(settings.Atmosphere && settings.RefinedSky ? 1 : 0, _clouds?.Blend ?? 0,
                 settings.GibbousMoon ? 1 : 0, !settings.Bloom || settings.Quality == OceanQuality.Economy ? 0 : .14f);
             data[44] = new(OceanLightingModel.ApparentRadius(MathF.Asin(palette.Direction.Y),
@@ -199,7 +212,7 @@ internal sealed class OceanGpuRenderer : IDisposable
                 data[49]=new(VisualRadius(frame.Moon),frame.Moon.ApparentElevation,frame.Moon.VerticalScale,frame.PhaseAngle);
                 data[50]=new(frame.MoonLight,0); data[51]=new(frame.MoonPrime,0);
                 data[52]=new(frame.MoonEast,0); data[53]=new(frame.MoonNorth,0);
-                data[54]=new(0,0,0,0);
+                data[54]=new((int)Diagnostic,FlatDiagnosticSurface ? 1 : 0,0,0);
                 if(settings.Weather is { } weather && _volumes is { } volumes)
                 {
                     data[55]=new(1,volumes.Blend,0,0);
@@ -219,6 +232,8 @@ internal sealed class OceanGpuRenderer : IDisposable
         PrepareScene(settings);
         _context.PSSetShaderResource(10, null!);
         for (uint slot = 11; slot <= 27; slot++) _context.PSSetShaderResource(slot, null!);
+        _reflectionLut ??= Own(new OceanReflectionLut(_device,_context));
+        _context.PSSetShaderResource(16,_reflectionLut.Read);
         if (settings.Atmosphere)
         {
             _atmosphere ??= Own(new OceanAtmosphere(_device, _context));

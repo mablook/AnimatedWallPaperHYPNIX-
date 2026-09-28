@@ -1,0 +1,1130 @@
+{
+  "AdapterName": "NVIDIA GeForce RTX 5070 Ti",
+  "mirrorTracking": true,
+  "highBodyLeavesFrame": true,
+  "finiteHdr": true,
+  "reflectionLutIntegral": true,
+  "reflectionLutBounds": true,
+  "scenes": [
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 0,
+      "utc": "2026-09-27T06:38:00+00:00",
+      "AirlessElevation": 0.9806904800999792,
+      "ApparentElevation": 0.023474427,
+      "Direction": {
+        "X": 0.050947964,
+        "Y": 0.017115442,
+        "Z": 0.99855465
+      },
+      "flat": false,
+      "expected": {
+        "X": 687.78564,
+        "Y": 230.68959
+      },
+      "measurement": {
+        "Peak": 45.2182275390625,
+        "PeakX": 716,
+        "PeakY": 338,
+        "Total": 49998.067000110226,
+        "X": 684.2900331417894,
+        "Y": 409.45341400331284,
+        "BrightX": 692.169846851565,
+        "BrightY": 390.81822098013566
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 0,
+      "utc": "2026-09-27T06:38:00+00:00",
+      "AirlessElevation": 0.9806904800999792,
+      "ApparentElevation": 0.023474427,
+      "Direction": {
+        "X": 0.050947964,
+        "Y": 0.017115442,
+        "Z": 0.99855465
+      },
+      "flat": true,
+      "expected": {
+        "X": 687.78564,
+        "Y": 230.68959
+      },
+      "measurement": {
+        "Peak": 10556.610775,
+        "PeakX": 688,
+        "PeakY": 227,
+        "Total": 621614.9139824302,
+        "X": 688.5128672497553,
+        "Y": 226.45859738448206,
+        "BrightX": 688.6102735100588,
+        "BrightY": 225.84341053956595
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 0.5,
+      "utc": "2026-09-27T07:08:00+00:00",
+      "AirlessElevation": 6.80205643553564,
+      "ApparentElevation": 0.1209224,
+      "Direction": {
+        "X": 0.13236342,
+        "Y": 0.11843961,
+        "Z": 0.98409957
+      },
+      "flat": false,
+      "expected": {
+        "X": 764.7933,
+        "Y": 323.84573
+      },
+      "measurement": {
+        "Peak": 90.09475625,
+        "PeakX": 757,
+        "PeakY": 330,
+        "Total": 272923.40771978896,
+        "X": 766.2801489980466,
+        "Y": 362.5049504060291,
+        "BrightX": 767.1886272988168,
+        "BrightY": 347.23393901526333
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 0.5,
+      "utc": "2026-09-27T07:08:00+00:00",
+      "AirlessElevation": 6.80205643553564,
+      "ApparentElevation": 0.1209224,
+      "Direction": {
+        "X": 0.13236342,
+        "Y": 0.11843961,
+        "Z": 0.98409957
+      },
+      "flat": true,
+      "expected": {
+        "X": 764.7933,
+        "Y": 323.84573
+      },
+      "measurement": {
+        "Peak": 10735.2664,
+        "PeakX": 766,
+        "PeakY": 323,
+        "Total": 1149346.0117394812,
+        "X": 764.705823865922,
+        "Y": 323.4360837472575,
+        "BrightX": 764.6617564019377,
+        "BrightY": 323.516717722812
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 1.5,
+      "utc": "2026-09-27T08:08:00+00:00",
+      "AirlessElevation": 18.2021519736295,
+      "ApparentElevation": 0.3185669,
+      "Direction": {
+        "X": 0.28820544,
+        "Y": 0.3123706,
+        "Z": 0.9051863
+      },
+      "flat": false,
+      "expected": {
+        "X": 925.96246,
+        "Y": 523.5839
+      },
+      "measurement": {
+        "Peak": 76.9164625,
+        "PeakX": 1081,
+        "PeakY": 517,
+        "Total": 613742.0746940048,
+        "X": 951.2229035617963,
+        "Y": 364.36935682189227,
+        "BrightX": 945.2039451191134,
+        "BrightY": 335.4994861733478
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 1.5,
+      "utc": "2026-09-27T08:08:00+00:00",
+      "AirlessElevation": 18.2021519736295,
+      "ApparentElevation": 0.3185669,
+      "Direction": {
+        "X": 0.28820544,
+        "Y": 0.3123706,
+        "Z": 0.9051863
+      },
+      "flat": true,
+      "expected": {
+        "X": 925.96246,
+        "Y": 523.5839
+      },
+      "measurement": {
+        "Peak": 4635.1648,
+        "PeakX": 926,
+        "PeakY": 523,
+        "Total": 718292.0602337978,
+        "X": 925.8823313001707,
+        "Y": 523.2673627427216,
+        "BrightX": 925.9042462464499,
+        "BrightY": 523.2660896389438
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 3,
+      "utc": "2026-09-27T09:38:00+00:00",
+      "AirlessElevation": 33.86480282303724,
+      "ApparentElevation": 0.5914901,
+      "Direction": {
+        "X": 0.4850634,
+        "Y": 0.5572351,
+        "Z": 0.6739455
+      },
+      "flat": false,
+      "expected": {
+        "X": 1242.6671,
+        "Y": 910.69354
+      },
+      "measurement": {
+        "Peak": 41.24976875,
+        "PeakX": 1213,
+        "PeakY": 582,
+        "Total": 154139.34070100097,
+        "X": 1151.3023572342258,
+        "Y": 406.6004979120296,
+        "BrightX": 1184.7575653009762,
+        "BrightY": 511.5375303377974
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 3,
+      "utc": "2026-09-27T09:38:00+00:00",
+      "AirlessElevation": 33.86480282303724,
+      "ApparentElevation": 0.5914901,
+      "Direction": {
+        "X": 0.4850634,
+        "Y": 0.5572351,
+        "Z": 0.6739455
+      },
+      "flat": true,
+      "expected": {
+        "X": 1242.6671,
+        "Y": 910.69354
+      },
+      "measurement": {
+        "Peak": 0,
+        "PeakX": 0,
+        "PeakY": 0,
+        "Total": 0,
+        "X": 0,
+        "Y": 0,
+        "BrightX": 0,
+        "BrightY": 0
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 5,
+      "utc": "2026-09-27T11:38:00+00:00",
+      "AirlessElevation": 47.956889769478146,
+      "ApparentElevation": 0.8372714,
+      "Direction": {
+        "X": 0.6344332,
+        "Y": 0.74264115,
+        "Z": 0.21442628
+      },
+      "flat": false,
+      "expected": {
+        "X": 2442.14,
+        "Y": 2346.6917
+      },
+      "measurement": {
+        "Peak": 5.811893749999999,
+        "PeakX": 1245,
+        "PeakY": 530,
+        "Total": 927.1008985586527,
+        "X": 1133.4166976754677,
+        "Y": 595.2399874039222,
+        "BrightX": 1235.3307071083848,
+        "BrightY": 619.9928818824098
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": false,
+      "hour": 5,
+      "utc": "2026-09-27T11:38:00+00:00",
+      "AirlessElevation": 47.956889769478146,
+      "ApparentElevation": 0.8372714,
+      "Direction": {
+        "X": 0.6344332,
+        "Y": 0.74264115,
+        "Z": 0.21442628
+      },
+      "flat": true,
+      "expected": {
+        "X": 2442.14,
+        "Y": 2346.6917
+      },
+      "measurement": {
+        "Peak": 0,
+        "PeakX": 0,
+        "PeakY": 0,
+        "Total": 0,
+        "X": 0,
+        "Y": 0,
+        "BrightX": 0,
+        "BrightY": 0
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 0,
+      "utc": "2026-09-27T18:48:00+00:00",
+      "AirlessElevation": 1.1271797446725202,
+      "ApparentElevation": 0.025786461,
+      "Direction": {
+        "X": -0.21205454,
+        "Y": 0.019671729,
+        "Z": 0.97705984
+      },
+      "flat": false,
+      "expected": {
+        "X": 434.20016,
+        "Y": 233.44193
+      },
+      "measurement": {
+        "Peak": 8.01098108291626E-05,
+        "PeakX": 393,
+        "PeakY": 370,
+        "Total": 0.12440399087666482,
+        "X": 430.5901592791143,
+        "Y": 427.9665875326709,
+        "BrightX": 424.8614231862795,
+        "BrightY": 400.20809043071364
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 0,
+      "utc": "2026-09-27T18:48:00+00:00",
+      "AirlessElevation": 1.1271797446725202,
+      "ApparentElevation": 0.025786461,
+      "Direction": {
+        "X": -0.21205454,
+        "Y": 0.019671729,
+        "Z": 0.97705984
+      },
+      "flat": true,
+      "expected": {
+        "X": 434.20016,
+        "Y": 233.44193
+      },
+      "measurement": {
+        "Peak": 0.026426144886016845,
+        "PeakX": 432,
+        "PeakY": 229,
+        "Total": 1.1113248325705547,
+        "X": 433.85756866916273,
+        "Y": 230.26130970028672,
+        "BrightX": 433.7480232335362,
+        "BrightY": 229.19972364037912
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 0.5,
+      "utc": "2026-09-27T19:18:00+00:00",
+      "AirlessElevation": 6.785463804789758,
+      "ApparentElevation": 0.1206373,
+      "Direction": {
+        "X": -0.13625914,
+        "Y": 0.118152045,
+        "Z": 0.98360234
+      },
+      "flat": false,
+      "expected": {
+        "X": 510.44934,
+        "Y": 323.63675
+      },
+      "measurement": {
+        "Peak": 0.00020990054607391358,
+        "PeakX": 467,
+        "PeakY": 416,
+        "Total": 0.7257007656457807,
+        "X": 508.2639410288293,
+        "Y": 390.67028394964575,
+        "BrightX": 509.03517697072374,
+        "BrightY": 382.21593357476695
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 0.5,
+      "utc": "2026-09-27T19:18:00+00:00",
+      "AirlessElevation": 6.785463804789758,
+      "ApparentElevation": 0.1206373,
+      "Direction": {
+        "X": -0.13625914,
+        "Y": 0.118152045,
+        "Z": 0.98360234
+      },
+      "flat": true,
+      "expected": {
+        "X": 510.44934,
+        "Y": 323.63675
+      },
+      "measurement": {
+        "Peak": 0.021360814666748048,
+        "PeakX": 509,
+        "PeakY": 323,
+        "Total": 2.1156536549568217,
+        "X": 510.28013483361997,
+        "Y": 322.66160827286086,
+        "BrightX": 510.2570646787434,
+        "BrightY": 322.6713938296221
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 1.5,
+      "utc": "2026-09-27T20:18:00+00:00",
+      "AirlessElevation": 18.27084595183062,
+      "ApparentElevation": 0.31976244,
+      "Direction": {
+        "X": 0.014038409,
+        "Y": 0.31350932,
+        "Z": 0.94948137
+      },
+      "flat": false,
+      "expected": {
+        "X": 652.83307,
+        "Y": 510.64966
+      },
+      "measurement": {
+        "Peak": 0.00013345755338668825,
+        "PeakX": 716,
+        "PeakY": 464,
+        "Total": 1.0376484741681549,
+        "X": 650.7491122424797,
+        "Y": 361.4053949575221,
+        "BrightX": 654.9446145767917,
+        "BrightY": 333.6385413012251
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 1.5,
+      "utc": "2026-09-27T20:18:00+00:00",
+      "AirlessElevation": 18.27084595183062,
+      "ApparentElevation": 0.31976244,
+      "Direction": {
+        "X": 0.014038409,
+        "Y": 0.31350932,
+        "Z": 0.94948137
+      },
+      "flat": true,
+      "expected": {
+        "X": 652.83307,
+        "Y": 510.64966
+      },
+      "measurement": {
+        "Peak": 0.008290020751953123,
+        "PeakX": 652,
+        "PeakY": 510,
+        "Total": 1.1366616951346367,
+        "X": 652.6792150822442,
+        "Y": 509.7496835859429,
+        "BrightX": 652.6370359116087,
+        "BrightY": 509.7405979183186
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 3,
+      "utc": "2026-09-27T21:48:00+00:00",
+      "AirlessElevation": 35.408822391740635,
+      "ApparentElevation": 0.618414,
+      "Direction": {
+        "X": 0.21780723,
+        "Y": 0.5794067,
+        "Z": 0.78539664
+      },
+      "flat": false,
+      "expected": {
+        "X": 874.8964,
+        "Y": 843.00745
+      },
+      "measurement": {
+        "Peak": 4.195858240127563E-05,
+        "PeakX": 824,
+        "PeakY": 484,
+        "Total": 0.4524857029554721,
+        "X": 923.2885567765989,
+        "Y": 399.59632015718665,
+        "BrightX": 931.4677275080561,
+        "BrightY": 468.04195572649286
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 3,
+      "utc": "2026-09-27T21:48:00+00:00",
+      "AirlessElevation": 35.408822391740635,
+      "ApparentElevation": 0.618414,
+      "Direction": {
+        "X": 0.21780723,
+        "Y": 0.5794067,
+        "Z": 0.78539664
+      },
+      "flat": true,
+      "expected": {
+        "X": 874.8964,
+        "Y": 843.00745
+      },
+      "measurement": {
+        "Peak": 0,
+        "PeakX": 0,
+        "PeakY": 0,
+        "Total": 0,
+        "X": 0,
+        "Y": 0,
+        "BrightX": 0,
+        "BrightY": 0
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 5,
+      "utc": "2026-09-27T23:48:00+00:00",
+      "AirlessElevation": 55.61349796158944,
+      "ApparentElevation": 0.9708404,
+      "Direction": {
+        "X": 0.4027934,
+        "Y": 0.8252466,
+        "Z": 0.39588583
+      },
+      "flat": false,
+      "expected": {
+        "X": 1362.661,
+        "Y": 1709.5906
+      },
+      "measurement": {
+        "Peak": 1.5630519390106202E-05,
+        "PeakX": 1271,
+        "PeakY": 560,
+        "Total": 0.03632181527614452,
+        "X": 1063.10577450772,
+        "Y": 572.0674523706735,
+        "BrightX": 1091.0398629998142,
+        "BrightY": 610.2348549302569
+      }
+    },
+    {
+      "composition": "Geographic",
+      "moon": true,
+      "hour": 5,
+      "utc": "2026-09-27T23:48:00+00:00",
+      "AirlessElevation": 55.61349796158944,
+      "ApparentElevation": 0.9708404,
+      "Direction": {
+        "X": 0.4027934,
+        "Y": 0.8252466,
+        "Z": 0.39588583
+      },
+      "flat": true,
+      "expected": {
+        "X": 1362.661,
+        "Y": 1709.5906
+      },
+      "measurement": {
+        "Peak": 0,
+        "PeakX": 0,
+        "PeakY": 0,
+        "Total": 0,
+        "X": 0,
+        "Y": 0,
+        "BrightX": 0,
+        "BrightY": 0
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 0,
+      "utc": "2026-09-27T06:38:00+00:00",
+      "AirlessElevation": 0.9806904800999792,
+      "ApparentElevation": 0.023474427,
+      "Direction": {
+        "X": -0.44334763,
+        "Y": 0.017115442,
+        "Z": 0.89618635
+      },
+      "flat": false,
+      "expected": {
+        "X": 171.5256,
+        "Y": 233.25302
+      },
+      "measurement": {
+        "Peak": 54.844502734375006,
+        "PeakX": 178,
+        "PeakY": 321,
+        "Total": 69662.42613478682,
+        "X": 172.72051717608116,
+        "Y": 434.6984631800649,
+        "BrightX": 175.30786382084193,
+        "BrightY": 410.0342930149962
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 0,
+      "utc": "2026-09-27T06:38:00+00:00",
+      "AirlessElevation": 0.9806904800999792,
+      "ApparentElevation": 0.023474427,
+      "Direction": {
+        "X": -0.44334763,
+        "Y": 0.017115442,
+        "Z": 0.89618635
+      },
+      "flat": true,
+      "expected": {
+        "X": 171.5256,
+        "Y": 233.25302
+      },
+      "measurement": {
+        "Peak": 10611.3233,
+        "PeakX": 170,
+        "PeakY": 235,
+        "Total": 692960.0617068426,
+        "X": 171.25905040594182,
+        "Y": 231.4909918608135,
+        "BrightX": 171.19172674319526,
+        "BrightY": 231.08469848404357
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 0.5,
+      "utc": "2026-09-27T07:08:00+00:00",
+      "AirlessElevation": 6.80205643553564,
+      "ApparentElevation": 0.1209224,
+      "Direction": {
+        "X": -0.43716693,
+        "Y": 0.11843961,
+        "Z": 0.8915476
+      },
+      "flat": false,
+      "expected": {
+        "X": 183.64413,
+        "Y": 335.59912
+      },
+      "measurement": {
+        "Peak": 140.76295000000002,
+        "PeakX": 213,
+        "PeakY": 370,
+        "Total": 471457.8041439928,
+        "X": 173.9877322863721,
+        "Y": 390.1793557284598,
+        "BrightX": 175.30020145970315,
+        "BrightY": 390.4781033115464
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 0.5,
+      "utc": "2026-09-27T07:08:00+00:00",
+      "AirlessElevation": 6.80205643553564,
+      "ApparentElevation": 0.1209224,
+      "Direction": {
+        "X": -0.43716693,
+        "Y": 0.11843961,
+        "Z": 0.8915476
+      },
+      "flat": true,
+      "expected": {
+        "X": 183.64413,
+        "Y": 335.59912
+      },
+      "measurement": {
+        "Peak": 10806.2944,
+        "PeakX": 185,
+        "PeakY": 336,
+        "Total": 1536674.6199916143,
+        "X": 183.47782782261544,
+        "Y": 335.1529267165017,
+        "BrightX": 183.50630267028814,
+        "BrightY": 335.2268837895886
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 1.5,
+      "utc": "2026-09-27T08:08:00+00:00",
+      "AirlessElevation": 18.2021519736295,
+      "ApparentElevation": 0.3185669,
+      "Direction": {
+        "X": -0.40318027,
+        "Y": 0.3123706,
+        "Z": 0.86015713
+      },
+      "flat": false,
+      "expected": {
+        "X": 218.94385,
+        "Y": 539.18
+      },
+      "measurement": {
+        "Peak": 95.19869375,
+        "PeakX": 57,
+        "PeakY": 555,
+        "Total": 734902.5490224349,
+        "X": 196.51780627036683,
+        "Y": 376.20022610904033,
+        "BrightX": 195.70001455242053,
+        "BrightY": 397.6637178648169
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 1.5,
+      "utc": "2026-09-27T08:08:00+00:00",
+      "AirlessElevation": 18.2021519736295,
+      "ApparentElevation": 0.3185669,
+      "Direction": {
+        "X": -0.40318027,
+        "Y": 0.3123706,
+        "Z": 0.86015713
+      },
+      "flat": true,
+      "expected": {
+        "X": 218.94385,
+        "Y": 539.18
+      },
+      "measurement": {
+        "Peak": 4631.3092,
+        "PeakX": 219,
+        "PeakY": 539,
+        "Total": 830362.2565655509,
+        "X": 218.78281958413953,
+        "Y": 538.8745481845651,
+        "BrightX": 218.79610798332507,
+        "BrightY": 538.9022031984509
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 3,
+      "utc": "2026-09-27T09:38:00+00:00",
+      "AirlessElevation": 33.86480282303724,
+      "ApparentElevation": 0.5914901,
+      "Direction": {
+        "X": -0.30286267,
+        "Y": 0.5572351,
+        "Z": 0.77315146
+      },
+      "flat": false,
+      "expected": {
+        "X": 306.18027,
+        "Y": 829.9485
+      },
+      "measurement": {
+        "Peak": 42.433346875,
+        "PeakX": 370,
+        "PeakY": 457,
+        "Total": 295519.4973040436,
+        "X": 288.4861447229082,
+        "Y": 399.81141529868916,
+        "BrightX": 280.86630275423437,
+        "BrightY": 497.5627214841548
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 3,
+      "utc": "2026-09-27T09:38:00+00:00",
+      "AirlessElevation": 33.86480282303724,
+      "ApparentElevation": 0.5914901,
+      "Direction": {
+        "X": -0.30286267,
+        "Y": 0.5572351,
+        "Z": 0.77315146
+      },
+      "flat": true,
+      "expected": {
+        "X": 306.18027,
+        "Y": 829.9485
+      },
+      "measurement": {
+        "Peak": 0,
+        "PeakX": 0,
+        "PeakY": 0,
+        "Total": 0,
+        "X": 0,
+        "Y": 0,
+        "BrightX": 0,
+        "BrightY": 0
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 5,
+      "utc": "2026-09-27T11:38:00+00:00",
+      "AirlessElevation": 47.956889769478146,
+      "ApparentElevation": 0.8372714,
+      "Direction": {
+        "X": -0.098279856,
+        "Y": 0.74264115,
+        "Z": 0.6624388
+      },
+      "flat": false,
+      "expected": {
+        "X": 520.164,
+        "Y": 1122.0579
+      },
+      "measurement": {
+        "Peak": 12.3584265625,
+        "PeakX": 291,
+        "PeakY": 514,
+        "Total": 84574.9598163794,
+        "X": 539.2258956597469,
+        "Y": 460.2056199372502,
+        "BrightX": 547.2783156060258,
+        "BrightY": 531.2092832253685
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": false,
+      "hour": 5,
+      "utc": "2026-09-27T11:38:00+00:00",
+      "AirlessElevation": 47.956889769478146,
+      "ApparentElevation": 0.8372714,
+      "Direction": {
+        "X": -0.098279856,
+        "Y": 0.74264115,
+        "Z": 0.6624388
+      },
+      "flat": true,
+      "expected": {
+        "X": 520.164,
+        "Y": 1122.0579
+      },
+      "measurement": {
+        "Peak": 0,
+        "PeakX": 0,
+        "PeakY": 0,
+        "Total": 0,
+        "X": 0,
+        "Y": 0,
+        "BrightX": 0,
+        "BrightY": 0
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 0,
+      "utc": "2026-09-27T18:48:00+00:00",
+      "AirlessElevation": 1.1271797446725202,
+      "ApparentElevation": 0.025786461,
+      "Direction": {
+        "X": -0.43446225,
+        "Y": 0.019671729,
+        "Z": 0.9004752
+      },
+      "flat": false,
+      "expected": {
+        "X": 183.26788,
+        "Y": 235.5828
+      },
+      "measurement": {
+        "Peak": 0.0001005782127380371,
+        "PeakX": 179,
+        "PeakY": 321,
+        "Total": 0.14034461849927765,
+        "X": 183.28315627308308,
+        "Y": 433.07581353466077,
+        "BrightX": 185.43665848887704,
+        "BrightY": 409.7847834905266
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 0,
+      "utc": "2026-09-27T18:48:00+00:00",
+      "AirlessElevation": 1.1271797446725202,
+      "ApparentElevation": 0.025786461,
+      "Direction": {
+        "X": -0.43446225,
+        "Y": 0.019671729,
+        "Z": 0.9004752
+      },
+      "flat": true,
+      "expected": {
+        "X": 183.26788,
+        "Y": 235.5828
+      },
+      "measurement": {
+        "Peak": 0.023426017475128177,
+        "PeakX": 180,
+        "PeakY": 225,
+        "Total": 1.3278293115615867,
+        "X": 182.92450732041894,
+        "Y": 233.40605163478372,
+        "BrightX": 182.93538719292405,
+        "BrightY": 233.25230174630667
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 0.5,
+      "utc": "2026-09-27T19:18:00+00:00",
+      "AirlessElevation": 6.785463804789758,
+      "ApparentElevation": 0.1206373,
+      "Direction": {
+        "X": -0.4369626,
+        "Y": 0.118152045,
+        "Z": 0.8916859
+      },
+      "flat": false,
+      "expected": {
+        "X": 183.9035,
+        "Y": 335.28717
+      },
+      "measurement": {
+        "Peak": 0.00025770334005355836,
+        "PeakX": 213,
+        "PeakY": 370,
+        "Total": 0.8573834975245768,
+        "X": 174.17624409733475,
+        "Y": 390.2553660005572,
+        "BrightX": 175.51864940854549,
+        "BrightY": 390.2645027123418
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 0.5,
+      "utc": "2026-09-27T19:18:00+00:00",
+      "AirlessElevation": 6.785463804789758,
+      "ApparentElevation": 0.1206373,
+      "Direction": {
+        "X": -0.4369626,
+        "Y": 0.118152045,
+        "Z": 0.8916859
+      },
+      "flat": true,
+      "expected": {
+        "X": 183.9035,
+        "Y": 335.28717
+      },
+      "measurement": {
+        "Peak": 0.021349901580810546,
+        "PeakX": 182,
+        "PeakY": 335,
+        "Total": 2.822509739601619,
+        "X": 183.6343610347794,
+        "Y": 334.2185545635267,
+        "BrightX": 183.57972885933705,
+        "BrightY": 334.2468806008564
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 1.5,
+      "utc": "2026-09-27T20:18:00+00:00",
+      "AirlessElevation": 18.27084595183062,
+      "ApparentElevation": 0.31976244,
+      "Direction": {
+        "X": -0.42152375,
+        "Y": 0.31350932,
+        "Z": 0.85089934
+      },
+      "flat": false,
+      "expected": {
+        "X": 195.38467,
+        "Y": 543.7234
+      },
+      "measurement": {
+        "Peak": 0.00016356488466262817,
+        "PeakX": 259,
+        "PeakY": 444,
+        "Total": 1.328059634446142,
+        "X": 175.93101476150653,
+        "Y": 375.5232965120723,
+        "BrightX": 172.68739430475975,
+        "BrightY": 377.58385416496617
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 1.5,
+      "utc": "2026-09-27T20:18:00+00:00",
+      "AirlessElevation": 18.27084595183062,
+      "ApparentElevation": 0.31976244,
+      "Direction": {
+        "X": -0.42152375,
+        "Y": 0.31350932,
+        "Z": 0.85089934
+      },
+      "flat": true,
+      "expected": {
+        "X": 195.38467,
+        "Y": 543.7234
+      },
+      "measurement": {
+        "Peak": 0.008385582733154297,
+        "PeakX": 195,
+        "PeakY": 543,
+        "Total": 1.5523251423001232,
+        "X": 195.09394895262022,
+        "Y": 542.7566586100744,
+        "BrightX": 195.04915906314392,
+        "BrightY": 542.7532237842145
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 3,
+      "utc": "2026-09-27T21:48:00+00:00",
+      "AirlessElevation": 35.408822391740635,
+      "ApparentElevation": 0.618414,
+      "Direction": {
+        "X": -0.34956685,
+        "Y": 0.5794067,
+        "Z": 0.7362682
+      },
+      "flat": false,
+      "expected": {
+        "X": 239.33762,
+        "Y": 880.5917
+      },
+      "measurement": {
+        "Peak": 6.251872777938842E-05,
+        "PeakX": 143,
+        "PeakY": 541,
+        "Total": 0.44176211791020353,
+        "X": 236.24243628649282,
+        "Y": 404.70870864454884,
+        "BrightX": 231.93908875897657,
+        "BrightY": 494.7313833254355
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 3,
+      "utc": "2026-09-27T21:48:00+00:00",
+      "AirlessElevation": 35.408822391740635,
+      "ApparentElevation": 0.618414,
+      "Direction": {
+        "X": -0.34956685,
+        "Y": 0.5794067,
+        "Z": 0.7362682
+      },
+      "flat": true,
+      "expected": {
+        "X": 239.33762,
+        "Y": 880.5917
+      },
+      "measurement": {
+        "Peak": 0,
+        "PeakX": 0,
+        "PeakY": 0,
+        "Total": 0,
+        "X": 0,
+        "Y": 0,
+        "BrightX": 0,
+        "BrightY": 0
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 5,
+      "utc": "2026-09-27T23:48:00+00:00",
+      "AirlessElevation": 55.61349796158944,
+      "ApparentElevation": 0.9708404,
+      "Direction": {
+        "X": -0.17896822,
+        "Y": 0.8252466,
+        "Z": 0.5356664
+      },
+      "flat": false,
+      "expected": {
+        "X": 385.3316,
+        "Y": 1395.8351
+      },
+      "measurement": {
+        "Peak": 1.8562555313110348E-05,
+        "PeakX": 361,
+        "PeakY": 506,
+        "Total": 0.06960937037464654,
+        "X": 439.1614918406486,
+        "Y": 524.3310477179199,
+        "BrightX": 423.38724996600945,
+        "BrightY": 592.5799484859301
+      }
+    },
+    {
+      "composition": "Cinematic",
+      "moon": true,
+      "hour": 5,
+      "utc": "2026-09-27T23:48:00+00:00",
+      "AirlessElevation": 55.61349796158944,
+      "ApparentElevation": 0.9708404,
+      "Direction": {
+        "X": -0.17896822,
+        "Y": 0.8252466,
+        "Z": 0.5356664
+      },
+      "flat": true,
+      "expected": {
+        "X": 385.3316,
+        "Y": 1395.8351
+      },
+      "measurement": {
+        "Peak": 0,
+        "PeakX": 0,
+        "PeakY": 0,
+        "Total": 0,
+        "X": 0,
+        "Y": 0,
+        "BrightX": 0,
+        "BrightY": 0
+      }
+    }
+  ]
+}

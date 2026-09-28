@@ -3,6 +3,8 @@
 28/09/2026. Base preservada em `11b5fe0`, branch `codex/ocean-and-day-cycle`.
 Referência: [estudo de transporte, nuvens e neblina](OCEAN_VOLUMETRIC_ENVIRONMENT_STUDY.md).
 
+Revisão posterior: [correção da resposta rasante e acompanhamento dos reflexos solar/lunar](OCEAN_REFLECTION_TRACKING_FIX.md), com energia refletida compatível com a rugosidade e testes de projeção do reflexo ao longo do ciclo.
+
 ## Entrega
 
 A prévia nativa tem um novo caminho para atmosfera, nuvens, névoa e iluminação da água. O controle **Ambiente volumétrico** permite alternar com o renderer aprovado. A geometria, os espectros de ondas, os deslocamentos e o cálculo das normais continuam iguais. A aparência da água muda pela iluminação incidente, pelas sombras e pelo ar entre superfície e câmera.
