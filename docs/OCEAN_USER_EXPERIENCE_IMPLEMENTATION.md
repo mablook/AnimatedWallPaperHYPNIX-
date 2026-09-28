@@ -98,3 +98,26 @@ Validação: 454 testes unitários passaram; build Release sem avisos/erros. O t
 dotnet build Tests/Hypnix.NativeSmoke/Hypnix.NativeSmoke.csproj --no-restore -c Release -v minimal
 Tests/Hypnix.NativeSmoke/bin/Release/net8.0-windows10.0.19041.0/Hypnix.NativeSmoke.exe artifacts/library-startup-final --library-startup
 ```
+
+## Sino — composição das janelas de prévia
+
+28/09/2026. O proprietário confirmou que o sino alterna somente com prévias, incluindo wallpapers além do Ocean. Isso amplia o problema para a apresentação comum da interface; não confirma uma causa específica no Windows.
+
+Os renderers GPU de prévia continuam sem swap chain de janela. Ainda havia, porém, a composição acelerada do próprio WPF na janela principal e no editor de visualizadores. Agora essas duas janelas definem `HwndTarget.RenderMode = SoftwareOnly` em `OnSourceInitialized`, antes da primeira apresentação. O modo permanece estável durante toda a vida da janela, sem alternar aceleração ao abrir/fechar/trocar prévias. Cada inicialização registra `WpfRenderMode=SoftwareOnly; WallpaperGpuUnchanged=True` no log.
+
+Essa é uma mitigação para testar a hipótese de que a apresentação WPF contribui para a alternância. A API seleciona o modo de renderização **por janela**, conforme a [documentação de HwndTarget.RenderMode](https://learn.microsoft.com/en-us/dotnet/api/system.windows.interop.hwndtarget.rendermode?view=windowsdesktop-10.0). A Microsoft também descreve essa seleção por janela nas [orientações de diagnóstico do renderizador WPF](https://learn.microsoft.com/en-us/troubleshoot/developer/dotnet/framework/general/wpf-render-thread-failures). Essas fontes sustentam o mecanismo; não demonstram a causa do sino neste computador.
+
+O cálculo Direct3D das prévias continua na GPU; Ocean entrega pixels ao WPF e os outros renderers mantêm a apresentação GDI anterior. Os renderers, shaders, relógios e swap chains dos wallpapers no desktop não foram alterados. Não há configuração global `RenderOptions.ProcessRenderMode`, edição de registro, alteração de Não incomodar ou supressão de notificações do Windows.
+
+O custo de composição da interface passa à CPU nessas janelas, inclusive quando a prévia está oculta. É um compromisso deliberado para manter o modo estável; não foi medido com uma janela visível. A validação manual deve comparar consumo e fluidez do scroll/redimensionamento, além do sino.
+
+Verificação automatizada: 454 testes unitários passaram e a build Release compilou sem avisos/erros. O teste nativo offscreen verifica os modos reais das duas janelas após criar seus handles invisíveis, sem `Show`, confirma que a configuração global e uma terceira janela permanecem intactas e exercita animação, pausa, edição Sol/Lua e retomada do Ocean com composição por software. O teste de apresentação dos renderers Fire/shader compara frames GPU e GDI pixel a pixel e rejeita swap chains de prévia. Os resultados desses testes não constituem aceitação visual do sino. A consulta de vulnerabilidades NuGet permaneceu indisponível (`NU1900`).
+
+Aceitação pelo proprietário: reabrir `artifacts/ocean-product-build/HYPNIX.exe`, observar o sino com prévias Ocean e outros wallpapers na biblioteca e no editor, rolar/redimensionar e comparar com prévia oculta. Repetir com wallpaper ativo no desktop e conferir uso de CPU. **O sino permanece pendente de confirmação manual nesta build.**
+
+Os dois testes nativos passaram sem mostrar janelas. Resultado de composição e ciclo Ocean: [preview-bell-composition-2026-09-28.json](validation/preview-bell-composition-2026-09-28.json).
+
+```powershell
+Tests/Hypnix.NativeSmoke/bin/Release/net8.0-windows10.0.19041.0/Hypnix.NativeSmoke.exe artifacts/preview-bell-composition --ocean-preview-offscreen
+Tests/Hypnix.NativeSmoke/bin/Release/net8.0-windows10.0.19041.0/Hypnix.NativeSmoke.exe artifacts/preview-bell-gdi --preview-presentation
+```

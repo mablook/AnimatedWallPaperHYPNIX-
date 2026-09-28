@@ -37,7 +37,8 @@ internal static class OceanProductChecks
         CheckEditor(output);
         CheckWpfPreviewLifecycle();
         File.WriteAllText(Path.Combine(output,"offscreen-checks.json"),JsonSerializer.Serialize(new
-        {windowsShown=false,desktopModified=false,reusableReadbackExact=true,frames=2,width=213,height=121,editorApplyChecks=true,wpfStartupAnimationPausedEdits=true}));
+        {windowsShown=false,desktopModified=false,reusableReadbackExact=true,frames=2,width=213,height=121,editorApplyChecks=true,wpfStartupAnimationPausedEdits=true,
+            previewOwnersSoftwareOnly=true,processRenderModeUnchanged=true,bellManuallyVerified=false}));
         Console.WriteLine("Ocean offscreen readback and editor apply checks passed; no windows shown.");
     }
 
@@ -47,6 +48,7 @@ internal static class OceanProductChecks
         // it is never shown, attached to Explorer or used as a GPU presentation target.
         using var source=new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters("Ocean hidden lifecycle test")
         {Width=160,Height=90,WindowStyle=unchecked((int)0x80000000)});
+        source.CompositionTarget.RenderMode=System.Windows.Interop.RenderMode.SoftwareOnly;
         using var preview=new OceanPreviewControl{Width=160,Height=90};
         var runtime=new OceanRuntime(new OceanPreferences(DayCycle:false));
         preview.Select(new("ocean",WallpaperKind.Ocean,Ocean:runtime));
@@ -159,6 +161,7 @@ internal static class OceanProductChecks
                 using var file=File.Create(Path.Combine(output,$"editor-{size.Width}x{size.Height}.png"));encoder.Save(file);
             }
             Check(Descendants(editor).OfType<ComboBox>().All(c=>!string.IsNullOrWhiteSpace(System.Windows.Automation.AutomationProperties.GetName(c))||c.DisplayMemberPath=="Label"),"Unlabelled editor choice.");
+            CheckPreviewOwnerComposition(window);
         }
         finally
         {
@@ -166,6 +169,30 @@ internal static class OceanProductChecks
             SynchronizationContext.SetSynchronizationContext(context);
         }
     }
+    private static void CheckPreviewOwnerComposition(MainWindow main)
+    {
+        var processMode=RenderOptions.ProcessRenderMode;
+        void CheckOwner(Window window)
+        {
+            // EnsureHandle fires the real SourceInitialized path without Show/Loaded.
+            var handle=new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+            var target=System.Windows.Interop.HwndSource.FromHwnd(handle)!.CompositionTarget;
+            Check(target.RenderMode==System.Windows.Interop.RenderMode.SoftwareOnly,"Preview owner still permits WPF hardware presentation.");
+            Check(!IsWindowVisible(handle),"Preview owner test showed a window.");
+        }
+        CheckOwner(main);
+        var settings=new VisualizerSettingsWindow();
+        try { CheckOwner(settings); }
+        finally { settings.Close(); }
+        Check(RenderOptions.ProcessRenderMode==processMode,"Preview policy changed process-wide rendering.");
+        using var unrelated=new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters("Unrelated hidden render target")
+        {Width=2,Height=2,WindowStyle=unchecked((int)0x80000000)});
+        Check(unrelated.CompositionTarget.RenderMode==System.Windows.Interop.RenderMode.Default,"Preview policy leaked to an unrelated window.");
+    }
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr handle);
+
     private static void CheckHost(string output)
     {
         var parent=CreateWindowEx(0,"STATIC","Ocean product test",0x80000000,0,0,640,360,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);

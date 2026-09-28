@@ -70,6 +70,18 @@ public partial class MainWindow : Window
 
     public MainWindow() : this(new AppSettingsStore(), null) { }
 
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        // Keep the preview owner's WPF presentation off Direct3D too. This does not
+        // change the offscreen GPU renderers or the desktop wallpaper swap chains.
+        if (HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.CompositionTarget is { } target)
+        {
+            target.RenderMode = RenderMode.SoftwareOnly;
+            AppLog.Write("Main window composition initialized. WpfRenderMode=SoftwareOnly; WallpaperGpuUnchanged=True");
+        }
+        base.OnSourceInitialized(e);
+    }
+
     internal MainWindow(AppSettingsStore settingsStore, string? libraryRoot, DisplayWallpaperController? controller = null, AppLicenseService? license = null,
         Func<DesktopWorker.WallpaperTarget[]>? getMonitorTargets = null)
     {

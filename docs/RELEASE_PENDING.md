@@ -279,3 +279,5 @@ in [Store licensing](STORE_LICENSING.md); they are not the current sales model.
 ## Ocean integration regression — 2026-09-28
 
 The owner reported notification-bell flicker again in the new Ocean integration. The earlier 1.2.2 acceptance remains historical. Ocean previews now use WPF composition with no preview HWND or window swap chain; manual bell acceptance is pending. See [implementation and regression evidence](OCEAN_USER_EXPERIENCE_IMPLEMENTATION.md).
+
+The owner subsequently confirmed flicker also affects other wallpaper previews. A further mitigation sets the main and visualizer-settings windows' WPF composition to `SoftwareOnly` at source initialization. Offscreen GPU preview rendering and desktop presentation are unchanged. This is a scoped presentation experiment, not a confirmed diagnosis of the Windows notification heuristic; bell stability and UI CPU cost still require manual acceptance.

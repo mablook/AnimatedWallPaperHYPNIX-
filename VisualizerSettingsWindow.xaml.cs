@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AnimatedWallPaper.Services;
@@ -22,6 +23,17 @@ public partial class VisualizerSettingsWindow : Window
     private bool _previewSuspended;
     internal event Action<VisualizerPreferences>? Changed;
     internal event Action? PresetsChanged;
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        // Use the same presentation policy as the library's preview owner.
+        if (HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.CompositionTarget is { } target)
+        {
+            target.RenderMode = RenderMode.SoftwareOnly;
+            AppLog.Write("Visualizer settings composition initialized. WpfRenderMode=SoftwareOnly; WallpaperGpuUnchanged=True");
+        }
+        base.OnSourceInitialized(e);
+    }
 
     public VisualizerSettingsWindow()
     {
