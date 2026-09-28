@@ -2,7 +2,7 @@
 
 28/09/2026 · Base técnica: `762a45a` · Branch: `codex/ocean-and-day-cycle`.
 
-**Status: estudo e plano. Nenhuma mudança de renderização implementada nesta entrega.**
+**Status: plano original, seguido pela [implementação documentada](OCEAN_CLOUD_MOTION_IMPLEMENTATION.md).** A implementação registra as escolhas finais, diferenças em relação à candidata e limites da validação; os números exploratórios abaixo continuam sendo metas do plano.
 
 ## 1. Contrato de escopo para a implementação
 

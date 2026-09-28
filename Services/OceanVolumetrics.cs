@@ -34,6 +34,8 @@ internal sealed class OceanVolumetrics : IDisposable
     private readonly ProbeArray[] _reflection=new ProbeArray[3];
     private readonly long[] _ticks=[long.MinValue,long.MinValue,long.MinValue];
     private (OceanWeatherSettings,OceanCelestialSettings,bool)? _key;
+    private OceanCloudTrajectory? _trajectory;
+    private OceanCloudTrajectory? _constantTrajectory;
     private DateTimeOffset _epoch;
     private int _first,_second,_preparingIndex=-1,_preparingStage;
     private long _preparingTick=long.MinValue;
@@ -65,7 +67,7 @@ internal sealed class OceanVolumetrics : IDisposable
             ID3D11ComputeShader Shader(string entry)=>Own(device.CreateComputeShader(OceanShader.Compile(path,entry,"cs_5_0").Span));
             _noiseShader=Shader("BuildNoise"); _lightShader=Shader("BuildLight"); _skyShader=Shader("BuildEnvironment");
             _aerialShader=Shader("BuildAerial"); _reflectionShader=Shader("BuildReflections");
-            _constants=Own(device.CreateBuffer(12*16,BindFlags.ConstantBuffer,ResourceUsage.Dynamic,CpuAccessFlags.Write));
+            _constants=Own(device.CreateBuffer(15*16,BindFlags.ConstantBuffer,ResourceUsage.Dynamic,CpuAccessFlags.Write));
             _wrap=Own(device.CreateSamplerState(new SamplerDescription {Filter=Filter.MinMagMipLinear,
                 AddressU=TextureAddressMode.Wrap,AddressV=TextureAddressMode.Wrap,AddressW=TextureAddressMode.Wrap,MaxLOD=float.MaxValue}));
             _clamp=Own(device.CreateSamplerState(new SamplerDescription {Filter=Filter.MinMagMipLinear,
@@ -90,14 +92,16 @@ internal sealed class OceanVolumetrics : IDisposable
         }
         catch { Dispose(); throw; }
     }
-    public void Update(double weatherTime,OceanSettings settings,OceanCelestialFrame frame)
+    public void Update(double weatherTime,OceanSettings settings,OceanCelestialFrame frame,OceanCloudTrajectory? trajectory=null)
     {
         weatherTime=double.IsFinite(weatherTime) ? Math.Max(0,weatherTime) : 0;
         var key=(settings.Weather!,frame.Settings,settings.Horizon);
+        trajectory ??= _constantTrajectory is { } current && current.InitialWind==settings.Weather!.WindMetresPerSecond
+            ? current : (_constantTrajectory=new OceanCloudTrajectory(settings.Weather!.WindMetresPerSecond));
         var epoch=frame.Utc.AddSeconds(-weatherTime*frame.Settings.TimeScale);
-        if(_key!=key || Math.Abs((epoch-_epoch).TotalSeconds)>.05)
+        if(_key!=key || _trajectory!=trajectory || Math.Abs((epoch-_epoch).TotalSeconds)>.05)
         {
-            _key=key; _epoch=epoch; Array.Fill(_ticks,long.MinValue);
+            _key=key; _trajectory=trajectory; _epoch=epoch; Array.Fill(_ticks,long.MinValue);
             _preparingIndex=-1; _lastWeatherTime=double.NaN;
         }
         // Present two complete samples; prepare a third in four independent passes.
@@ -137,15 +141,15 @@ internal sealed class OceanVolumetrics : IDisposable
         if(_preparingIndex==index) _preparingIndex=-1;
         for(var pass=0;pass<4;pass++) BuildPass(index,tick,interval,settings,pass);
     }
-    private unsafe void BuildPass(int index,long tick,double interval,OceanSettings settings,int pass)
+    private unsafe void SetFrameConstants(double time,OceanSettings settings,OceanCloudTrajectory trajectory)
     {
-        var weather=settings.Weather!; var time=tick*interval;
+        var weather=settings.Weather!;
         var frame=OceanCelestialModel.Evaluate(_epoch.AddSeconds(time*_key!.Value.Item2.TimeScale),_key.Value.Item2);
         var layer=weather.Layer; var fog=weather.FogProfile;
         var mapped=_context.Map(_constants,0,MapMode.WriteDiscard);
         try
         {
-            var data=new Span<Vector4>((void*)mapped.DataPointer,12); data.Clear();
+            var data=new Span<Vector4>((void*)mapped.DataPointer,15); data.Clear();
             data[0]=new(frame.Sun.Direction,frame.Sun.Radius); data[1]=new(frame.Sun.Irradiance,OceanOpticalDepth.Aerosol(frame.Settings.Air));
             data[2]=new(frame.Moon.Direction,frame.Moon.Radius); data[3]=new(frame.Moon.Irradiance,0);
             data[4]=new(layer.Base,layer.Top,weather.Coverage,(int)weather.Clouds);
@@ -157,9 +161,22 @@ internal sealed class OceanVolumetrics : IDisposable
             data[8]=new(Budget.Width,Budget.Height,Budget.CloudSteps,Budget.ShadowSteps);
             data[9]=new(Budget.AirSteps,Budget.FogSteps,Budget.AerialDepth,Budget.LightSize);
             data[10]=new(32,16,layer.Top,Quality==OceanQuality.High ? 3 : 2);
+            var motion=trajectory.Constants(time,weather.Clouds);
+            data[12]=motion.Travel; data[13]=motion.Evolution; data[14]=motion.Shear;
         }
         finally { _context.Unmap(_constants,0); }
         _context.CSSetConstantBuffer(1,_constants);
+    }
+    // Native density checks exercise the production function without lighting,
+    // sky projection or cache interpolation masking a motion discontinuity.
+    internal void BindDensityDiagnostic(double time,OceanSettings settings,OceanCloudTrajectory trajectory)
+    {
+        SetFrameConstants(time,settings,trajectory);
+        _context.CSSetShaderResource(23,_noise.Read); _context.CSSetSampler(4,_wrap);
+    }
+    private void BuildPass(int index,long tick,double interval,OceanSettings settings,int pass)
+    {
+        SetFrameConstants(tick*interval,settings,_trajectory!);
         _context.CSSetShaderResource(24,pass==0 ? null! : Light[index].Read);
         switch(pass)
         {

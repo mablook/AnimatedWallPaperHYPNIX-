@@ -96,6 +96,8 @@ internal static class OceanProofWindow
         var gate = new object();
         var clock = new OceanFrameClock();
         var weatherClock = new OceanFrameClock();
+        var cloudMotion = new OceanCloudMotion();
+        hints.SetToolTip(wind,"Vento das nuvens muda suavemente, com resposta de até 1 s e transição de 3 s. Vento parado mantém evolução lenta; Pausar congela tudo.");
         var celestialClock = new OceanCelestialClock(OceanCelestialSettings.Default.EpochUtc);
         var wall = Stopwatch.StartNew();
         var settings = new OceanSettings(Lighting: startMoon ? OceanLighting.Moon : OceanLighting.Sunset, Celestial: OceanCelestialSettings.Default);
@@ -129,6 +131,7 @@ internal static class OceanProofWindow
             lock (gate)
             {
                 var rate = speed.SelectedIndex switch { 0 => .5f, 2 => 1.5f, _ => 1f };
+                cloudMotion.SetWind(weatherClock.Advance(wall.Elapsed.TotalSeconds),wind.SelectedIndex*9);
                 clock.SetSpeed(rate, wall.Elapsed.TotalSeconds);
                 var skyRate=cycleSpeed.SelectedIndex switch { 0=>1,1=>12,3=>72,4=>144,_=>24 };
                 celestialClock.SetRate(skyRate,wall.Elapsed.TotalSeconds);
@@ -169,15 +172,16 @@ internal static class OceanProofWindow
                 void Draw()
                 {
                     var started = Stopwatch.GetTimestamp();
-                    double time,weatherTime; DateTimeOffset celestialUtc; OceanSettings snapshot; bool save;
+                    double time,weatherTime; DateTimeOffset celestialUtc; OceanSettings snapshot; OceanCloudTrajectory trajectory; bool save;
                     lock (gate)
                     {
                         var now=wall.Elapsed.TotalSeconds;
                         time = clock.Advance(now); celestialUtc=celestialClock.Advance(now); weatherTime=weatherClock.Advance(now);
                         snapshot = settings;
+                        trajectory = cloudMotion.Trajectory;
                         save = captureRequested; captureRequested = false;
                     }
-                    renderer!.Render(time, snapshot, present: true, celestialUtc: celestialUtc,weatherTime:weatherTime);
+                    renderer!.Render(time, snapshot, present: true, celestialUtc: celestialUtc,weatherTime:weatherTime,cloudTrajectory:trajectory);
                     if (save) OceanRenderChecks.Save(renderer.Pixels(),
                         Path.Combine(output, $"ocean-{DateTime.Now:yyyyMMdd-HHmmss-fff}.png"), width, height);
                     Interlocked.Increment(ref frameCount);
@@ -292,8 +296,8 @@ internal static class OceanProofWindow
                 if (step == 6) { showSun.PerformClick(); cycleEnabled.Checked=false; }
                 if (step == 7) { showMoon.PerformClick(); if(!cycleEnabled.Checked || eventChoice.SelectedIndex!=2) throw new InvalidOperationException("Moon shortcut did not enable the lunar cycle view."); }
                 if (step == 8) { volumetric.Checked=false; }
-                if (step == 9) { volumetric.Checked=true; fogType.SelectedIndex=3; cloudType.SelectedIndex=1; }
-                if (step == 10) { fogType.SelectedIndex=1; cloudType.SelectedIndex=0; advanceHour.PerformClick(); capture.PerformClick(); }
+                if (step == 9) { volumetric.Checked=true; fogType.SelectedIndex=3; cloudType.SelectedIndex=1; wind.SelectedIndex=2; }
+                if (step == 10) { fogType.SelectedIndex=1; cloudType.SelectedIndex=0; wind.SelectedIndex=0; advanceHour.PerformClick(); capture.PerformClick(); }
                 if (step++ == 11) { checkTimer.Stop(); form.Close(); }
             };
             form.Shown += (_, _) => checkTimer.Start();

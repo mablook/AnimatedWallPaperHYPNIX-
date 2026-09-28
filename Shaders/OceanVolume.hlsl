@@ -6,6 +6,26 @@ RWTexture3D<float2> LightVolumeOutput : register(u3);
 RWTexture3D<float2> NoiseOutput : register(u4);
 RWTexture2DArray<float4> ReflectionOutput : register(u5);
 
+// Native test-only entry: sample the actual cloud/fog fields, without light,
+// projection, exposure or cached image interpolation hiding density changes.
+cbuffer DensityProbe : register(b2) { float4 ProbeArea; }; // origin x/z, span km, size
+[numthreads(8,8,1)]
+void CloudDensityReference(uint3 id:SV_DispatchThreadID)
+{
+    if(id.x>=ProbeArea.w || id.y>=ProbeArea.w) return;
+    float2 xz=ProbeArea.xy+(id.xy/(ProbeArea.w-1)-.5)*ProbeArea.z;
+    float density=0, peak=0;
+    [unroll] for(int k=0;k<8;k++)
+    {
+        float3 p=float3(xz.x,lerp(VLayer.x,VLayer.y,(k+.5)/8),xz.y);
+        // Align samples with the spherical height convention used in production.
+        p.y-=dot(xz,xz)/(2*VR);
+        float d=VCloud(p,0); density+=d/8; peak=max(peak,d);
+    }
+    float3 fogPosition=float3(xz.x,.04-dot(xz,xz)/(2*VR),xz.y);
+    SkyVolumeOutput[id.xy]=float4(density,VFogDensity(fogPosition),peak,1);
+}
+
 // Native validation executes the production transport step against a double-precision oracle.
 [numthreads(8,1,1)]
 void TransportReference(uint3 id:SV_DispatchThreadID)

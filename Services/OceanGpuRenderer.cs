@@ -223,7 +223,8 @@ internal sealed class OceanGpuRenderer : IDisposable
         finally { _context.Unmap(_constants, 0); }
     }
 
-    public void Render(double time, OceanSettings settings, bool present = false, DateTimeOffset? celestialUtc = null, double? weatherTime = null)
+    public void Render(double time, OceanSettings settings, bool present = false, DateTimeOffset? celestialUtc = null, double? weatherTime = null,
+        OceanCloudTrajectory? cloudTrajectory = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         settings = settings.Normalize();
@@ -246,7 +247,7 @@ internal sealed class OceanGpuRenderer : IDisposable
                 {
                     if(_volumes is null || _volumes.Quality!=settings.Quality)
                     { _volumes?.Dispose(); _volumes=null; _volumes=new OceanVolumetrics(_device,_context,settings.Quality); }
-                    _volumes.Update(weatherTime ?? time/settings.Speed,settings,celestial);
+                    _volumes.Update(weatherTime ?? time/settings.Speed,settings,celestial,cloudTrajectory);
                     _volumes.Bind();
                 }
                 else

@@ -14,6 +14,9 @@ cbuffer VolumeFrame : register(b1)
     float4 VGrid; // air steps, fog steps, AP slices, shadow volume horizontal size
     float4 VConfig; // AP extent, shadow half extent, shadow height, AP substeps
     float4 VReserved;
+    float4 VCloudTravel; // independent cloud x/z offset km, integrated wind phase, reserved
+    float4 VCloudEvolution; // bounded material-space warp phase xyz, renewal distance km
+    float4 VCloudShear; // differential x/z transport per normalized layer height
 };
 Texture3D<float2> VolumeNoise : register(t23);
 SamplerState VolumeWrap : register(s4);
@@ -45,14 +48,8 @@ float3 VCoordinates(float3 p)
 {
     return float3(p.x+VWind.x+VWind.z,VHeight(p),p.z+VWind.y+VWind.z*.713);
 }
-float VCloud(float3 p,float lod)
+float VCloudStructure(float3 q,float h,float coverage,float lod)
 {
-    float h=(VHeight(p)-VLayer.x)/(VLayer.y-VLayer.x);
-    if(h<=0 || h>=1 || VLayer.z<=0) return 0;
-    float3 q=VCoordinates(p);
-    q.xz+=float2(VN(q*3+19,lod).x-.5,VN(q*3+43,lod).x-.5)*(.16+.16*h);
-    float weather=VN(float3(q.x*.22,11.3,q.z*.22),0).x;
-    float coverage=smoothstep(1-VLayer.z-.17,1-VLayer.z+.13,weather);
     float2 low=VN(q*1.15, max(0,lod-1));
     float shape=.40*low.x+.36*(1-low.y)+.16*(1-VN(q*2.3+17,lod).y)+.08*VN(q*4.6+37,lod).x;
     float profile;
@@ -60,8 +57,33 @@ float VCloud(float3 p,float lod)
     else if(VLayer.w<1.5) profile=smoothstep(0,.06,h)*(1-smoothstep(.58,1,h));
     else { profile=smoothstep(0,.16,h)*(1-smoothstep(.75,1,h)); shape=lerp(shape,.76,.72); }
     float base=saturate((shape+coverage*.56-.66)*3.4)*coverage*profile;
-    float erosion=VN(q*7.5+37,lod).y*.22;
+    float erosion=VN(q*7.5+37+VCloudEvolution.xyz*.7,lod).y*.22;
     return max(0,base-erosion*(1-base)) * VFog.w;
+}
+float3 VCloudCoordinates(float3 p)
+{
+    // Deliberately separate from VCoordinates: fog retains its existing motion.
+    return float3(p.x+VCloudTravel.x+VWind.z,VHeight(p),p.z+VCloudTravel.y+VWind.z*.713);
+}
+float VCloud(float3 p,float lod)
+{
+    float h=(VHeight(p)-VLayer.x)/(VLayer.y-VLayer.x);
+    if(h<=0 || h>=1 || VLayer.z<=0) return 0;
+    float3 q=VCloudCoordinates(p);
+    float weather=VN(float3(q.x*.22,11.3,q.z*.22),0).x;
+    float coverage=smoothstep(1-VLayer.z-.17,1-VLayer.z+.13,weather);
+    if(coverage<=0) return 0;
+    q.xz+=float2(VN(q*3+19+VCloudEvolution.xyz,lod).x-.5,
+                 VN(q*3+43+VCloudEvolution.zxy,lod).x-.5)*(.16+.16*h);
+    // Two locally aged, overlapping deformations; at a reset the corresponding
+    // weight AND its derivative vanish. Material-space weather varies phases
+    // continuously across space. Only differential shear is renewed, not bulk flow.
+    float age=frac(VCloudTravel.z+weather*2), other=frac(age+.5);
+    float weight=sin(VP*age); weight*=weight;
+    float2 shear=VCloudShear.xy*(2*h-1)*VCloudEvolution.w;
+    float3 a=q, b=q;
+    a.xz+=shear*(age-.5); b.xz+=shear*(other-.5);
+    return lerp(VCloudStructure(b,h,coverage,lod),VCloudStructure(a,h,coverage,lod),weight);
 }
 float VFogDensity(float3 p)
 {

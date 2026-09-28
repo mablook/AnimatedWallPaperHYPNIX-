@@ -5,7 +5,7 @@ Referência: [estudo de transporte, nuvens e neblina](OCEAN_VOLUMETRIC_ENVIRONME
 
 Revisão posterior: [correção da resposta rasante e acompanhamento dos reflexos solar/lunar](OCEAN_REFLECTION_TRACKING_FIX.md), com energia refletida compatível com a rugosidade e testes de projeção do reflexo ao longo do ciclo.
 
-Próximo plano, ainda não implementado: [movimento e evolução apenas das nuvens](OCEAN_CLOUD_MOTION_PLAN.md), preservando os controles existentes e os demais componentes do ambiente.
+Evolução posterior: [movimento e evolução apenas das nuvens — implementação](OCEAN_CLOUD_MOTION_IMPLEMENTATION.md), seguindo o [plano](OCEAN_CLOUD_MOTION_PLAN.md) e preservando os controles existentes e os demais componentes do ambiente.
 
 ## Entrega
 

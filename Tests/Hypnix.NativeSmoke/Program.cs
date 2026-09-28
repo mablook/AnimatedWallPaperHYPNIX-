@@ -34,6 +34,11 @@ internal static class Program
                 "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
                 string.Concat(resourceXml.Nodes()) + "</ResourceDictionary>");
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (args.Contains("--ocean-cloud-motion")) { OceanCloudMotionChecks.Run(output); return 0; }
+            if (args.Contains("--ocean-cloud-video")) { OceanCloudMotionChecks.Movie(output,args[Array.IndexOf(args,"--ocean-cloud-video")+1]); return 0; }
+            if (args.Contains("--ocean-cloud-stress-benchmark")) { OceanRenderChecks.Benchmark(output,
+                new OceanSettings(Celestial:OceanCelestialSettings.Default with {TimeScale=144},
+                    Weather:new(Clouds:OceanCloudType.Cumulus,Coverage:.95f,WindMetresPerSecond:18)),args.Contains("--quick")); return 0; }
             if (args.Contains("--ocean-reflection")) { OceanReflectionChecks.Run(output); return 0; }
             if (args.Contains("--ocean-volumes")) { OceanVolumeChecks.Run(output,args.Contains("--quick")); return 0; }
             if (args.Contains("--ocean-volume-benchmark")) { OceanRenderChecks.Benchmark(output,new OceanSettings(Celestial:OceanCelestialSettings.Default with {TimeScale=144},Weather:new()),args.Contains("--quick")); return 0; }

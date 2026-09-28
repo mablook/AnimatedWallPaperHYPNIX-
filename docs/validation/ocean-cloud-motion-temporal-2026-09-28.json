@@ -1,0 +1,26 @@
+[
+  {
+    "kind": "Stratocumulus",
+    "frames": 3600,
+    "meanCodeDifference": 0.006876232766989496,
+    "p95CodeDifference": 0.010524691358024653,
+    "maxCodeDifference": 0.01689300411522615,
+    "peakFrame": 1230
+  },
+  {
+    "kind": "Cumulus",
+    "frames": 3600,
+    "meanCodeDifference": 0.0030557813841750785,
+    "p95CodeDifference": 0.0055658436213992,
+    "maxCodeDifference": 0.008991769547325123,
+    "peakFrame": 3300
+  },
+  {
+    "kind": "Stratus",
+    "frames": 3600,
+    "meanCodeDifference": 0.0055502728810129225,
+    "p95CodeDifference": 0.009290123456790136,
+    "maxCodeDifference": 0.013261316872427785,
+    "peakFrame": 2371
+  }
+]
