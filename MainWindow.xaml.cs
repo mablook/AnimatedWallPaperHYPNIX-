@@ -393,65 +393,76 @@ public partial class MainWindow : Window
         ShowInTaskbar = false;
     }
 
-    private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e) => await CheckForUpdatesInteractiveAsync();
+
+    private void SetUpdateCheckStatus(string message)
     {
-        if (ReferenceEquals(sender, HeaderCheckUpdatesButton))
-        {
-            AppSettings_Click(sender, e);
-            AppSettingsPage.UpdateLayout();
-            AboutUpdateText.BringIntoView();
-        }
-        await CheckForUpdatesInteractiveAsync();
+        AboutUpdateText.Text = message;
+        HeaderUpdateStatusText.Text = message;
+        HeaderUpdateStatusText.Visibility = Visibility.Visible;
     }
 
-    // Manual update check. Store builds update themselves, so this opens the Store listing where the
-    // user can confirm; website installs run the Velopack check and report the outcome either way.
+    // Query the installed channel directly. A loose development/portable copy cannot query
+    // Store package updates; its explicit fallback opens the product in Microsoft Store.
     private async Task CheckForUpdatesInteractiveAsync()
     {
         if (_updateCheckInFlight) return;
-        if (AppInstall.IsPackaged) { OpenStoreListing(); return; }
         _updateCheckInFlight = true;
         CheckUpdatesButton.IsEnabled = false;
-        AboutUpdateText.Text = "Checking for updates\u2026";
+        SetUpdateCheckStatus("Checking for updates\u2026");
         try
         {
+            if (AppInstall.IsPackaged)
+            {
+                var context = Windows.Services.Store.StoreContext.GetDefault();
+                WinRT.Interop.InitializeWithWindow.Initialize(context, new WindowInteropHelper(this).EnsureHandle());
+                var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
+                if (_isQuitting) return;
+                if (updates.Count == 0) SetUpdateCheckStatus("No updates are currently available from Microsoft Store.");
+                else OpenStoreListing("An update is available. Opening Microsoft Store to update HYPNIX.");
+                return;
+            }
             _updateService ??= new UpdateService();
             if (!_updateService.IsInstalled)
             {
-                AboutUpdateText.Text = "Automatic updates apply to the installed HYPNIX; this build does not update itself.";
+                OpenStoreListing("Opening Microsoft Store. Updates there apply to the Store-installed HYPNIX.");
                 return;
             }
-            var update = await _updateService.CheckAndDownloadAsync();
+            var update = await _updateService.CheckAndDownloadAsync(throwOnError: true);
             if (_isQuitting) return;
-            if (update is null) { AboutUpdateText.Text = $"HYPNIX {AppInstall.Version} is up to date."; return; }
+            if (update is null) { SetUpdateCheckStatus($"HYPNIX {AppInstall.Version} is up to date."); return; }
             _pendingUpdate = update;
             if (_trayUpdateItem is not null)
             {
                 _trayUpdateItem.Text = $"Restart to update HYPNIX to {update.TargetFullRelease.Version}";
                 _trayUpdateItem.Visible = true;
             }
-            AboutUpdateText.Text = $"Update {update.TargetFullRelease.Version} is ready. Choose \u201CRestart to update HYPNIX\u201D in the tray to install it.";
+            SetUpdateCheckStatus($"Update {update.TargetFullRelease.Version} is ready. Choose \u201CRestart to update HYPNIX\u201D in the tray to install it.");
         }
         catch (Exception exception)
         {
             AppLog.WriteException("Interactive update check failed", exception);
-            AboutUpdateText.Text = "Update check failed. Open diagnostics for details.";
+            if (!_isQuitting)
+            {
+                if (AppInstall.IsPackaged) OpenStoreListing("Could not check for updates. Opening Microsoft Store so you can check there.");
+                else SetUpdateCheckStatus("Update check failed. Open diagnostics for details.");
+            }
         }
         finally { _updateCheckInFlight = false; CheckUpdatesButton.IsEnabled = true; }
     }
 
-    private void OpenStoreListing()
+    private void OpenStoreListing(string status)
     {
         try
         {
-            AboutUpdateText.Text = "Opening the Microsoft Store\u2026";
+            SetUpdateCheckStatus(status);
             using var _ = Process.Start(new ProcessStartInfo(
                 $"ms-windows-store://pdp/?productid={MicrosoftStoreLicenseProvider.StoreId}") { UseShellExecute = true });
         }
         catch (Exception exception)
         {
             AppLog.WriteException("Open Microsoft Store", exception);
-            AboutUpdateText.Text = "Could not open the Microsoft Store. Search for HYPNIX there to check for updates.";
+            SetUpdateCheckStatus("Could not open the Microsoft Store. Search for HYPNIX there to check for updates.");
         }
     }
 

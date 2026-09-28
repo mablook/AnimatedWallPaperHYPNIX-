@@ -28,8 +28,9 @@ internal sealed class UpdateService
 
     // Returns a downloaded update ready to apply, or null when there is nothing new, when the app is
     // not a Velopack install, or when the feed is unreachable (logged and treated as "no update", so
-    // a failed check never disrupts a running wallpaper).
-    public async Task<UpdateInfo?> CheckAndDownloadAsync()
+    // a failed background check never disrupts a running wallpaper). Interactive callers request
+    // errors explicitly so a network/feed failure is never reported as "up to date".
+    public async Task<UpdateInfo?> CheckAndDownloadAsync(bool throwOnError = false)
     {
         if (!_manager.IsInstalled) return null;
         try
@@ -42,6 +43,7 @@ internal sealed class UpdateService
         catch (Exception exception)
         {
             AppLog.WriteException("Update check failed; keeping the current version", exception);
+            if (throwOnError) throw;
             return null;
         }
     }
