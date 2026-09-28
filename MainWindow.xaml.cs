@@ -156,7 +156,7 @@ public partial class MainWindow : Window
         WallpaperGallery.SelectedItem = entries.FirstOrDefault(entry => entry.Id == selectedId) ?? entries.FirstOrDefault();
         LibraryStatusText.Text = invalid == 0 ? $"{entries.Count} wallpapers" : $"{entries.Count} wallpapers · {invalid} unavailable packages";
         _isUiInitialized = initialized;
-        if (initialized) UpdateSelection();
+        if (initialized) { UpdateSelection(); UpdateStatus(); }
     }
 
     private void WallpaperGallery_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -693,18 +693,18 @@ public partial class MainWindow : Window
         ActiveWallpaperId = active?.Id;
         var title = WallpaperGallery.Items.Cast<WallpaperEntry>().FirstOrDefault(entry => entry.Id == ActiveWallpaperId)?.Title;
         var count = _wallpaperController.ActiveRequests.Count;
-        StatusText.Text = _changingWallpaper ? "Preparing wallpaper…" : count == 0 ? state : $"{state} · {count} {(count == 1 ? "display" : "displays")}";
+        StatusText.Text = _changingWallpaper ? "Preparing wallpaper…" : _restoringDisplays ? "Restoring saved wallpapers…" : count == 0 ? state : $"{state} · {count} {(count == 1 ? "display" : "displays")}";
         DisplayWallpaperText.Text = title is null ? "No wallpaper on this display" : $"{(_wallpaperController.IsDisplayPaused(SelectedDisplay!.Target.DeviceId) ? "Paused" : "Playing")} · {title}";
         StatusText.ToolTip = Decision.Reason;
         StopButton.IsEnabled = _wallpaperController.IsRunning || _changingWallpaper || _restoringDisplays || _recovering || _playRequested;
-        StartButton.IsEnabled = _license.CanPlay && Selected is not null && SelectedDisplay is not null && !_changingWallpaper && !_recovering && !_restoringDisplays;
+        StartButton.IsEnabled = _license.CanPlay && Selected is not null && SelectedDisplay is not null && !_changingWallpaper && !_recovering;
         ApplyAllButton.IsEnabled = StartButton.IsEnabled;
         ApplyAllButton.Visibility = TargetDisplayCombo.Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         StopDisplayButton.IsEnabled = active is not null && !_changingWallpaper && !_recovering && !_restoringDisplays;
         StartButton.Content = _changingWallpaper && Selected?.IsEnvironment==true ? OceanText.T("Preparing ocean…") :
             SelectedDisplay is { } selectedDisplay ? $"Apply to display {selectedDisplay.Number}" : "Apply wallpaper";
         ApplyTargetText.Text = SelectedDisplay is { } target ? $"Only display {target.Number} will change" : "Connect a display to apply";
-        OceanEditor.SetApplyState(_license.CanPlay&&SelectedDisplay is not null&&!_recovering&&!_restoringDisplays,_changingWallpaper);
+        OceanEditor.SetApplyState(_license.CanPlay&&SelectedDisplay is not null&&!_recovering,_changingWallpaper);
         UpdatePreviewActions();
         UpdateMonitorPreviews();
     }

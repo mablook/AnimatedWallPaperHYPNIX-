@@ -52,12 +52,12 @@ public partial class MainWindow
             d.Target.DeviceId,OceanText.Format("Display {0}",d.Number),d.Aspect)).ToArray();
         if(SelectedDisplay is { } selected)
             OceanEditor.SetDraft(selected.Target.DeviceId,OceanDraftFor(selected.Target.DeviceId),displays,_settings.FramesPerSecond);
-        OceanEditor.SetApplyState(_license.CanPlay&&SelectedDisplay is not null&&!_recovering&&!_restoringDisplays,_changingWallpaper);
+        OceanEditor.SetApplyState(_license.CanPlay&&SelectedDisplay is not null&&!_recovering,_changingWallpaper);
     }
 
     private async Task ApplyOceanAsync(bool all)
     {
-        if(_isQuitting||IsPreviewSimulation||!_license.CanPlay||_changingWallpaper||_recovering||_restoringDisplays||SelectedDisplay is not { } display)return;
+        if(_isQuitting||IsPreviewSimulation||!_license.CanPlay||_changingWallpaper||_recovering||SelectedDisplay is not { } display)return;
         var draft=OceanDraftFor(display.Target.DeviceId);
         var submitted=draft.Preferences;
         var snapshot=draft.Runtime.Fork();

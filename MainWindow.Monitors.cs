@@ -56,7 +56,7 @@ public partial class MainWindow
 
     private async Task ApplyToDisplaysAsync(IReadOnlyList<DesktopWorker.WallpaperTarget> targets, bool copySelectedPreferences = false)
     {
-        if (IsPreviewSimulation || !_license.CanPlay || _isQuitting || _changingWallpaper || _recovering || _restoringDisplays || Selected is not { } entry) return;
+        if (IsPreviewSimulation || !_license.CanPlay || _isQuitting || _changingWallpaper || _recovering || Selected is not { } entry) return;
         var preferences = CurrentPreferencesFor(entry);
         var revision = ++_selectionRevision;
         _changingWallpaper = true;
@@ -141,8 +141,18 @@ public partial class MainWindow
             }
             _playRequested = _wallpaperController.DesiredRequests.Count > 0 || _settings.DisplayWallpapers.Values.Any(value => value.Enabled);
             if (!_license.CanPlay || _isQuitting) StopWallpapers(persist: false);
-            if (errors.Count > 0) throw new AggregateException("Some displays could not be restored", errors);
+            if (revision == _selectionRevision && errors.Count > 0) throw new AggregateException("Some displays could not be restored", errors);
         }
-        finally { _restoringDisplays = false; ApplyPlaybackPolicy(); UpdateStatus(); }
+        finally
+        {
+            _restoringDisplays = false; ApplyPlaybackPolicy(); UpdateStatus();
+            // Manual Apply can supersede startup work on the same display. The controller
+            // rejects its late frame; resume restoration for other saved displays afterward.
+            if(revision!=_selectionRevision&&_playRequested)
+            {
+                _layoutRecoveryPending=true;
+                ScheduleRecovery();
+            }
+        }
     }
 }

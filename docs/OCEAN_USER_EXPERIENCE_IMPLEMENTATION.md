@@ -81,3 +81,20 @@ Usar a build `artifacts/ocean-product-build/HYPNIX.exe` depois de encerrar norma
 **Validação:** 454 testes unitários passaram. O teste `--ocean-preview-offscreen` foi ampliado para exercitar o ciclo real WPF/Direct3D: inicialização sem imagem, animação, pausa, mudança de pixels ao trocar Sol por Lua pausado, edição enquanto há uma entrega pendente e retomada. Passou com a escala DPI real do Windows. Para disparar `Loaded`, usa um proprietário WPF invisível, nunca mostrado ou anexado ao desktop; a prévia continua sem HWND de apresentação GPU. Nenhuma janela do usuário foi reiniciada. A aceitação visual das novas opções de pausa permanece com o proprietário.
 
 Resultado: [ocean-preview-lifecycle-2026-09-28.json](validation/ocean-preview-lifecycle-2026-09-28.json). Build atualizada no mesmo caminho `artifacts/ocean-product-build/HYPNIX.exe`.
+
+## Biblioteca — Aplicar ao abrir e ordem dos cartões
+
+28/09/2026. Relato: Aplicar ficava desabilitado na abertura e parecia depender de entrar em Customize ocean.
+
+O novo teste `--library-startup` reproduziu o bloqueio antes da correção: uma restauração inicial com preparação pendente desabilitava globalmente Aplicar, mesmo com licença válida, wallpaper selecionado e monitor disponível. O botão e os handlers de aplicação agora permitem uma escolha manual durante essa restauração. A sessão pendente do mesmo monitor é substituída pelo mecanismo de cancelamento/revisão já existente no controlador; frames tardias não podem tomar o lugar da escolha manual. A restauração dos outros monitores é retomada após essa substituição. Erros de uma revisão já superada não são apresentados como falhas da ação atual. O status indica quando está restaurando wallpapers salvos.
+
+Atualizar a biblioteca também recalcula o estado dos botões depois de reconstruir a seleção. Não é necessário abrir um editor para habilitar Aplicar. Verificação de licença, disponibilidade do monitor, bloqueio de aplicações simultâneas e modo de simulação permanecem ativos.
+
+A ordem dos wallpapers incluídos foi invertida: Ocean, Living Fire e o restante da sequência anterior ao contrário. Pacotes e vídeos adicionados continuam após os itens incluídos, e a seleção salva é preservada.
+
+Validação: 454 testes unitários passaram; build Release sem avisos/erros. O teste de biblioteca, sem mostrar janelas e com sessões/configurações isoladas, passou nos cenários de abertura nova, restauração lenta substituída por escolha manual e restauração com falha. Verificou aplicação direta de Living Fire e Ocean sem abrir Customize ocean, rejeição da sessão atrasada, retomada do segundo monitor e Ocean como primeiro cartão. Resultado em [library-startup-2026-09-28.json](validation/library-startup-2026-09-28.json).
+
+```powershell
+dotnet build Tests/Hypnix.NativeSmoke/Hypnix.NativeSmoke.csproj --no-restore -c Release -v minimal
+Tests/Hypnix.NativeSmoke/bin/Release/net8.0-windows10.0.19041.0/Hypnix.NativeSmoke.exe artifacts/library-startup-final --library-startup
+```

@@ -69,7 +69,8 @@ internal static class WallpaperCatalog
             catch (Exception exception) when (exception is IOException or JsonException or ArgumentException or InvalidOperationException)
             { AppLog.WriteException($"Built-in manifest skipped: {path}", exception); }
         }
-        return entries.OrderBy(entry => entry.Kind).ToArray();
+        // Reverse the established built-in sequence: Ocean first, then Living Fire, etc.
+        return entries.OrderBy(entry => entry.Kind).Reverse().ToArray();
     }
 
     public static WallpaperEntry FromPackage(WallpaperPackageRegistration registration)
