@@ -34,7 +34,8 @@
    </Grid>
    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
     <Button x:Name="StopButton" Content="Stop all" Click="StopButton_Click" MinWidth="68" Style="{StaticResource QuietButtonStyle}"/>
-    <Button x:Name="AppSettingsButton" Content="App settings" Click="AppSettings_Click" Margin="0" Style="{StaticResource QuietButtonStyle}"/>
+    <Button x:Name="AppSettingsButton" Content="App settings" Click="AppSettings_Click" Margin="0,0,8,0" Style="{StaticResource QuietButtonStyle}"/>
+    <Button x:Name="HeaderCheckUpdatesButton" Content="Check for updates" Click="CheckUpdates_Click" IsEnabled="{Binding IsEnabled, ElementName=CheckUpdatesButton}" Margin="0" Style="{StaticResource QuietButtonStyle}"/>
    </StackPanel>
   </Grid>
   <Grid Grid.Row="2">

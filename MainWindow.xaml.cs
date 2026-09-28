@@ -393,7 +393,16 @@ public partial class MainWindow : Window
         ShowInTaskbar = false;
     }
 
-    private async void CheckUpdates_Click(object sender, RoutedEventArgs e) => await CheckForUpdatesInteractiveAsync();
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        if (ReferenceEquals(sender, HeaderCheckUpdatesButton))
+        {
+            AppSettings_Click(sender, e);
+            AppSettingsPage.UpdateLayout();
+            AboutUpdateText.BringIntoView();
+        }
+        await CheckForUpdatesInteractiveAsync();
+    }
 
     // Manual update check. Store builds update themselves, so this opens the Store listing where the
     // user can confirm; website installs run the Velopack check and report the outcome either way.
