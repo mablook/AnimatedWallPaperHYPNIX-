@@ -636,7 +636,7 @@ public partial class MainWindow : Window
     private int GetSelectedFps() => FpsComboBox.SelectedItem is ComboBoxItem item &&
         int.TryParse(item.Tag?.ToString(), out var fps) ? FrameRatePolicy.Normalize(fps) : 30;
     private PlaybackDecision Decision => PlaybackPolicy.Evaluate(AppPauseModeComboBox.SelectedIndex,
-        _foregroundMonitor.FullscreenMonitors, _foregroundMonitor.CoveredMonitors,
+        _foregroundMonitor.FullscreenMonitors, _foregroundMonitor.VisibleAppMonitors,
         PauseBatteryCheckBox.IsChecked == true, _foregroundMonitor.IsOnBattery,
         PausePerMonitorToggle.IsChecked == true, _environment.SessionLocked);
 

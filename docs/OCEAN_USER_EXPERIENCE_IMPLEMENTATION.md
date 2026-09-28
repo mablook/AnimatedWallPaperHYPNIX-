@@ -69,3 +69,15 @@ Usar a build `artifacts/ocean-product-build/HYPNIX.exe` depois de encerrar norma
 2. Abrir o editor, rolar repetidamente e redimensionar. Conferir faixa de licença, cabeçalho e rodapé, incluindo escala DPI do sistema.
 3. Observar o sino com prévia aberta, oculta e app minimizado, com/sem desktop Ocean ativo. Registrar qual combinação reproduz se ainda ocorrer.
 4. Conferir qualidade/movimento, pausa/retomada, presets, Aplicar e Descartar em cada monitor. Comparar consumo com a build anterior: não foi feita nova medição de consumo nesta revisão.
+
+## Correção seguinte — prévia inicial e pausa em modo janela
+
+28/09/2026, após teste manual da build `93a2f99`.
+
+**Prévia:** o primeiro backend WPF herdava diretamente de `Image`. Sem `Source`, esse controle organizava seu tamanho como zero, mesmo dentro de um painel com dimensões válidas. O guard de inicialização aguardava dimensões positivas para gerar a primeira imagem, formando um ciclo sem progresso. Agora um `Grid` define o viewport e contém a imagem. Um teste verifica dimensões antes de existir qualquer frame. Outro defeito corrigido: uma edição recebida enquanto a frame anterior aguardava o dispatcher podia ficar sem novo sinal quando a animação estava pausada. Ao concluir a entrega ao WPF, uma repintura pendente agora acorda o worker.
+
+**Pausa:** conforme esclarecimento do proprietário, as opções são Never, Fullscreen apps only e Fullscreen or windowed apps. A terceira inclui janelas normais, encaixadas e maximizadas; não exige que cubram todo o monitor. Aplicativos minimizados, ocultos, em outro desktop virtual, overlays auxiliares e o próprio HYPNIX continuam excluídos. Janelas visíveis que atravessam monitores ocupam ambos. Usa-se a moldura visível do DWM para evitar que bordas invisíveis pausem o monitor vizinho. O escopo por monitor/todos os monitores continua configurável. O valor salvo 2 passa a ter a nova semântica, sem migração de schema.
+
+**Validação:** 454 testes unitários passaram. O teste `--ocean-preview-offscreen` foi ampliado para exercitar o ciclo real WPF/Direct3D: inicialização sem imagem, animação, pausa, mudança de pixels ao trocar Sol por Lua pausado, edição enquanto há uma entrega pendente e retomada. Passou com a escala DPI real do Windows. Para disparar `Loaded`, usa um proprietário WPF invisível, nunca mostrado ou anexado ao desktop; a prévia continua sem HWND de apresentação GPU. Nenhuma janela do usuário foi reiniciada. A aceitação visual das novas opções de pausa permanece com o proprietário.
+
+Resultado: [ocean-preview-lifecycle-2026-09-28.json](validation/ocean-preview-lifecycle-2026-09-28.json). Build atualizada no mesmo caminho `artifacts/ocean-product-build/HYPNIX.exe`.

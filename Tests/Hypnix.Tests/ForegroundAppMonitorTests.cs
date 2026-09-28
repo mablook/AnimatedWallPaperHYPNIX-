@@ -33,7 +33,7 @@ public sealed class ForegroundAppMonitorTests
             Assert.Equal(ownerThread, result.Thread);
             Assert.Null(result.Failure);
             Assert.Equal(1, result.Selection);
-            Assert.DoesNotContain(-1, monitor.CoveredMonitors);
+            Assert.DoesNotContain(-1, monitor.VisibleAppMonitors);
         });
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class ForegroundAppMonitorTests
             DrainDispatcher();
 
             Assert.Equal(0, notifications);
-            Assert.Equal(new[] { -1 }, monitor.CoveredMonitors);
+            Assert.Equal(new[] { -1 }, monitor.VisibleAppMonitors);
         });
 
     [Fact]
@@ -69,11 +69,11 @@ public sealed class ForegroundAppMonitorTests
             monitor.RefreshNow();
 
             Assert.Equal(ownerThread, notificationThread);
-            Assert.DoesNotContain(-1, monitor.CoveredMonitors);
+            Assert.DoesNotContain(-1, monitor.VisibleAppMonitors);
         });
 
     private static void ForceStateChange(ForegroundAppMonitor monitor)
-        => typeof(ForegroundAppMonitor).GetField("<CoveredMonitors>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
+        => typeof(ForegroundAppMonitor).GetField("<VisibleAppMonitors>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(monitor, new[] { -1 });
 
     private static void RunBackgroundTick(ForegroundAppMonitor monitor)

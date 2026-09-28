@@ -4,6 +4,22 @@ namespace Hypnix.Tests;
 
 public sealed class MonitorCoverageTests
 {
+    [Theory]
+    [InlineData(100,100,500,400,true)]
+    [InlineData(-100,100,100,400,true)]
+    [InlineData(1920,0,2000,400,false)]
+    [InlineData(-500,0,-100,400,false)]
+    [InlineData(10,10,10,100,false)]
+    public void WindowedPresenceRequiresPositiveVisibleIntersection(int left,int top,int right,int bottom,bool expected)
+        => Assert.Equal(expected,MonitorCoverage.Intersects(new(left,top,right,bottom),Monitor));
+
+    [Fact]
+    public void WindowStraddlingTwoDisplaysOccupiesBoth()
+    {
+        var window=new MonitorCoverage.Rectangle(-200,100,200,500);
+        Assert.True(MonitorCoverage.Intersects(window,new(-1920,0,0,1080)));
+        Assert.True(MonitorCoverage.Intersects(window,Monitor));
+    }
     // A 1920x1080 monitor with a 40px taskbar at the bottom (work area 1920x1040).
     private static readonly MonitorCoverage.Rectangle Monitor = new(0, 0, 1920, 1080);
     private static readonly MonitorCoverage.Rectangle Work = new(0, 0, 1920, 1040);

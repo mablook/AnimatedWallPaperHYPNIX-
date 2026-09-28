@@ -4,15 +4,15 @@ internal readonly record struct PlaybackDecision(bool PauseAll, IReadOnlyList<in
 
 internal static class PlaybackPolicy
 {
-    // appMode: 0 = never, 1 = fullscreen apps only, 2 = maximized or fullscreen apps.
+    // appMode: 0 = never, 1 = fullscreen apps only, 2 = fullscreen or windowed apps.
     // fullscreenMonitors: indices whose monitor is fully covered by a foreign app window (borderless/fullscreen).
-    // coveredMonitors:    indices whose monitor is covered by a maximized OR fullscreen foreign app window.
+    // visibleAppMonitors:    indices with any visible, non-minimized foreign app window.
     // perMonitor:         "Active display only" scope. Only the covered monitors freeze; clean monitors keep running.
     //                     When false ("All displays"), a single covered monitor freezes the whole desktop.
     public static PlaybackDecision Evaluate(
         int appMode,
         IReadOnlyCollection<int> fullscreenMonitors,
-        IReadOnlyCollection<int> coveredMonitors,
+        IReadOnlyCollection<int> visibleAppMonitors,
         bool pauseOnBattery, bool onBattery,
         bool perMonitor,
         bool sessionLocked = false)
@@ -23,7 +23,7 @@ internal static class PlaybackPolicy
         var occupied = appMode switch
         {
             1 => fullscreenMonitors,
-            2 => coveredMonitors,
+            2 => visibleAppMonitors,
             _ => Array.Empty<int>()
         };
 
@@ -38,6 +38,6 @@ internal static class PlaybackPolicy
             return new(false, monitors, reason);
         }
 
-        return new(true, Array.Empty<int>(), appMode == 1 ? "fullscreen app detected" : "another app is active");
+        return new(true, Array.Empty<int>(), appMode == 1 ? "fullscreen app detected" : "visible app window detected");
     }
 }

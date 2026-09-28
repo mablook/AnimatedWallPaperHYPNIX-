@@ -5,13 +5,17 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AnimatedWallPaper.Services;
 using Image = System.Windows.Controls.Image;
+using Grid = System.Windows.Controls.Grid;
 
 namespace AnimatedWallPaper;
 
 // No HWND, DXGI window association, GDI drawing or UI-thread wait. Only complete BGRA frames
 // cross to WPF; one reusable buffer and at most one outstanding dispatcher callback per session.
-internal sealed class OceanPreviewControl : Image, IDisposable
+internal sealed class OceanPreviewControl : Grid, IDisposable
 {
+    private readonly Image _image=new(){Stretch=Stretch.Fill};
+    internal ImageSource? Source { get=>_image.Source; set=>_image.Source=value; }
+    internal long PresentedFrames { get; private set; }
     private sealed class Session(OceanRuntime runtime,int width,int height)
     {
         internal readonly OceanRuntime Runtime=runtime;
@@ -32,7 +36,9 @@ internal sealed class OceanPreviewControl : Image, IDisposable
     internal event Action<string>? StatusChanged;
     internal OceanPreviewControl()
     {
-        Stretch=Stretch.Fill;ClipToBounds=true;
+        // An empty Image arranges to 0x0 before its first Source. The panel must own the
+        // viewport size so startup can render the very frame that supplies that Source.
+        ClipToBounds=true;Children.Add(_image);
         _resize.Tick+=async(_,_)=>{_resize.Stop();await RefreshAsync();};
         SizeChanged+=(_,_)=>Schedule();IsVisibleChanged+=(_,_)=>Schedule();
         Loaded+=(_,_)=>Schedule();Unloaded+=(_,_)=>StopSession();
@@ -117,8 +123,15 @@ internal sealed class OceanPreviewControl : Image, IDisposable
                     s.Bitmap??=new WriteableBitmap(s.Width,s.Height,96,96,PixelFormats.Bgr32,null);
                     s.Bitmap.WritePixels(new Int32Rect(0,0,s.Width,s.Height),s.Pixels,s.Width*4,0);
                     Source=s.Bitmap;
+                    PresentedFrames++;
                 }
-                finally {Volatile.Write(ref s.Pending,0);}
+                finally
+                {
+                    Volatile.Write(ref s.Pending,0);
+                    // An edit can arrive while the previous frame awaits WPF. Preserve that
+                    // redraw even with animation paused (the worker otherwise waits forever).
+                    if(!s.Stopped&&Volatile.Read(ref s.Repaint)!=0)s.Worker?.Signal();
+                }
             }));
         }
         catch(Exception exception)

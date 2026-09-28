@@ -31,8 +31,8 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
     // is fully covered by a foreign app window (borderless/fullscreen).
     public IReadOnlyList<int> FullscreenMonitors { get; private set; } = Array.Empty<int>();
 
-    // Monitor indices covered by a maximized OR fullscreen foreign app window (superset of FullscreenMonitors).
-    public IReadOnlyList<int> CoveredMonitors { get; private set; } = Array.Empty<int>();
+    // Monitor indices touched by any visible, non-minimized foreign app window.
+    public IReadOnlyList<int> VisibleAppMonitors { get; private set; } = Array.Empty<int>();
 
     public bool IsOnBattery { get; private set; }
 
@@ -66,7 +66,7 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
             Interlocked.Exchange(ref _ticking, 1) == 1) return;
         try
         {
-            var (fullscreen, covered) = DetectCoveredMonitors();
+            var (fullscreen, covered) = DetectVisibleAppMonitors();
             var onBattery = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Offline;
             _dispatcher.BeginInvoke(DispatcherPriority.Background,
                 new Action(() => Apply(fullscreen, covered, onBattery)));
@@ -86,7 +86,7 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
     {
         if (_disposed) return;
         _dispatcher.VerifyAccess();
-        var (fullscreen, covered) = DetectCoveredMonitors();
+        var (fullscreen, covered) = DetectVisibleAppMonitors();
         var onBattery = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Offline;
         Apply(fullscreen, covered, onBattery);
     }
@@ -97,24 +97,23 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
     {
         if (_disposed) return;
         _dispatcher.VerifyAccess();
-        if (onBattery == IsOnBattery && SameSet(fullscreen, FullscreenMonitors) && SameSet(covered, CoveredMonitors))
+        if (onBattery == IsOnBattery && SameSet(fullscreen, FullscreenMonitors) && SameSet(covered, VisibleAppMonitors))
         {
             return;
         }
 
         FullscreenMonitors = fullscreen;
-        CoveredMonitors = covered;
+        VisibleAppMonitors = covered;
         IsOnBattery = onBattery;
         AppLog.Write($"Foreground state changed. Fullscreen=[{string.Join(",", fullscreen)}]; " +
-                     $"Covered=[{string.Join(",", covered)}]; OnBattery={onBattery}");
+                     $"VisibleApps=[{string.Join(",", covered)}]; OnBattery={onBattery}");
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    // Enumerates every visible top-level window and, per monitor, records whether a foreign app window covers
-    // it. A window "covers" a monitor when its rectangle spans the whole monitor (fullscreen) or the whole
-    // work area (maximized). This is per monitor, so every occupied display freezes independently while a
-    // clean display keeps animating.
-    private (IReadOnlyList<int> Fullscreen, IReadOnlyList<int> Covered) DetectCoveredMonitors()
+    // Fullscreen keeps its geometric rule. Windowed mode counts any intersection with a
+    // visible app, including normal/snapped windows spanning two displays. Hidden,
+    // minimized, cloaked, own-process and overlay windows are excluded in both modes.
+    private (IReadOnlyList<int> Fullscreen, IReadOnlyList<int> Covered) DetectVisibleAppMonitors()
     {
         var screens = Screen.AllScreens;
         var fullscreen = new SortedSet<int>();
@@ -153,6 +152,17 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
                 return true;
             }
 
+            // DWM excludes invisible resize borders, which can spill onto the neighboring
+            // monitor even when a maximized window is visible on only one display.
+            var visibleRect = DwmGetWindowFrame(window,9,out var frame,Marshal.SizeOf<Rect>())==0
+                && frame.Right>frame.Left && frame.Bottom>frame.Top ? frame : windowRect;
+            var appBounds=new MonitorCoverage.Rectangle(visibleRect.Left,visibleRect.Top,visibleRect.Right,visibleRect.Bottom);
+            for(var i=0;i<screens.Length;i++)
+            {
+                var bounds=screens[i].Bounds;
+                if(MonitorCoverage.Intersects(appBounds,new(bounds.Left,bounds.Top,bounds.Right,bounds.Bottom)))covered.Add(i);
+            }
+
             var monitor = MonitorFromWindow(window, MonitorDefaultToNearest);
             if (monitor == IntPtr.Zero)
             {
@@ -181,10 +191,6 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
             if (coverage == MonitorCoverage.Coverage.Fullscreen)
             {
                 fullscreen.Add(index);
-                covered.Add(index);
-            }
-            else if (coverage == MonitorCoverage.Coverage.Maximized)
-            {
                 covered.Add(index);
             }
 
@@ -283,4 +289,7 @@ internal sealed partial class ForegroundAppMonitor : IDisposable
 
     [LibraryImport("dwmapi.dll")]
     private static partial int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int valueSize);
+
+    [LibraryImport("dwmapi.dll", EntryPoint="DwmGetWindowAttribute")]
+    private static partial int DwmGetWindowFrame(IntPtr hwnd,int attribute,out Rect value,int valueSize);
 }

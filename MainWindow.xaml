@@ -147,8 +147,8 @@
       <Border Style="{StaticResource SettingsCard}"><StackPanel>
        <TextBlock Text="Playback &amp; power" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,16"/>
        <TextBlock Text="Pause for other apps" Margin="0,0,0,6"/>
-       <ComboBox x:Name="AppPauseModeComboBox" SelectionChanged="PolicyModeChanged" AutomationProperties.Name="Pause animation for apps" ToolTip="Never keeps the wallpaper animating even while other apps cover it."><ComboBoxItem Content="Never"/><ComboBoxItem Content="Fullscreen apps only"/><ComboBoxItem Content="Maximized or fullscreen apps"/></ComboBox>
-       <CheckBox x:Name="PausePerMonitorToggle" Content="Pause only the display in use" Style="{StaticResource ToggleSwitchStyle}" Margin="0,18,0,12" Checked="PolicyChanged" Unchecked="PolicyChanged" ToolTip="Other displays keep animating. When off, a covering app pauses every display."/>
+       <ComboBox x:Name="AppPauseModeComboBox" SelectionChanged="PolicyModeChanged" AutomationProperties.Name="Pause animation for apps" ToolTip="Choose when other apps pause the wallpaper. Windowed includes normal, snapped and maximized windows. Minimized apps do not pause it."><ComboBoxItem Content="Never"/><ComboBoxItem Content="Fullscreen apps only"/><ComboBoxItem Content="Fullscreen or windowed apps"/></ComboBox>
+       <CheckBox x:Name="PausePerMonitorToggle" Content="Pause only the display in use" Style="{StaticResource ToggleSwitchStyle}" Margin="0,18,0,12" Checked="PolicyChanged" Unchecked="PolicyChanged" ToolTip="Other displays keep animating. When off, a detected app pauses every display."/>
        <CheckBox x:Name="PauseBatteryCheckBox" Content="Pause on battery" Checked="PolicyChanged" Unchecked="PolicyChanged"/>
        <TextBlock Text="Frame cap" Margin="0,18,0,6"/><ComboBox x:Name="FpsComboBox" SelectionChanged="FpsComboBox_SelectionChanged" AutomationProperties.Name="Frame cap"><ComboBoxItem Content="15 FPS" Tag="15"/><ComboBoxItem Content="30 FPS" Tag="30"/><ComboBoxItem Content="60 FPS" Tag="60"/></ComboBox>
       </StackPanel></Border>

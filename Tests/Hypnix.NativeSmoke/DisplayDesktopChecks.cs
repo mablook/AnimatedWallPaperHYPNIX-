@@ -157,18 +157,18 @@ internal static class DisplayDesktopChecks
                 // Guarantee a change without opening, maximizing or otherwise manipulating a
                 // foreign app. Only the real timer's detection result can replace this sentinel:
                 // do not invoke RefreshNow or Apply during this wait.
-                typeof(ForegroundAppMonitor).GetField("<CoveredMonitors>k__BackingField", PrivateInstance)!
+                typeof(ForegroundAppMonitor).GetField("<VisibleAppMonitors>k__BackingField", PrivateInstance)!
                     .SetValue(monitor, new[] { -1 });
                 WaitUntil(() => Volatile.Read(ref callbacks) > 0, window!, step + " periodic foreground callback");
                 Assert(Volatile.Read(ref callbackThread) == ownerThread && window!.Dispatcher.CheckAccess(),
                     "Periodic foreground StateChanged ran outside the MainWindow dispatcher thread.");
-                Assert(!monitor.CoveredMonitors.Contains(-1), "The periodic sweep did not replace the injected sentinel.");
+                Assert(!monitor.VisibleAppMonitors.Contains(-1), "The periodic sweep did not replace the injected sentinel.");
                 Assert(Ready(window!) && controller!.IsHealthy && controller.ActiveRequests.Count == 2,
                     "The periodic foreground callback damaged UI readiness or an active wallpaper.");
                 foregroundEvidence.Add(new
                 {
                     Step = step, OwnerThread = ownerThread, CallbackThread = Volatile.Read(ref callbackThread),
-                    CallbackCount = Volatile.Read(ref callbacks), CoveredMonitors = monitor.CoveredMonitors.ToArray(),
+                    CallbackCount = Volatile.Read(ref callbacks), VisibleAppMonitors = monitor.VisibleAppMonitors.ToArray(),
                     FullscreenMonitors = monitor.FullscreenMonitors.ToArray(),
                     LivePreviewVisible = Control<WallpaperPreviewControl>(window!, "LivePreview").IsVisible
                 });

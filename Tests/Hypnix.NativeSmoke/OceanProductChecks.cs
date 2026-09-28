@@ -35,9 +35,50 @@ internal static class OceanProductChecks
             previous=(byte[])pixels.Clone();
         }
         CheckEditor(output);
+        CheckWpfPreviewLifecycle();
         File.WriteAllText(Path.Combine(output,"offscreen-checks.json"),JsonSerializer.Serialize(new
-        {windowsShown=false,desktopModified=false,reusableReadbackExact=true,frames=2,width=213,height=121,editorApplyChecks=true}));
+        {windowsShown=false,desktopModified=false,reusableReadbackExact=true,frames=2,width=213,height=121,editorApplyChecks=true,wpfStartupAnimationPausedEdits=true}));
         Console.WriteLine("Ocean offscreen readback and editor apply checks passed; no windows shown.");
+    }
+
+    private static void CheckWpfPreviewLifecycle()
+    {
+        // WPF needs a PresentationSource for Loaded. This test owner has no WS_VISIBLE;
+        // it is never shown, attached to Explorer or used as a GPU presentation target.
+        using var source=new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters("Ocean hidden lifecycle test")
+        {Width=160,Height=90,WindowStyle=unchecked((int)0x80000000)});
+        using var preview=new OceanPreviewControl{Width=160,Height=90};
+        var runtime=new OceanRuntime(new OceanPreferences(DayCycle:false));
+        preview.Select(new("ocean",WallpaperKind.Ocean,Ocean:runtime));
+        source.RootVisual=preview;
+        preview.Measure(new Size(160,90));preview.Arrange(new Rect(0,0,160,90));preview.UpdateLayout();
+        Pump(()=>preview.PresentedFrames>=3,50);
+        Check(preview.Source is WriteableBitmap,"WPF preview never produced its first image.");
+        preview.SetUserPaused(true);
+        // Drain an already prepared frame without allowing a hidden user-facing window.
+        var settle=Stopwatch.StartNew();Pump(()=>settle.ElapsedMilliseconds>=250,3);
+        var stable=preview.PresentedFrames;
+        var freeze=runtime.Frame().Snapshot.WaterTime;
+        settle.Restart();Pump(()=>settle.ElapsedMilliseconds>=150,3);
+        Check(preview.PresentedFrames==stable,"Paused preview kept rendering.");
+        var image=(WriteableBitmap)preview.Source!;
+        var stride=image.PixelWidth*4;
+        var pixelsBefore=new byte[stride*image.PixelHeight];image.CopyPixels(pixelsBefore,stride,0);
+        runtime.Update(new OceanPreferences(Moment:OceanMoment.Moon,SkyUtc:OceanPreferences.MomentUtc(OceanMoment.Moon),DayCycle:false));
+        preview.RefreshOcean();Pump(()=>preview.PresentedFrames>stable,10);
+        var pixelsAfter=new byte[pixelsBefore.Length];((WriteableBitmap)preview.Source!).CopyPixels(pixelsAfter,stride,0);
+        Check(!pixelsBefore.SequenceEqual(pixelsAfter),"Paused Sun-to-Moon edit did not repaint.");
+        Check(runtime.Frame().Snapshot.WaterTime==freeze,"Paused edit advanced the water clock.");
+        // Queue another edit while the first frame is pending on the dispatcher.
+        stable=preview.PresentedFrames;
+        runtime.Update(new OceanPreferences(Moment:OceanMoment.Day,SkyUtc:OceanPreferences.MomentUtc(OceanMoment.Day),DayCycle:false));
+        preview.RefreshOcean();
+        Thread.Sleep(200); // dispatcher intentionally blocked while the worker prepares a frame
+        runtime.Update(new OceanPreferences(Moment:OceanMoment.Moon,SkyUtc:OceanPreferences.MomentUtc(OceanMoment.Moon),DayCycle:false));
+        preview.RefreshOcean();Pump(()=>preview.PresentedFrames>=stable+2,10);
+        preview.SetUserPaused(false);stable=preview.PresentedFrames;
+        Pump(()=>preview.PresentedFrames>=stable+2,10);
+        source.RootVisual=null;
     }
     private static void Check(bool condition,string message){if(!condition)throw new InvalidOperationException(message);}
     public static void Run(string output)

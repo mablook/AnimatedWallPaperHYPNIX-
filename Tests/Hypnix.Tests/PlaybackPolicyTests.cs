@@ -73,16 +73,16 @@ public sealed class PlaybackPolicyTests
     }
 
     [Fact]
-    public void FullscreenOnlyModeIgnoresMerelyMaximizedMonitors()
+    public void FullscreenOnlyModeIgnoresWindowedApps()
     {
-        // Monitor 0 is maximized (covered) but not fullscreen; monitor 1 is fullscreen.
+        // Monitor 0 contains a normal window but is not fullscreen; monitor 1 is fullscreen.
         var result = PlaybackPolicy.Evaluate(1, new[] { 1 }, new[] { 0, 1 }, false, false, perMonitor: true);
         Assert.False(result.PauseAll);
         Assert.Equal(new[] { 1 }, result.PausedMonitors);
     }
 
     [Fact]
-    public void MaximizedOrFullscreenModeIncludesMaximizedMonitors()
+    public void FullscreenOrWindowedModeIncludesVisibleWindowedApps()
     {
         var result = PlaybackPolicy.Evaluate(2, new[] { 1 }, new[] { 0, 1 }, false, false, perMonitor: true);
         Assert.False(result.PauseAll);
@@ -96,7 +96,7 @@ public sealed class PlaybackPolicyTests
         var result = PlaybackPolicy.Evaluate(2, None, new[] { 1 }, false, false, perMonitor: false);
         Assert.True(result.PauseAll);
         Assert.Empty(result.PausedMonitors);
-        Assert.Equal("another app is active", result.Reason);
+        Assert.Equal("visible app window detected", result.Reason);
     }
 
     [Fact]

@@ -15,6 +15,11 @@ internal static class MonitorCoverage
 
     public readonly record struct Rectangle(int Left, int Top, int Right, int Bottom);
 
+    public static bool Intersects(Rectangle window,Rectangle monitor) =>
+        window.Right>window.Left && window.Bottom>window.Top &&
+        Math.Max(window.Left,monitor.Left)<Math.Min(window.Right,monitor.Right) &&
+        Math.Max(window.Top,monitor.Top)<Math.Min(window.Bottom,monitor.Bottom);
+
     public static Coverage Classify(Rectangle window, Rectangle monitor, Rectangle work, int tolerance = 2)
     {
         if (window.Right <= window.Left || window.Bottom <= window.Top)

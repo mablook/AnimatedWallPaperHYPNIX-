@@ -17,6 +17,15 @@ namespace Hypnix.Tests;
 public sealed class OceanPreviewCompositionTests
 {
     [Fact]
+    public Task EmptyOceanPreviewHasViewportBeforeTheFirstFrame()=>OnSta(()=>
+    {
+        using var preview=new WallpaperPreviewControl{Width=320,Height=180};
+        preview.SetSuspended(true);preview.Select(new("ocean",WallpaperKind.Ocean));
+        preview.Measure(new System.Windows.Size(320,180));preview.Arrange(new Rect(0,0,320,180));
+        var ocean=Assert.IsType<OceanPreviewControl>(preview.Children[0]);
+        Assert.Null(ocean.Source);Assert.Equal(320,ocean.ActualWidth);Assert.Equal(180,ocean.ActualHeight);
+    });
+    [Fact]
     public Task OceanIsCompositedAndScrollCannotPaintOverHeaderOrFooter()=>OnSta(()=>
     {
         using var preview=new WallpaperPreviewControl{Width=80,Height=80};
